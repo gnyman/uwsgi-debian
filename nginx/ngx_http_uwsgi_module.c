@@ -35,7 +35,9 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-#define NGX_HTTP_UWSGI_TEMP_PATH  "uwsgi_temp"
+#ifndef NGX_HTTP_UWSGI_TEMP_PATH
+	#define NGX_HTTP_UWSGI_TEMP_PATH  "uwsgi_temp"
+#endif
 
 typedef struct {
     ngx_http_upstream_conf_t upstream;
@@ -108,7 +110,9 @@ static ngx_conf_bitmask_t ngx_http_uwsgi_next_upstream_masks[] = {
     {ngx_string ("timeout"), NGX_HTTP_UPSTREAM_FT_TIMEOUT},
     {ngx_string ("invalid_header"), NGX_HTTP_UPSTREAM_FT_INVALID_HEADER},
     {ngx_string ("http_500"), NGX_HTTP_UPSTREAM_FT_HTTP_500},
+    {ngx_string ("http_502"), NGX_HTTP_UPSTREAM_FT_HTTP_502},
     {ngx_string ("http_503"), NGX_HTTP_UPSTREAM_FT_HTTP_503},
+    {ngx_string ("http_504"), NGX_HTTP_UPSTREAM_FT_HTTP_504},
     {ngx_string ("http_404"), NGX_HTTP_UPSTREAM_FT_HTTP_404},
     {ngx_string ("updating"), NGX_HTTP_UPSTREAM_FT_UPDATING},
     {ngx_string ("off"), NGX_HTTP_UPSTREAM_FT_OFF},

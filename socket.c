@@ -51,12 +51,21 @@ int bind_to_unix(char *socket_name, int listen_queue, int chmod_socket, int abst
 	}
 
 	// chmod unix socket for lazy users
-	if (chmod_socket == 1 && abstract_socket == 0) {
-		uwsgi_log( "chmod() socket to 666 for lazy and brave users\n");
-		if (chmod(socket_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) != 0) {
-			uwsgi_error("chmod()");
-		}
-	}
+        if (chmod_socket == 1 && abstract_socket == 0) {
+                if (uwsgi.chmod_socket_value) {
+                        if (chmod(socket_name, uwsgi.chmod_socket_value) != 0) {
+                                uwsgi_error("chmod()");
+                        }
+                }
+                else {
+                        uwsgi_log( "chmod() socket to 666 for lazy and brave users\n");
+                        if (chmod(socket_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) != 0) {
+                                uwsgi_error("chmod()");
+                        }
+                }
+        }
+
+        free(uws_addr);
 
 	return serverfd;
 }
@@ -262,7 +271,8 @@ int bind_to_tcp(char *socket_name, int listen_queue, char *tcp_port) {
 		if (setsockopt(serverfd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT], sizeof(int))) {
 			uwsgi_error("setsockopt()");
 		}
-#elif defined(__apple__) || defined(__freebsd__)
+// OSX has no SO_ACCEPTFILTER !!!
+#elif defined(__freebsd__)
 		struct  accept_filter_arg afa;
 		strcpy(afa.af_name, "dataready");
 		afa.af_arg[0] = 0;

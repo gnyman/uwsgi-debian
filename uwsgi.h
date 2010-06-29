@@ -2,7 +2,7 @@
 
 /* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs */
 
-#define UWSGI_VERSION	"0.9.5.1"
+#define UWSGI_VERSION	"0.9.5.3"
 
 #define uwsgi_error(x)  uwsgi_log("%s: %s [%s line %d]\n", x, strerror(errno), __FILE__, __LINE__);
 
@@ -36,6 +36,10 @@
 #include <stdint.h>
 
 #include <sys/wait.h>
+
+#ifdef __APPLE__
+#define MAC_OS_X_VERSION_MIN_REQUIRED MAC_OS_X_VERSION_10_4
+#endif
 
 #include <dlfcn.h>
 
@@ -101,7 +105,7 @@
 #endif
 
 /* this value are taken from nginx */
-#if defined(__apple__) || defined(__freebsd__)
+#if defined(__APPLE__) || defined(__freebsd__)
 #define UWSGI_LISTEN_QUEUE -1
 #else
 #define UWSGI_LISTEN_QUEUE 511
@@ -179,7 +183,7 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #ifdef _BIG_ENDIAN
 #define __BIG_ENDIAN__ 1
 #endif
-#elif __apple__
+#elif __APPLE__
 #include <libkern/OSByteOrder.h>
 #else
 #include <machine/endian.h>
@@ -492,6 +496,7 @@ struct uwsgi_server {
 #ifndef UNBIT
 	int abstract_socket;
 	int chmod_socket;
+	mode_t chmod_socket_value;
 	int listen_queue;
 
 #ifdef UWSGI_XML
@@ -503,6 +508,12 @@ struct uwsgi_server {
 	char *python_path[64];
 	int python_path_cnt;
 	char *pyargv;
+	int pyargc;
+#ifdef PYTHREE
+	wchar_t *py_argv[MAX_PYARGV];
+#else
+	char *py_argv[MAX_PYARGV];
+#endif
 #endif
 
 	char *wsgi_config;
@@ -856,3 +867,5 @@ void env_to_arg(char *, char *);
 void parse_sys_envs(char **, struct option *);
 
 void uwsgi_log(const char *, ...);
+
+void init_pyargv(struct uwsgi_server *);
