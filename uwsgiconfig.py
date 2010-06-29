@@ -55,7 +55,7 @@ gcc_list = ['utils', 'pyutils', 'protocol', 'socket', 'logging', 'wsgi_handlers'
 
 # large file support
 try:
-	cflags = ['-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64'] + os.environ.get("CFLAGS", "").split()
+	cflags = ['-Wall','-Werror', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64'] + os.environ.get("CFLAGS", "").split()
 except:
 	print("You need python headers to build uWSGI.")
 	sys.exit(1)
@@ -63,6 +63,8 @@ except:
 cflags = cflags + ['-I' + sysconfig.get_python_inc(), '-I' + sysconfig.get_python_inc(plat_specific=True) ]
 ldflags = os.environ.get("LDFLAGS", "").split()
 libs = ['-lpthread', '-rdynamic'] + sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
+if sysconfig.get_config_var('LIBPL'):
+	libs.append('-L' + sysconfig.get_config_var('LIBPL'))
 
 if USWALLOW:
 	cflags = cflags + sysconfig.get_config_var('LLVM_CXXFLAGS').split()
@@ -270,20 +272,30 @@ def parse_vars():
 	if UNBIT:
 		cflags.append("-DUWSGI_UNBIT")
 
+	
 def build_plugin(path):
 	path = path.rstrip('/')
 
 	sys.path.insert(0, path)
 	import uwsgiplugin as up
 
-	cflags.append(up.CFLAGS)
-	libs.append(up.LDFLAGS)
+	p_cflags = cflags[:]
+	p_ldflags = ldflags[:]
 
-	cflags.insert(0, '-I.')
+	p_cflags.append(up.CFLAGS)
+	p_libs = [up.LDFLAGS]
+
+	p_cflags.insert(0, '-I.')
 
 	plugin_base = path + '/' + up.NAME + '_plugin'
+	plugin_dest = up.NAME + '_plugin'
 
-	gccline = "%s -fPIC -shared -o %s.so %s %s %s.c %s" % (GCC, plugin_base, ' '.join(cflags), ' '.join(ldflags), plugin_base, ' '.join(libs))
+	shared_flag = '-shared'
+
+	if uwsgi_os == 'Darwin':
+		shared_flag = '-dynamiclib -undefined dynamic_lookup'
+
+	gccline = "%s -fPIC %s -o %s.so %s %s %s.c %s" % (GCC, shared_flag, plugin_dest, ' '.join(p_cflags), ' '.join(p_ldflags), plugin_base, ' '.join(p_libs) )
 	print(gccline)
 
 	ret = os.system(gccline)
@@ -291,11 +303,7 @@ def build_plugin(path):
 		print("*** unable to build %s plugin ***" % up.NAME)
 		sys.exit(1)
 
-	print("*** %s plugin built and available in %s ***" % (up.NAME, plugin_base + '.so'))
-	
-	
-
-	
+	print("*** %s plugin built and available in %s ***" % (up.NAME, plugin_dest + '.so'))
 	
 
 

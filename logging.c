@@ -45,7 +45,6 @@ void log_request(struct wsgi_request *wsgi_req) {
 			app_req = wi->requests;
 		}
 	}
-	via = msg2;
 
 	if (wsgi_req->sendfile_fd > -1) {
 		via = msg1;
@@ -60,11 +59,11 @@ void log_request(struct wsgi_request *wsgi_req) {
 	if (uwsgi.shared->options[UWSGI_OPTION_MEMORY_DEBUG] == 1) {
 #ifndef UNBIT
 		rlen = snprintf(mempkt, 4096, "{address space usage: %lld bytes/%lluMB} {rss usage: %llu bytes/%lluMB} ",
-			uwsgi.workers[uwsgi.mywid].vsz_size, uwsgi.workers[uwsgi.mywid].vsz_size / 1024 / 1024,
-			uwsgi.workers[uwsgi.mywid].rss_size, uwsgi.workers[uwsgi.mywid].rss_size / 1024 / 1024);
+			(unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size, (unsigned long long ) uwsgi.workers[uwsgi.mywid].vsz_size / 1024 / 1024,
+			(unsigned long long) uwsgi.workers[uwsgi.mywid].rss_size, (unsigned long long ) uwsgi.workers[uwsgi.mywid].rss_size / 1024 / 1024);
 #else
 		rlen = snprintf(mempkt, 4096, "{address space usage: %lld bytes/%lluMB} ",
-			uwsgi.workers[uwsgi.mywid].vsz_size, uwsgi.workers[uwsgi.mywid].vsz_size / 1024 / 1024);
+			(unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size, (unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size / 1024 / 1024);
 #endif
 
 	
@@ -79,7 +78,7 @@ void log_request(struct wsgi_request *wsgi_req) {
 		uwsgi.mypid,
 		wsgi_req->app_id,
 		app_req,
-		uwsgi.workers[0].requests,
+		(unsigned long long) uwsgi.workers[0].requests,
 		wsgi_req->remote_addr_len, wsgi_req->remote_addr,
 		wsgi_req->remote_user_len, wsgi_req->remote_user,
 		wsgi_req->var_cnt,
@@ -87,7 +86,7 @@ void log_request(struct wsgi_request *wsgi_req) {
 		24, time_request,
 		wsgi_req->method_len, wsgi_req->method,
 		wsgi_req->uri_len, wsgi_req->uri,
-		(uint64_t) wsgi_req->response_size,
+		(unsigned long long) wsgi_req->response_size,
 		(long int) (microseconds - microseconds2) / 1000,
 		via,
 		wsgi_req->protocol_len, wsgi_req->protocol,
@@ -113,7 +112,7 @@ void get_memusage() {
 	int i;
 	procfile = fopen("/proc/self/stat", "r");
 	if (procfile) {
-		i = fscanf(procfile, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu %lld", &uwsgi.workers[uwsgi.mywid].vsz_size, &uwsgi.workers[uwsgi.mywid].rss_size);
+		i = fscanf(procfile, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu %lld", (unsigned long long *) &uwsgi.workers[uwsgi.mywid].vsz_size, (unsigned long long *) &uwsgi.workers[uwsgi.mywid].rss_size);
 		if (i != 2) {
 			uwsgi_log( "warning: invalid record in /proc/self/stat\n");
 		}
