@@ -1,0 +1,5 @@
+<uwsgi>
+	<app mountpoint="/test">
+		<script>myapp_wsgi</script>
+	</app>
+</uwsgi>
