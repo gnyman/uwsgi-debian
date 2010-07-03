@@ -27,7 +27,7 @@ clean::
 	$(RM) $(CURDIR)/uwsgi $(addprefix $(CURDIR)/uwsgi-python, $(python_ver))
 	$(RM) $(CURDIR)/*.o $(CURDIR)/*.pyc
 	for name in $(plugins); do \
-		$(RM) $(CURDIR)/$(plugins_dir)/$$name/$${name}_plugin.so; \
+		$(RM) $(CURDIR)/$${name}_plugin.so; \
 		$(RM) $(CURDIR)/$(plugins_dir)/$$name/uwsgiplugin.pyc; \
 	done
 	$(RM) -r $(CURDIR)/apache2/.libs $(addprefix $(CURDIR)/apache2/mod_uwsgi, .la .lo .slo)
