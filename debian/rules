@@ -44,7 +44,11 @@ $(patsubst %,build/uwsgi-python%,$(python_ver)):: build/% : %
 # Build uwsgi-python% executable
 $(patsubst %,uwsgi-python%,$(python_ver)):
 	$(eval python = $(call last_pkgname_component,$@))
-	CFLAGS="$(CFLAGS) -fno-strict-aliasing" /usr/bin/$(python) $(builder) --build
+	$(eval build_executable = /usr/bin/$(python) $(builder) --build)
+	$(if $(findstring python2.,$(python)), \
+		CFLAGS="$(CFLAGS) -fno-strict-aliasing" $(build_executable), \
+		$(build_executable) \
+	)
 	for type in $(uwsgi_python_pkg_templates); do \
 		sed -e 's/@@uwsgi_binary@@/$@/g' \
 			< $(CURDIR)/debian/uwsgi-python.$${type}.in \
