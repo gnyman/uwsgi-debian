@@ -21,7 +21,7 @@ uwsgi_python_pkg_templates = dirs install default init.d logrotate \
 
 last_pkgname_component = $(lastword $(subst -, ,$(1)))
 
-DEB_COMPRESS_EXCLUDE = .class .java .rb
+DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb
 
 clean::
 	$(RM) $(CURDIR)/uwsgi $(addprefix $(CURDIR)/uwsgi-python, $(python_ver))
