@@ -71,7 +71,7 @@ Changing of owner, group and rights for UNIX socket and pidfile
 
 After starting of uWSGI instance init.d script tries to chown and/or chmod:
   * pidfile                    | chown root:root   | chmod 644
-  * UNIX socket                |                   | chmod 0660
+  * UNIX socket                |                   | chmod 660
   * directory with these files | chown <uid>:<gid> | chmod 755
 
 Directory with pidfile and socket of additional uWSGI instance is located after
