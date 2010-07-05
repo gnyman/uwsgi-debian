@@ -1,3 +1,11 @@
+Contents:
+  1. The default uWSGI daemon
+  2. Automatic starting of additional instances of uWSGI
+  3. Owner, group and permissions of UNIX socket and pidfile
+  4. Commands recognized by init.d script
+  5. Controling additional instances of uWSGI
+  6. Status of executing init.d command for specific instance
+
 The default uWSGI daemon
 ========================
 
@@ -15,19 +23,6 @@ For setting options of '<default daemon>' or for disabling it, look into
 Service files of default uWSGI daemon are located on:
   * UNIX socket | /var/run/uwsgi/default/@@uwsgi_binary@@.socket
   * pidfile     | /var/run/uwsgi/default/@@uwsgi_binary@@.pid
-
-Commands recognized by init.d script
-====================================
-
-You can issue to init.d script following commands:
-  * start        | starts daemon
-  * stop         | stops daemon
-  * reload       | sends to daemon SIGHUP signal
-  * force-reload | sends to daemon SIGTERM signal
-  * restart      | issue 'stop', then 'start' commands
-
-As mentioned, to control the default uWSGI daemon, you should use specific
-command with '-default' suffix. For example: 'start-default' etc.
 
 Automatic starting of additional instances of uWSGI
 ===================================================
@@ -50,6 +45,46 @@ Example of more realistic configuration file:
 For list of options passed by default to each started instance see
 /etc/default/@@uwsgi_binary@@.
 
+Service files of additional uWSGI instance are located in directory named after
+configuration file (without '.xml' extension):
+  * UNIX socket | /var/run/uwsgi/@@uwsgi_binary@@/<confname>/socket
+  * pidfile     | /var/run/uwsgi/@@uwsgi_binary@@/<confname>/pid
+
+Owner, group and permissions of UNIX socket and pidfile
+=======================================================
+
+After starting of uWSGI instance init.d script tries to chown and/or chmod:
+  * pidfile                    | chown root:root   | chmod 644
+  * UNIX socket                |                   | chmod 660
+  * directory with these files | chown <uid>:<gid> | chmod 755
+
+init.d script tries to parse XML configuration file for values of <uid> or
+<gid> tag. If this tag didn't found, init.d tries to parse DAEMON_OPTS for
+'--uid' or '--gid' option. If even this fails, then directory will be chowned
+to root:root.
+
+Chmodding of UNIX socket is made by using uWSGI option '--chmod-socket' in
+DEFAULT_DAEMON_OPTS and DAEMON_OPTS. For value of these variables see
+/etc/default/@@uwsgi_binary@@.
+
+Commands recognized by init.d script
+====================================
+
+You can issue to init.d script following commands:
+  * start        | starts daemon
+  * stop         | stops daemon
+  * reload       | sends to daemon SIGHUP signal
+  * force-reload | sends to daemon SIGTERM signal
+  * restart      | issue 'stop', then 'start' commands
+  * status       | show status of daemon (runned/not runned)
+
+As mentioned, to control the default uWSGI daemon, you should use specific
+command with '-default' suffix. For example: 'start-default' etc.
+
+Exception is the 'status' command. It can be executed:
+  * without arguments -- to show status of '<default daemon>' instance
+  * with one argument -- to show status of instance with given '<confname>'
+
 Controling additional instances of uWSGI
 ========================================
 
@@ -66,30 +101,8 @@ started:
 
     /etc/init.d/@@uwsgi_binary@@ start hello
 
-Changing of owner, group and rights for UNIX socket and pidfile
-===============================================================
-
-After starting of uWSGI instance init.d script tries to chown and/or chmod:
-  * pidfile                    | chown root:root   | chmod 644
-  * UNIX socket                |                   | chmod 660
-  * directory with these files | chown <uid>:<gid> | chmod 755
-
-Directory with pidfile and socket of additional uWSGI instance is located after
-name of configuration file:
-
-    /var/run/uwsgi/@@uwsgi_binary@@/<confname>
-
-init.d script tries to parse XML configuration file for values of <uid> or
-<gid> tag. If this tag didn't found, init.d tries to parse DAEMON_OPTS for
-'--uid' or '--gid' option. If even this fails, then directory will be chowned
-to root:root.
-
-Chmodding of UNIX socket is made by using uWSGI option '--chmod-socket' in
-DEFAULT_DAEMON_OPTS and DAEMON_OPTS. For value of these variables see
-/etc/default/@@uwsgi_binary@@.
-
-Status of executing init.d commands for specific instance
-=========================================================
+Status of executing init.d command for specific instance
+========================================================
 
 In init.d script output:
   * <confname>   -- command was executed without problems
@@ -113,10 +126,3 @@ It means that:
   * starting 'moogl' is failed
 
 Return value of init.d script is the number of instances with '!' mark.
-
-init.d status command
-=====================
-
-'status' command can be executed:
-  * without arguments -- it shows status of '<default daemon>' instance
-  * with one argument -- it shows status of instance with given '<confname>'
