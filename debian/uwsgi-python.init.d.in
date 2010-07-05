@@ -488,9 +488,10 @@ case "$WHAT" in
     fi
 
     [ "$VERBOSE" != no ] && log_daemon_msg "Restarting $DESC" "$NAME"
+    CURRENT_VERBOSE=$VERBOSE
     VERBOSE=no
     do_command "stop$SUFFIX_DEFAULT" "$@"
-    VERBOSE=yes
+    VERBOSE=$CURRENT_VERBOSE
     case "$?" in
       0)
         do_command "start$SUFFIX_DEFAULT" "$@"
