@@ -16,6 +16,19 @@ Service files of default uWSGI daemon are located on:
   * UNIX socket | /var/run/uwsgi/default/@@uwsgi_binary@@.socket
   * pidfile     | /var/run/uwsgi/default/@@uwsgi_binary@@.pid
 
+Commands recognized by init.d script
+====================================
+
+You can issue to init.d script following commands:
+  * start        | starts daemon
+  * stop         | stops daemon
+  * reload       | sends to daemon SIGHUP signal
+  * force-reload | sends to daemon SIGTERM signal
+  * restart      | issue 'stop', then 'start' commands
+
+As mentioned, to control the default uWSGI daemon, you should use specific
+command with '-default' suffix. For example: 'start-default' etc.
+
 Automatic starting of additional instances of uWSGI
 ===================================================
 
