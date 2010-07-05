@@ -18,7 +18,7 @@ RUN_AT_STARTUP=1
 DAEMON_OPTS=" \
   --uid $(id -u www-data) \
   --gid $(id -g www-data) \
-  --chmod-socket \
+  --chmod-socket=0660 \
   --master \
   --enable-threads \
   --disable-logging \
@@ -40,7 +40,7 @@ ALWAYS_RUN_DEFAULT_DAEMON=1
 # Socket location: /var/run/uwsgi/default/@@uwsgi_binary@@.socket
 # Uid/gid: www-data
 DEFAULT_DAEMON_OPTS=" \
-  --chmod-socket \
+  --chmod-socket=0660 \
   --master \
   --processes 2 \
   --enable-threads \

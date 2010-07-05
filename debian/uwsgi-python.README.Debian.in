@@ -56,13 +56,13 @@ started:
 Changing of owner, group and rights for UNIX socket and pidfile
 ===============================================================
 
-After starting of additional uWSGI instance init.d script tries to chown and/or
-chmod:
+After starting of uWSGI instance init.d script tries to chown and/or chmod:
   * pidfile                    | chown root:root   | chmod 644
-  * UNIX socket                |                   | chmod o-rwx
+  * UNIX socket                |                   | chmod 0660
   * directory with these files | chown <uid>:<gid> | chmod 755
 
-Directory with pidfile and socket is located after name of configuration file:
+Directory with pidfile and socket of additional uWSGI instance is located after
+name of configuration file:
 
     /var/run/uwsgi/@@uwsgi_binary@@/<confname>
 
@@ -71,7 +71,9 @@ init.d script tries to parse XML configuration file for values of <uid> or
 '--uid' or '--gid' option. If even this fails, then directory will be chowned
 to root:root.
 
-For value of DAEMON_OPTS see /etc/default/@@uwsgi_binary@@
+Chmodding of UNIX socket is made by using uWSGI option '--chmod-socket' in
+DEFAULT_DAEMON_OPTS and DAEMON_OPTS. For value of these variables see
+/etc/default/@@uwsgi_binary@@.
 
 Status of executing init.d commands for specific instance
 =========================================================

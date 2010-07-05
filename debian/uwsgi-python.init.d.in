@@ -118,14 +118,10 @@ find_specific_socket()
 chown_and_chmod_service_files()
 {
   local PIDFILE=$1
-  local SOCKET=$2
 
   if [ -e "$PIDFILE" ]; then
     chown root:root $PIDFILE
     chmod 644 $PIDFILE
-  fi
-  if [ -e "$SOCKET" ]; then
-    chmod o-rwx $SOCKET
   fi
 }
 
@@ -172,7 +168,7 @@ do_start_specific_daemon()
       || return 2
 
   sleep 0.1
-  chown_and_chmod_service_files $PIDFILE $SOCKET
+  chown_and_chmod_service_files $PIDFILE
 
   return 0
 }
@@ -306,7 +302,7 @@ do_start_default_daemon()
       || return 2
 
   sleep 0.1
-  chown_and_chmod_service_files $DEFAULT_DAEMON_PIDFILE $DEFAULT_DAEMON_SOCKET
+  chown_and_chmod_service_files $DEFAULT_DAEMON_PIDFILE
 
   return 0
 }
