@@ -12,6 +12,10 @@ with suffix '-default'. For example:
 For setting options of '<default daemon>' or for disabling it, look into
 /etc/default/@@uwsgi_binary@@.
 
+Service files of default uWSGI daemon are located on:
+  * UNIX socket | /var/run/uwsgi/default/@@uwsgi_binary@@.socket
+  * pidfile     | /var/run/uwsgi/default/@@uwsgi_binary@@.pid
+
 Automatic starting of additional instances of uWSGI
 ===================================================
 
