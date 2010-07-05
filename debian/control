@@ -27,9 +27,23 @@ Description: Fast, self-healing, developer-friendly WSGI server
  This dependency package provides uWSGI server for serving on user-selectable
  Python version(s).
 
+Package: uwsgi-common
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Fast, self-healing, developer-friendly WSGI server (common files)
+ uWSGI is aimed for professional python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provides files with supplementary functions for init.d script of
+ uWSGI server.
+
 Package: uwsgi-python2.5
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, python2.5
+Depends: ${shlibs:Depends}, ${misc:Depends}, python2.5,
+ uwsgi-common (= ${binary:Version})
 Recommends: libapache2-mod-uwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-extra
 Description: Fast, self-healing, developer-friendly WSGI server (Python 2.5)
@@ -43,7 +57,8 @@ Description: Fast, self-healing, developer-friendly WSGI server (Python 2.5)
 
 Package: uwsgi-python2.6
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, python2.6
+Depends: ${shlibs:Depends}, ${misc:Depends}, python2.6,
+ uwsgi-common (= ${binary:Version})
 Recommends: libapache2-mod-uwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-extra
 Description: Fast, self-healing, developer-friendly WSGI server (Python 2.6)
@@ -57,7 +72,8 @@ Description: Fast, self-healing, developer-friendly WSGI server (Python 2.6)
 
 Package: uwsgi-python3.1
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, python3.1
+Depends: ${shlibs:Depends}, ${misc:Depends}, python3.1,
+ uwsgi-common (= ${binary:Version})
 Recommends: libapache2-mod-uwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-extra
 Description: Fast, self-healing, developer-friendly WSGI server (Python 3.1)

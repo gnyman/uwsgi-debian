@@ -1,0 +1,89 @@
+# This is shell script, (indirectly) sourced by uWSGI init.d script
+
+install_dir()
+{
+  local DIR=$1
+  local DIR_UID=$2
+  local DIR_GID=$3
+  local DIR_MODE=$4
+
+  if [ -z "$DIR_UID" ]; then DIR_UID=root; fi
+  if [ -z "$DIR_GID" ]; then DIR_GID=root; fi
+  if [ -z "$DIR_MODE" ]; then DIR_MODE=755; fi
+
+  if [ ! -e "$DIR" ]; then
+    # Suppose I don't know about /usr/bin/install
+    mkdir -p "$DIR"
+    chown "$DIR_UID":"$DIR_GID" "$DIR"
+    chmod "$DIR_MODE" "$DIR"
+  fi
+}
+
+# Get value of user-defined id (specifically, 'uid' or 'gid') for uWSGI
+# process.
+#
+# It parses XML configuration file with name $CONFNAME for value of first tag
+# <$KIND></$KIND>.
+#
+# If not found, parse $DAEMON_OPTS (defined in /etc/default/@@uwsgi_binary@@),
+# for value of '--$KIND' option.
+#
+# Echo found value or empty string if not found.
+extract_id()
+{
+  local KIND=$1
+  local CONFNAME=$2
+
+  local CONFFILE=$CONFDIR/$CONFNAME.xml
+
+  local ID=$(
+    grep --max-count=1 "<${KIND}>.\+</${KIND}>" "$CONFFILE" \
+    | sed -e "s/.*<${KIND}>\s*\(.*\)\s*<\/${KIND}>.*/\1/g"
+  )
+  if [ -z "$ID" ]; then
+    ID=$(
+      echo "$DAEMON_OPTS" \
+      | sed -e "s/.*--${KIND}\s*\([^[:space:]]\+\).*/\1/g"
+    )
+    if [ "$ID" = "$DAEMON_OPTS" ]; then ID=''; fi
+  fi
+
+  echo $ID
+}
+
+# Location of /var/run subdirectory for specific uWSGI process.
+find_specific_rundir()
+{
+  local $CONFNAME=$1
+  echo "$UWSGI_RUNDIR/$CONFNAME"
+}
+
+# Location of pidfile for specific uWSGI process.
+find_specific_pidfile()
+{
+  local CONFNAME=$1
+  local SPECIFIC_RUNDIR=$(find_specific_rundir $CONFNAME)
+  echo "$SPECIFIC_RUNDIR/pid"
+}
+
+# Location of UNIX socket for specific uWSGI process.
+find_specific_socket()
+{
+  local CONFNAME=$1
+  local SPECIFIC_RUNDIR=$(find_specific_rundir $CONFNAME)
+  echo "$SPECIFIC_RUNDIR/socket"
+}
+
+# Assigns owner, group and permissions to pidfile of uWSGI process.
+chown_and_chmod_pidfile()
+{
+  local PIDFILE=$1
+
+  # Wait until daemon starts; need of and value of delay was empirically found.
+  sleep 0.1
+
+  if [ -e "$PIDFILE" ]; then
+    chown root:root $PIDFILE
+    chmod 644 $PIDFILE
+  fi
+}

@@ -1,0 +1,106 @@
+# This is shell script, sourced by uWSGI init.d script
+
+. /usr/lib/uwsgi/init/default_daemon
+. /usr/lib/uwsgi/init/specific_daemon
+
+do_command()
+{
+  local COMMAND=$1
+  shift
+
+  # Convert command 'X-default' to just 'X' (i.e. strip suffix '-default').
+  local COMMAND_TO_DEFAULT=no
+  local WITH_STRIPPED_SUFFIX=${COMMAND%-default}
+  [ "$WITH_STRIPPED_SUFFIX" = "$COMMAND" ] || COMMAND_TO_DEFAULT=yes
+  COMMAND="$WITH_STRIPPED_SUFFIX"
+
+  [ "$VERBOSE" != no ] && log_progress_msg "->"
+
+  # If command is like 'start-default', 'stop-default' etc.
+  if [ "$COMMAND_TO_DEFAULT" = yes ]; then
+    do_with_default_daemon $COMMAND
+    return "$?"
+  fi
+
+  # If command is given with arguments, i.e. 'start smth smth_else'
+  if [ ! -z "$1" ]; then
+    do_with_given_specific_daemons $COMMAND "$@"
+    return "$?"
+  fi
+
+  local ERRORS=0
+
+  # List of names of user-defined configuration files.
+  local ALL_CONFNAMES=$(
+    ls -1 "$CONFDIR"/*.xml 2>/dev/null \
+    | sed 's/^.\+\/\(.\+\)\.xml$/\1/g' \
+    | tr '\n' ' '
+  )
+
+  # Do not start if disabled.
+  if [ "$COMMAND" = start -a "$RUN_AT_STARTUP" != 1 ]; then
+    [ "$VERBOSE" != no ] && log_progress_msg "(disabled; see /etc/default/#{NAME})"
+    return 2
+  fi
+
+  # Command actions.
+  if [ -z "$ALL_CONFNAMES" -o "$ALWAYS_RUN_DEFAULT_DAEMON" = 1 ]; then
+    do_with_default_daemon $COMMAND
+    ERRORS=$(expr $ERRORS + $?)
+  fi
+  do_with_given_specific_daemons $COMMAND $ALL_CONFNAMES
+  ERRORS=$(expr $ERRORS + $?)
+
+  return "$ERRORS"
+}
+
+do_with_default_daemon()
+{
+  local COMMAND=$1
+
+  local ERRORS=0
+  case "$COMMAND" in
+    start)        do_start_default_daemon ;;
+    stop)         do_stop_default_daemon ;;
+    force-reload) do_force_reload_default_daemon ;;
+    reload|*)     do_reload_default_daemon ;;
+  esac
+  case "$?" in
+    0) [ "$VERBOSE" != no ] && log_progress_msg "<default daemon>" ;;
+    1) [ "$VERBOSE" != no ] && log_progress_msg "(<default daemon>)" ;;
+    *) [ "$VERBOSE" != no ] && log_progress_msg "<default daemon>!"
+       ERRORS=$(expr $ERRORS + 1)
+    ;;
+  esac
+
+  return "$ERRORS"
+}
+
+do_with_given_specific_daemons()
+{
+  local COMMAND=$1
+  shift
+
+  local ERRORS=0
+  for CONFNAME in "$@"; do
+    if [ ! -e $CONFDIR/$CONFNAME.xml ]; then
+      [ "$VERBOSE" != no ] && log_progress_msg "$CONFNAME?"
+    else
+      case "$COMMAND" in
+        start)        do_start_specific_daemon $CONFNAME ;;
+        stop)         do_stop_specific_daemon $CONFNAME ;;
+        force-reload) do_force_reload_specific_daemon $CONFNAME ;;
+        reload|*)     do_reload_specific_daemon $CONFNAME ;;
+      esac
+      case "$?" in
+        0) [ "$VERBOSE" != no ] && log_progress_msg $CONFNAME ;;
+        1) [ "$VERBOSE" != no ] && log_progress_msg "($CONFNAME)" ;;
+        *) [ "$VERBOSE" != no ] && log_progress_msg "$CONFNAME!"
+           ERRORS=$(expr $ERRORS + 1)
+        ;;
+      esac
+    fi
+  done
+
+  return "$ERRORS"
+}
