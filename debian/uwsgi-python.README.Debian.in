@@ -58,6 +58,9 @@ After starting of uWSGI instance init.d script tries to chown and/or chmod:
   * UNIX socket                |                   | chmod 660
   * directory with these files | chown <uid>:<gid> | chmod 755
 
+If mentioned directory doesn't exist it will be created. Note that this
+directory will be chowned/chmodded only if it was created by init.d script.
+
 init.d script tries to parse XML configuration file for values of <uid> or
 <gid> tag. If this tag didn't found, init.d tries to parse DAEMON_OPTS for
 '--uid' or '--gid' option. If even this fails, then directory will be chowned
