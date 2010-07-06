@@ -18,6 +18,8 @@ python_ver = $(call list_pkgname_suffixes,uwsgi-python)
 plugins = $(call list_pkgname_suffixes,uwsgi-plugin-)
 uwsgi_python_pkg_templates = dirs install default init.d logrotate \
                              manpages README.Debian
+packages_with_common_doc = uwsgi uwsgi-plugin-lua uwsgi-plugin-psgi \
+                           libapache2-mod-uwsgi
 
 last_pkgname_component = $(lastword $(subst -, ,$(1)))
 
@@ -92,3 +94,8 @@ $(patsubst %,install/uwsgi-plugin-%,$(plugins))::
 binary-post-install/uwsgi-extra::
 	$(eval docdir = $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/doc/$(cdbs_curpkg))
 	mv $(docdir)/uwsgi_params $(docdir)/uwsgi_params.nginx
+
+$(patsubst %,binary-post-install/%,$(packages_with_common_doc))::
+	$(eval docdir = $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/doc/$(cdbs_curpkg))
+	rm -rf $(docdir)
+	ln -s uwsgi-common $(docdir)
