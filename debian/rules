@@ -65,10 +65,13 @@ $(patsubst %,debian/stamp-plugin-%,$(plugins)):
 	$(default_python) $(builder) --plugin $(plugins_dir)/$(plugin_name)
 	touch $@
 
-build/libapache2-mod-uwsgi::
+build/libapache2-mod-uwsgi:: debian/stamp-libapache2-mod-uwsgi
+
+debian/stamp-libapache2-mod-uwsgi:
 	apxs2 -c \
 		`apr-config --link-ld` `apu-config --link-ld` \
 		$(CURDIR)/apache2/mod_uwsgi.c
+	touch $@
 
 # Install uwsgi-python% package
 $(patsubst %,install/uwsgi-python%,$(python_ver))::
