@@ -44,6 +44,10 @@ do_command()
   fi
 
   # Command actions.
+  #
+  # Default daemon should receive command only if:
+  # * there is no user-defined configuration files
+  # * or user explicitly allows default daemon to start anyway.
   if [ -z "$ALL_CONFNAMES" -o "$ALWAYS_RUN_DEFAULT_DAEMON" = 1 ]; then
     do_with_default_daemon $COMMAND
     ERRORS=$(expr $ERRORS + $?)
