@@ -2,7 +2,7 @@
 
 /* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs */
 
-#define UWSGI_VERSION	"0.9.5.3"
+#define UWSGI_VERSION	"0.9.5.4"
 
 #define uwsgi_error(x)  uwsgi_log("%s: %s [%s line %d]\n", x, strerror(errno), __FILE__, __LINE__);
 

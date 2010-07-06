@@ -1,3 +1,10 @@
+*** july 2010 ***
+
+ * 0.9.5.4 [20100706]
+
+- support for Python 2.7
+- more verbose Spooler
+
 *** june 2010 ***
 
  * 0.9.5.3 [20100628]
