@@ -1,0 +1,10 @@
+Files with '.xml' extension found in this directory are processed by
+@@uwsgi_binary@@ init.d script as uWSGI configuration files.
+
+On system boot for each configuration file additional uWSGI daemon instance is
+started with option
+'--xmlconfig /etc/uwsgi/@@uwsgi_binary@@/<configuration file>'.
+
+See more detailed information at:
+  * /usr/share/doc/@@uwsgi_binary@@/README.Debian
+  * /etc/default/@@uwsgi_binary@@

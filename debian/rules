@@ -91,6 +91,12 @@ $(patsubst %,install/uwsgi-plugin-%,$(plugins))::
 		< $(CURDIR)/debian/uwsgi-plugin.install.in \
 		> $(CURDIR)/debian/$(cdbs_curpkg).install
 
+$(patsubst %,binary-post-install/uwsgi-python%,$(python_ver))::
+	$(eval package_name = $(notdir $@))
+	sed -e 's/@@uwsgi_binary@@/$(package_name)/g' \
+		< $(CURDIR)/debian/uwsgi-python.etc.README.in \
+		> $(CURDIR)/debian/$(cdbs_curpkg)/etc/uwsgi/$(package_name)/README
+
 binary-post-install/uwsgi-extra::
 	$(eval docdir = $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/doc/$(cdbs_curpkg))
 	mv $(docdir)/uwsgi_params $(docdir)/uwsgi_params.nginx
