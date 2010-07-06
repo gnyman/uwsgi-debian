@@ -1,4 +1,46 @@
-uWSGI for Python 2.* should be compiled without '-fstrict-aliasing' to avoid 
+Building uwsgi-pythonX.Y package for new Python version
+=======================================================
+
+Rules for building uwsgi-pythonX.Y are created automatically based on
+contents of debian/control.
+
+For building uWSGI for new Python version one's only necessary to add new
+package (for example, 'uwsgi-python13.0') in debian/control.
+
+Algorithmically speaking (see it in debian/rules):
+  1. Function list_pkgname_suffixes greps debian/control for substring
+     'Package: uwsgi-python', then removes this substring from each found line.
+     Remaining lines' suffixes are needing Python versions (2.5 or 2.6 or ...).
+  2. List of found suffixes is assigned to variable 'python_ver'.
+  3. Bunch of rules (each for building specific uwsgi-pythonX.Y) is generated
+     from 'python_ver' variable.
+  4. In each of these rules specific Python intepreter (python2.5 or python2.6
+     or ...) is called for executing 'uwsgiconfig.py --build'.
+
+Building new uwsgi-plugin-X package
+===================================
+
+Rules for building uwsgi-plugin-X are created automatically based on
+contents of debian/control.
+
+For building new uWSGI plugin one's only necessary to add new package (for
+example, 'uwsgi-plugin-brainfuck') in debian/control.
+
+Algorithmically speaking (see it in debian/rules):
+  1. Function list_pkgname_suffixes greps debian/control for substring
+     'Package: uwsgi-plugin-', then removes this substring from each found
+     line. Remaining lines' suffixes are needing plugin names (lua or psgi
+     or ...).
+  2. List of found suffixes is assigned to variable 'plugins'.
+  3. Bunch of rules (each for building specific plugin) is generated from
+     'plugins' variable.
+  4. In each of these rules 'uwsgiconfig.py --plugin <specific plugin location>'
+     is executed.
+
+Why define '-fno-strict-aliasing' in CFLAGS for uwsgi-python2.*?
+================================================================
+
+uWSGI for Python 2.* should be compiled without '-fstrict-aliasing' to avoid
 warning 'dereferencing type-punned pointer will break strict-aliasing rules'
 about well-known Python 2.* API "feature".
 
