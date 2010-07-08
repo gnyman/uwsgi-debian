@@ -1,3 +1,2 @@
 contrib
 django/uwsgi_admin
-nginx/uwsgi_params
