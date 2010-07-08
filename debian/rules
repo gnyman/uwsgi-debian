@@ -14,28 +14,42 @@ list_pkgname_suffixes = $(strip \
 	) \
 )
 
+# List of Python's versions, for which uWSGI should be built
 python_ver = $(call list_pkgname_suffixes,uwsgi-python)
+
+# List of packaged plugins' names
 plugins = $(call list_pkgname_suffixes,uwsgi-plugin-)
+
+# List of templates to instantiate for each uwsgi-pythonX.Y package
 uwsgi_python_pkg_templates = dirs install default init.d logrotate \
                              manpages README.Debian
 
+# Returns substring after last '-' character
 last_pkgname_component = $(lastword $(subst -, ,$(1)))
 
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb
 
 clean::
+	# uWSGI executables
 	$(RM) $(CURDIR)/uwsgi $(addprefix $(CURDIR)/uwsgi-python, $(python_ver))
+	# intermediate compiled files
 	$(RM) $(CURDIR)/*.o $(CURDIR)/*.pyc
+	# plugins
 	for name in $(plugins); do \
 		$(RM) $(CURDIR)/$${name}_plugin.so; \
 		$(RM) $(CURDIR)/$(plugins_dir)/$$name/uwsgiplugin.pyc; \
 	done
+	# compiled mod_uwsgi
 	$(RM) -r $(CURDIR)/apache2/.libs $(addprefix $(CURDIR)/apache2/mod_uwsgi, .la .lo .slo)
+	# instantiated uwsgi-pythonX.Y templates
 	for type in $(uwsgi_python_pkg_templates); do \
 		$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .$$type,$(python_ver))); \
 	done
+	# uwsgi-pythonX.Y manpages
 	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .8,$(python_ver)))
+	# instantiated uwsgi-plugin-N.install files
 	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-plugin-,$(addsuffix .install,$(plugins)))
+	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
 
 # Build uwsgi-python% package
@@ -89,6 +103,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(plugins))::
 		< $(CURDIR)/debian/uwsgi-plugin.install.in \
 		> $(CURDIR)/debian/$(cdbs_curpkg).install
 
+# Binary-post-install uwsgi-python% package
 $(patsubst %,binary-post-install/uwsgi-python%,$(python_ver))::
 	$(eval package_name = $(notdir $@))
 	sed -e 's/@@uwsgi_binary@@/$(package_name)/g' \
