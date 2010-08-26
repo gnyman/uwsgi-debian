@@ -1,0 +1,33 @@
+Description: Initialize section variable in ini.c
+ gcc (v4.4.5 20100816) emits warning about uninitialized variable 'section' in
+ 'ini.c'.
+ .
+ This patch initialize 'section' variable with empty string and also check that
+ 'section_asked' variable wasn't be empty string.
+Author: Leonid Borisenko <leo.borisenko@gmail.com>
+Last-Update: 2010-08-26
+
+Index: uwsgi-0.9.6-rc1/ini.c
+===================================================================
+--- uwsgi-0.9.6-rc1.orig/ini.c	2010-08-26 22:54:13.000000000 +0300
++++ uwsgi-0.9.6-rc1/ini.c	2010-08-26 22:54:59.000000000 +0300
+@@ -83,7 +83,7 @@
+ 
+ 	char *ini_line;
+ 
+-	char *section;
++	char *section = "";
+ 	char *key;
+ 	char *val;
+ 
+@@ -96,7 +96,9 @@
+ 	colon = strchr(file, ':');
+ 	if (colon) {
+ 		colon[0] = 0;
+-		section_asked = colon+1 ;
++		if (colon[1] != 0) {
++			section_asked = colon+1 ;
++		}
+ 	}
+ 
+ 	fd = open(file, O_RDONLY);
