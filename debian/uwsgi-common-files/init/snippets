@@ -79,12 +79,11 @@ chown_and_chmod_pidfile()
 {
   local PIDFILE=$1
 
-  # Wait until daemon starts.
-  # Need of this delay and it's value was empirically: found.
-  sleep 0.1
+  # Wait until daemon getting to create pidfile.
+  while [ ! -e "$PIDFILE" ]; do
+    sleep 0.05
+  done
 
-  if [ -e "$PIDFILE" ]; then
-    chown root:root $PIDFILE
-    chmod 644 $PIDFILE
-  fi
+  chown root:root $PIDFILE
+  chmod 644 $PIDFILE
 }
