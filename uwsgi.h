@@ -1,10 +1,11 @@
 /* uWSGI */
 
-/* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs */
+/* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs -npsl -di1 */
 
-#define UWSGI_VERSION	"0.9.5.4"
+#define UWSGI_VERSION	"0.9.6-dev"
 
 #define uwsgi_error(x)  uwsgi_log("%s: %s [%s line %d]\n", x, strerror(errno), __FILE__, __LINE__);
+#define uwsgi_debug(x, ...) uwsgi_log("[uWSGI DEBUG] " x, __VA_ARGS__);
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,9 +17,19 @@
 #include <netinet/tcp.h>
 #include <stdarg.h>
 
+#include <dirent.h>
+
+#include <pwd.h>
+#include <grp.h>
+
+
+#include <sys/utsname.h>
+
 // linux has not strlcpy
 #ifdef __linux
 	#define strlcpy(x, y, z) strcpy(x, y)
+	#define strlcat(x, y, z) strcat(x, y)
+	#include <sys/prctl.h>
 #endif
 
 #ifdef UWSGI_SCTP
@@ -27,6 +38,14 @@
 
 #ifdef UWSGI_UGREEN
 #include <ucontext.h>
+#endif
+
+#ifndef UWSGI_PLUGIN_BASE
+#define UWSGI_PLUGIN_BASE ""
+#endif
+
+#ifdef UWSGI_ROUTING
+#include <pcre.h>
 #endif
 
 #include <arpa/inet.h>
@@ -53,9 +72,7 @@
 
 #include <sys/resource.h>
 
-#ifndef UNBIT
 #include <getopt.h>
-#endif
 
 #ifdef __APPLE__
 #include <libkern/OSAtomic.h>
@@ -148,6 +165,17 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define LONG_ARGS_POST_BUFFERING	17027
 #define LONG_ARGS_POST_BUFFERING_SIZE	17028
 #define LONG_ARGS_LIMIT_POST		17029
+#define LONG_ARGS_HTTP			17030
+#define LONG_ARGS_MODE			17031
+#define LONG_ARGS_CHDIR			17032
+#define LONG_ARGS_ENV			17033
+#define LONG_ARGS_CHDIR2		17034
+#define LONG_ARGS_INI			17035
+#define LONG_ARGS_LDAP_SCHEMA		17036
+#define LONG_ARGS_LDAP			17037
+#define LONG_ARGS_LDAP_SCHEMA_LDIF	17038
+
+
 
 #define UWSGI_OK	0
 #define UWSGI_AGAIN	1
@@ -199,12 +227,6 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define UWSGI_OPTION_THREADS		7
 #define UWSGI_OPTION_REAPER		8
 
-#ifdef UNBIT
-#define UWSGI_MODIFIER_HT_S 1
-#define UWSGI_MODIFIER_HT_M 2
-#define UWSGI_MODIFIER_HT_H 3
-#endif
-
 #define UWSGI_MODIFIER_ADMIN_REQUEST		10
 #define UWSGI_MODIFIER_SPOOL_REQUEST		17
 #define UWSGI_MODIFIER_EVAL			22
@@ -228,6 +250,7 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define	PyString_FromFormat	PyUnicode_FromFormat
 #define	PyString_FromString	PyUnicode_FromString
 #define	PyString_Size		PyUnicode_GET_DATA_SIZE
+#define	PyString_Concat		PyUnicode_Concat
 #define	PyString_AsString	(char *) PyUnicode_AS_UNICODE
 #define PyFile_FromFile(A,B,C,D) PyFile_FromFd(fileno((A)), (B), (C), -1, NULL, NULL, NULL, 0)
 #endif
@@ -240,10 +263,14 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 
 #define MAX_VARS 64
 
+struct wsgi_request;
+struct uwsgi_server;
+
 struct uwsgi_app {
 
 	PyThreadState *interpreter;
 	PyObject *pymain_dict;
+	PyObject *wsgi_dict;
 	PyObject *wsgi_callable;
 
 
@@ -267,6 +294,31 @@ struct uwsgi_app {
 	int requests;
 
 };
+
+
+#ifdef UWSGI_ROUTING
+struct uwsgi_route {
+
+	const char *mountpoint;
+	const char *callbase;
+
+	pcre *pattern;
+	pcre_extra *pattern_extra;
+	pcre *method;
+	pcre_extra *method_extra;
+
+	const char *call;
+
+	int modifier1;
+	int modifier2;
+
+	void *callable;
+	void *callable_args;
+	int args;
+
+	void (*action)(struct uwsgi_server *, struct wsgi_request *, struct uwsgi_route *);
+};
+#endif
 
 struct __attribute__ ((packed)) uwsgi_header {
 	uint8_t modifier1;
@@ -312,16 +364,20 @@ struct wsgi_request {
 	char *script_name;
 	uint16_t script_name_len;
 
+	char *host;
+	uint16_t host_len;
+
+	char *path_info;
+	uint16_t path_info_len;
+
 	char *wsgi_script;
 	uint16_t wsgi_script_len;
 	char *wsgi_module;
 	uint16_t wsgi_module_len;
 	char *wsgi_callable;
 	uint16_t wsgi_callable_len;
-
-#ifdef UNBIT
-	unsigned long long unbit_flags;
-#endif
+	char *pyhome;
+	uint16_t pyhome_len;
 
 	int fd_closed;
 
@@ -329,6 +385,7 @@ struct wsgi_request {
 	size_t sendfile_fd_chunk;
 	size_t sendfile_fd_size;
 	off_t sendfile_fd_pos;
+	void *sendfile_obj;
 
 	uint16_t var_cnt;
 	uint16_t header_cnt;
@@ -349,6 +406,9 @@ struct wsgi_request {
 
 	void *async_app;
 	void *async_result;
+#ifdef UWSGI_WSGI2
+	void *async_orig_result;
+#endif
 	void *async_placeholder;
 	void *async_args;
 	void *async_environ;
@@ -357,6 +417,7 @@ struct wsgi_request {
 	
 	int async_plagued;
 
+	int *ovector;
 	size_t post_cl;
 	char *post_buffering_buf;
 	uint64_t post_buffering_read;
@@ -382,12 +443,19 @@ struct uwsgi_server {
 	struct wsgi_request *wsgi_req ;
 
 	PyThreadState *_save;
-#ifndef UNBIT
 	char *chroot;
 	gid_t gid;
 	uid_t uid;
-#endif
 
+	char *mode;
+	char *http;
+	char *http_server_name;
+	char *http_server_port;
+	int http_only;
+	int http_fd;
+
+	int ignore_script_name;
+	int logdate;
 
 	int serverfd;
 #ifdef UWSGI_PROXY
@@ -395,13 +463,23 @@ struct uwsgi_server {
 	char *proxy_socket_name;
 #endif
 
+	char *logfile;
+
+	int vhost;
+
 	struct iovec *async_hvec;
 	char **async_buf;
 	char **async_post_buf;
 
+#ifdef UWSGI_ROUTING
+	int **async_ovector;
+#endif
+
 	struct rlimit rl;
 	size_t limit_post;
 	int prio;
+
+	int grunt;
 
 	char *binary_path;
 
@@ -493,7 +571,6 @@ struct uwsgi_server {
 
 	struct timeval start_tv;
 
-#ifndef UNBIT
 	int abstract_socket;
 	int chmod_socket;
 	mode_t chmod_socket_value;
@@ -508,16 +585,31 @@ struct uwsgi_server {
 	char *python_path[64];
 	int python_path_cnt;
 	char *pyargv;
+
 	int pyargc;
 #ifdef PYTHREE
-	wchar_t *py_argv[MAX_PYARGV];
+        wchar_t *py_argv[MAX_PYARGV];
 #else
-	char *py_argv[MAX_PYARGV];
+        char *py_argv[MAX_PYARGV];
 #endif
+
+#ifdef UWSGI_ROUTING
+#ifndef MAX_UWSGI_ROUTES
+#define MAX_UWSGI_ROUTES 64
+#endif
+	int routing;
+	int nroutes;
+	struct uwsgi_route routes[MAX_UWSGI_ROUTES];
 #endif
 
 	char *wsgi_config;
+
+#ifdef UWSGI_INI
+	char *ini;
+#endif
+#ifdef UWSGI_PASTE
 	char *paste;
+#endif
 	char *wsgi_file;
 
 	int single_interpreter;
@@ -548,6 +640,35 @@ struct uwsgi_server {
 #ifdef UWSGI_ERLANG
 	int erlang_nodes;
 	int erlangfd;
+#endif
+
+	int no_orphans;
+
+#ifdef UWSGI_EMBED_PLUGINS
+
+#ifdef UWSGI_EMBED_PLUGIN_PSGI
+	char *plugin_arg_psgi;
+#endif
+
+#ifdef UWSGI_EMBED_PLUGIN_LUA
+	char *plugin_arg_lua;
+#endif
+
+#ifdef UWSGI_EMBED_PLUGIN_RACK
+	char *plugin_arg_rack;
+#endif
+
+#endif
+
+	char *chdir2;
+	int catch_exceptions;
+
+	int vacuum;
+	int bind_to_unix;
+	int no_server;
+
+#ifdef UWSGI_LDAP
+	char *ldap;
 #endif
 };
 
@@ -586,6 +707,8 @@ struct uwsgi_shared {
 	uint32_t options[256];
 
 	struct uwsgi_cluster_node nodes[MAX_CLUSTER_NODES];
+
+	off_t logsize;
 
 #ifdef UWSGI_SPOOLER
 	pid_t spooler_pid;
@@ -648,20 +771,22 @@ int bind_to_unix(char *, int, int, int);
 int bind_to_tcp(char *, int, char *);
 int bind_to_udp(char *);
 int timed_connect(struct pollfd *, const struct sockaddr *, int, int);
+int uwsgi_connect(char *, int);
 int connect_to_tcp(char *, int, int);
+int connect_to_unix(char *, int);
 #ifdef UWSGI_SCTP
 int bind_to_sctp(char *, int, char *);
 #endif
-#ifndef UNBIT
+
 void daemonize(char *);
 void logto(char *);
-#endif
+
 void log_request(struct wsgi_request *);
 void get_memusage(void);
 void harakiri(void);
-#ifndef UNBIT
+
 void stats(void);
-#endif
+
 void init_uwsgi_vars(void);
 void init_uwsgi_embedded_module(void);
 
@@ -815,11 +940,12 @@ PyObject *py_uwsgi_stackless(PyObject *, PyObject *) ;
 
 int manage_python_response(struct uwsgi_server *, struct wsgi_request *);
 int uwsgi_python_call(struct uwsgi_server *, struct wsgi_request *, PyObject *, PyObject *);
-PyObject *python_call(PyObject *, PyObject *);
+PyObject *python_call(PyObject *, PyObject *, int);
 
 #ifdef UWSGI_SENDFILE
 PyObject *py_uwsgi_sendfile(PyObject *, PyObject *) ;
 ssize_t uwsgi_sendfile(struct uwsgi_server *, struct wsgi_request *);
+ssize_t uwsgi_do_sendfile(int, int, size_t, size_t, off_t*, int);
 #endif
 
 PyObject *py_uwsgi_write(PyObject *, PyObject *) ;
@@ -868,4 +994,86 @@ void parse_sys_envs(char **, struct option *);
 
 void uwsgi_log(const char *, ...);
 
+
+#ifdef UWSGI_EVDIS
+#define EVDIS_TYPE_FILE
+#define EVDIS_TYPE_DNSSD
+#endif
+
+int uwsgi_load_plugin(struct uwsgi_server *, int, char *, char *, int);
+void embed_plugins(struct uwsgi_server *);
+
+
+// PLUGINS
+
+#define UWSGI_PLUGIN_LONGOPT_PSGI
+#define UWSGI_PLUGIN_LONGOPT_LUA
+#define UWSGI_PLUGIN_LONGOPT_RACK
+#define LONG_ARGS_PLUGIN_EMBED_PSGI
+#define LONG_ARGS_PLUGIN_EMBED_LUA
+#define LONG_ARGS_PLUGIN_EMBED_RACK
+
+
+
+#ifdef UWSGI_EMBED_PLUGINS
+
+
+#ifdef UWSGI_EMBED_PLUGIN_PSGI
+
+#undef UWSGI_PLUGIN_LONGOPT_PSGI
+#define UWSGI_PLUGIN_LONGOPT_PSGI {"psgi", required_argument, 0, 30005},
+
+#undef LONG_ARGS_PLUGIN_EMBED_PSGI
+#define LONG_ARGS_PLUGIN_EMBED_PSGI case 30005:\
+					uwsgi.plugin_arg_psgi = optarg;\
+					break;
+#endif
+
+#ifdef UWSGI_EMBED_PLUGIN_LUA
+
+#undef UWSGI_PLUGIN_LONGOPT_LUA
+#define UWSGI_PLUGIN_LONGOPT_LUA {"lua", required_argument, 0, 30006},
+
+#undef LONG_ARGS_PLUGIN_EMBED_LUA
+#define LONG_ARGS_PLUGIN_EMBED_LUA case 30006:\
+					uwsgi.plugin_arg_lua = optarg;\
+					break;
+#endif
+
+#ifdef UWSGI_EMBED_PLUGIN_RACK
+
+#undef UWSGI_PLUGIN_LONGOPT_RACK
+#define UWSGI_PLUGIN_LONGOPT_RACK {"rack", required_argument, 0, 30007},
+
+#undef LONG_ARGS_PLUGIN_EMBED_RACK
+#define LONG_ARGS_PLUGIN_EMBED_RACK case 30007:\
+					uwsgi.plugin_arg_rack = optarg;\
+					break;
+#endif
+
+
+#endif
+
+#ifdef UWSGI_ROUTING
+void routing_setup(struct uwsgi_server *);
+void check_route(struct uwsgi_server *, struct wsgi_request *);
+void uwsgi_route_action_uwsgi(struct uwsgi_server *, struct wsgi_request *, struct uwsgi_route *);
+void uwsgi_route_action_wsgi(struct uwsgi_server *, struct wsgi_request *, struct uwsgi_route *);
+#endif
+
 void init_pyargv(struct uwsgi_server *);
+
+void http_loop(struct uwsgi_server *);
+
+int unconfigured_hook(struct uwsgi_server *, struct wsgi_request *);
+
+#ifdef UWSGI_INI
+void uwsgi_ini_config(char *, struct option*);
+#endif
+
+
+#ifdef UWSGI_LDAP
+void uwsgi_ldap_schema_dump(struct option*);
+void uwsgi_ldap_schema_dump_ldif(struct option*);
+void uwsgi_ldap_config(struct uwsgi_server *, struct option*);
+#endif

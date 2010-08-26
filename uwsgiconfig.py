@@ -1,6 +1,7 @@
 # uWSGI configuration
 
 XML=True
+INI=True
 SNMP=True
 SCTP=False
 ERLANG=False
@@ -10,18 +11,28 @@ UDP=True
 MULTICAST=True
 THREADING=True
 SENDFILE=True
-PROFILER=True
+PROFILER=False
 NAGIOS=True
 PROXY=True
 PASTE=True
 MINTERPRETERS=True
 ASYNC=True
-UGREEN=True
+UGREEN=False
+HTTP=True
+EVDIS=False
+LDAP=False
+WSGI2=False
+ROUTING=False
 STACKLESS=False
+#PLUGINS = ['psgi']
 PLUGINS = []
 USWALLOW=False
 UNBIT=False
+DEBUG=True
+EMBED_PLUGINS=True
 UWSGI_BIN_NAME = 'uwsgi'
+UWSGI_PLUGIN_DIR = '.'
+
 
 # specific compilation flags
 # libxml2 or expat
@@ -41,6 +52,7 @@ ERLANG_LDFLAGS = '-lerl_interface -lei'
 
 import os
 uwsgi_os = os.uname()[0]
+uwsgi_cpu = os.uname()[4]
 
 import sys
 import subprocess
@@ -51,11 +63,11 @@ GCC = os.environ.get('CC', sysconfig.get_config_var('CC'))
 if not GCC:
 	GCC = 'gcc'
 
-gcc_list = ['utils', 'pyutils', 'protocol', 'socket', 'logging', 'wsgi_handlers', 'wsgi_headers', 'uwsgi_handlers', 'uwsgi']
+gcc_list = ['utils', 'pyutils', 'protocol', 'socket', 'logging', 'wsgi_handlers', 'wsgi_headers', 'uwsgi_handlers', 'plugins', 'uwsgi']
 
 # large file support
 try:
-	cflags = ['-Wall','-Werror', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64'] + os.environ.get("CFLAGS", "").split()
+	cflags = ['-Wall', '-Werror', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64'] + os.environ.get("CFLAGS", "").split()
 except:
 	print("You need python headers to build uWSGI.")
 	sys.exit(1)
@@ -63,8 +75,9 @@ except:
 cflags = cflags + ['-I' + sysconfig.get_python_inc(), '-I' + sysconfig.get_python_inc(plat_specific=True) ]
 ldflags = os.environ.get("LDFLAGS", "").split()
 libs = ['-lpthread', '-rdynamic'] + sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
-if sysconfig.get_config_var('LIBPL'):
+if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
 	libs.append('-L' + sysconfig.get_config_var('LIBPL'))
+
 
 if USWALLOW:
 	cflags = cflags + sysconfig.get_config_var('LLVM_CXXFLAGS').split()
@@ -105,9 +118,10 @@ def build_uwsgi(bin_name):
 			sys.exit(1)
 
 	if len(PLUGINS) > 0:
-		print("*** uWSGI embedding plugin ***")
+		print("*** uWSGI building plugins ***")
 		for plugin in PLUGINS:
-			print(plugin)
+			print("*** building plugin: %s ***" % plugin)
+			build_plugin("plugins/%s" % plugin)
 
 	print("*** uWSGI linking ***")
 	ldline = "%s -o %s %s %s %s" % (GCC, bin_name, ' '.join(ldflags), ' '.join(map(add_o, gcc_list)), ' '.join(libs))
@@ -122,30 +136,103 @@ def build_uwsgi(bin_name):
 	print("*** uWSGI is ready, launch it with %s ***" % bin_name)
 
 def unbit_setup():
-	global XML, SNMP, SCTP, ERLANG, SPOOLER
-	global EMBEDDED, UDP, MULTICAST, THREADING
-	global SENDFILE, PROFILER, NAGIOS, PROXY
 
-	global UWSGI_BIN_NAME
+	global XML
+	XML=True
 
-	XML=False
+	global INI
+	INI=False
+
+	global SNMP
 	SNMP=False
+
+	global SCTP
 	SCTP=False
+
+	global ERLANG
 	ERLANG=False
+
+	global SPOOLER
+	SPOOLER=True
+
+	global EMBEDDED
+	EMBEDDED=True
+	
+	global UDP
 	UDP=False
+
+	global MULTICAST
 	MULTICAST=False
+
+	global THREADING
+	THREADING=False
+
+	global SENDFILE
+	SENDFILE=True
+
+	global PROFILER
+	PROFILER=False
+
+	global NAGIOS
 	NAGIOS=False
+
+	global PROXY
 	PROXY=False
 
-	EMBEDDED=True
-	SPOOLER=True
-	THREADING=True
-	SENDFILE=True
-	PROFILER=True
+	global PASTE
+	PASTE=False
 
+	global MINTERPRETERS
+	MINTERPRETERS=False
+	
+	global ASYNC
+	ASYNC=False
+
+	global UGREEN
+	UGREEN=False
+
+	global HTTP
+	HTTP=False
+
+	global EVDIS
+	EVDIS=False
+
+	global WSGI2
+	WSGI2=False
+
+	global LDAP
+	LDAP=False
+
+	global ROUTING
+	ROUTING=False
+
+	global STACKLESS
+	STACKLESS=False
+
+	global PLUGINS
+	#PLUGINS = ['psgi']
+	PLUGINS = []
+
+	global USWALLOW
+	USWALLOW=False
+
+	global UNBIT
 	UNBIT=True
-	UWSGI_BIN_NAME='/usr/share/unbit/uwsgi26'
 
+	global DEBUG
+	DEBUG=False
+
+	global EMBED_PLUGINS
+	EMBED_PLUGINS=True
+
+	global UWSGI_BIN_NAME
+	UWSGI_BIN_NAME = '../bin/uwsgi'
+
+	global UWSGI_PLUGIN_DIR
+	UWSGI_PLUGIN_DIR = '../bin'
+
+	global PYLIB_PATH
+	PYLIB_PATH = '/proc/unbit/opt/python26/lib'
 
 def parse_vars():
 
@@ -158,6 +245,7 @@ def parse_vars():
 
 	if str(PYLIB_PATH) != '':
 		libs.insert(0,'-L' + PYLIB_PATH)
+		os.environ['LD_RUN_PATH'] = PYLIB_PATH
 
 	kvm_list = ['FreeBSD', 'OpenBSD', 'NetBSD', 'DragonFly']
 
@@ -168,7 +256,7 @@ def parse_vars():
 	if uwsgi_os in kvm_list:
 		libs.append('-lkvm')
 
-	if uwsgi_os == 'OpenBSD':
+	if uwsgi_os == 'OpenBSD' or uwsgi_cpu[0:3] == 'arm':
 		UGREEN = False
 
 	if EMBEDDED:
@@ -200,10 +288,49 @@ def parse_vars():
 		cflags.append("-DUWSGI_NAGIOS")
 		gcc_list.append('nagios')
 
+	if INI:
+		cflags.append("-DUWSGI_INI")
+		gcc_list.append('ini')
+
+	if DEBUG:
+		cflags.append("-DUWSGI_DEBUG")
+
 	if PROXY:
 		depends_on("PROXY", ['ASYNC'])
 		cflags.append("-DUWSGI_PROXY")
 		gcc_list.append('proxy')
+
+	if LDAP:
+		cflags.append("-DUWSGI_LDAP")
+		gcc_list.append('ldap')
+		libs.append('-lldap')
+
+	if ROUTING:
+		depends_on("ROUTING", ['WSGI2', 'XML'])
+		cflags.append("-DUWSGI_ROUTING")
+		gcc_list.append('routing')
+		pcreconf = spcall("pcre-config --cflags")
+		if pcreconf is None:
+			print ("*** Unable to locate pcre-config.  The uWSGI build has been interrupted.  You have to install pcre.")
+			sys.exit(1)
+		else:
+			cflags.append(pcreconf)
+
+		pcreconf = spcall("pcre-config --libs")
+		if pcreconf is None:
+			print ("*** Unable to locate pcre-config.  The uWSGI build has been interrupted.  You have to install pcre.")
+			sys.exit(1)
+		else:
+			libs.append(pcreconf)
+
+	if HTTP:
+		cflags.append("-DUWSGI_HTTP")
+		gcc_list.append('http')
+
+	if EVDIS:
+		cflags.append("-DUWSGI_EVDIS")
+		gcc_list.append('evdis')
+		
 
 	if UGREEN:
 		if uwsgi_os == 'Darwin':
@@ -260,6 +387,14 @@ def parse_vars():
 			cflags.append(ERLANG_CFLAGS)
 		gcc_list.append('erlang')
 
+	if UWSGI_PLUGIN_DIR is not None:
+		cflags.append("-DUWSGI_PLUGIN_DIR=\\\"%s\\\"" % UWSGI_PLUGIN_DIR)
+
+	if len(PLUGINS) > 0 and EMBED_PLUGINS:
+		cflags.append("-DUWSGI_EMBED_PLUGINS")
+		for plugin in PLUGINS:
+			cflags.append("-DUWSGI_EMBED_PLUGIN_%s" % plugin.upper())
+
 	if SCTP:
 		libs.append("-lsctp")
 		cflags.append("-DUWSGI_SCTP")
@@ -269,10 +404,16 @@ def parse_vars():
 		cflags.append("-DUWSGI_SPOOLER")
 		gcc_list.append('spooler')
 
-	if UNBIT:
-		cflags.append("-DUWSGI_UNBIT")
+	if WSGI2:
+		cflags.append("-DUWSGI_WSGI2")
 
-	
+	if DEBUG:
+		cflags.append("-DUWSGI_DEBUG")
+		cflags.append("-g")
+
+	if UNBIT:
+		cflags.append("-DUNBIT")
+
 def build_plugin(path):
 	path = path.rstrip('/')
 
@@ -283,19 +424,19 @@ def build_plugin(path):
 	p_ldflags = ldflags[:]
 
 	p_cflags.append(up.CFLAGS)
-	p_libs = [up.LDFLAGS]
+	p_ldflags.append(up.LDFLAGS)
 
 	p_cflags.insert(0, '-I.')
 
 	plugin_base = path + '/' + up.NAME + '_plugin'
-	plugin_dest = up.NAME + '_plugin'
+	plugin_dest = UWSGI_PLUGIN_DIR + '/' + up.NAME + '_plugin'
 
 	shared_flag = '-shared'
 
 	if uwsgi_os == 'Darwin':
 		shared_flag = '-dynamiclib -undefined dynamic_lookup'
 
-	gccline = "%s -fPIC %s -o %s.so %s %s %s.c %s" % (GCC, shared_flag, plugin_dest, ' '.join(p_cflags), ' '.join(p_ldflags), plugin_base, ' '.join(p_libs) )
+	gccline = "%s -fPIC %s -o %s.so %s %s %s.c" % (GCC, shared_flag, plugin_dest, ' '.join(p_cflags), ' '.join(p_ldflags), plugin_base )
 	print(gccline)
 
 	ret = os.system(gccline)
@@ -304,6 +445,10 @@ def build_plugin(path):
 		sys.exit(1)
 
 	print("*** %s plugin built and available in %s ***" % (up.NAME, plugin_dest + '.so'))
+	
+	
+
+	
 	
 
 

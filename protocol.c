@@ -266,6 +266,10 @@ int uwsgi_parse_response(struct pollfd *upoll, int timeout, struct uwsgi_header 
 	uh->pktsize = uwsgi_swap16(uh->pktsize);
 #endif
 
+#ifdef UWSGI_DEBUG
+	uwsgi_debug("uwsgi payload size: %d (0x%X) modifier1: %d modifier2: %d\n", uh->pktsize, uh->pktsize, uh->modifier1, uh->modifier2);
+#endif
+
 	/* check for max buffer size */
 	if (uh->pktsize > uwsgi.buffer_size) {
 		uwsgi_log( "invalid request block size: %d...skip\n", uh->pktsize);
@@ -344,9 +348,20 @@ int uwsgi_parse_vars(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) 
 #endif
 					ptrbuf += 2;
 					if (ptrbuf + strsize <= bufferend) {
+						//uwsgi_log("uwsgi %.*s = %.*s\n", wsgi_req->hvec[wsgi_req->var_cnt].iov_len, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, strsize, ptrbuf);
 						if (!strncmp("SCRIPT_NAME", wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
 							wsgi_req->script_name = ptrbuf;
 							wsgi_req->script_name_len = strsize;
+#ifdef UWSGI_DEBUG
+							uwsgi_debug("SCRIPT_NAME=%.*s\n", wsgi_req->script_name_len, wsgi_req->script_name);
+#endif
+						}
+						else if (!strncmp("PATH_INFO", wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
+							wsgi_req->path_info = ptrbuf;
+							wsgi_req->path_info_len = strsize;
+#ifdef UWSGI_DEBUG
+							uwsgi_debug("PATH_INFO=%.*s\n", wsgi_req->path_info_len, wsgi_req->path_info);
+#endif
 						}
 						else if (!strncmp("SERVER_PROTOCOL", wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
 							wsgi_req->protocol = ptrbuf;
@@ -388,18 +403,22 @@ int uwsgi_parse_vars(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) 
 							wsgi_req->wsgi_callable = ptrbuf;
 							wsgi_req->wsgi_callable_len = strsize;
 						}
+						else if (!strncmp("UWSGI_PYHOME", wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
+							wsgi_req->pyhome = ptrbuf;
+							wsgi_req->pyhome_len = strsize;
+						}
+						else if (!strncmp("SERVER_NAME", wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
+							wsgi_req->host = ptrbuf;
+							wsgi_req->host_len = strsize;
+						}
 						else if (!strncmp("HTTPS", wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
 							wsgi_req->https = ptrbuf;
 							wsgi_req->https_len = strsize;
 						}
-#ifdef UNBIT
-						else if (!strncmp("UNBIT_FLAGS", wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
-							wsgi_req->unbit_flags = *(unsigned long long *) ptrbuf;
-						}
-#endif
 						else if (!strncmp("CONTENT_LENGTH", wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
 							wsgi_req->post_cl = get_content_length(ptrbuf, strsize);
 						}
+
 						if (wsgi_req->var_cnt < uwsgi->vec_size - (4 + 1)) {
 							wsgi_req->var_cnt++;
 						}

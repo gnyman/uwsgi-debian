@@ -122,15 +122,32 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 	}
 #endif
 
+	if (!uwsgi->ignore_script_name) {
 
-	if (wsgi_req->script_name_len > 0) {
-		zero = PyString_FromStringAndSize(wsgi_req->script_name, wsgi_req->script_name_len);
+		if (!wsgi_req->script_name)
+			wsgi_req->script_name = "";
+
+		if (uwsgi->vhost) {
+			zero = PyString_FromStringAndSize(wsgi_req->host, wsgi_req->host_len);
+#ifdef PYTHREE
+			zero = PyString_Concat(zero, PyString_FromString("|"));
+			zero = PyString_Concat(zero, PyString_FromStringAndSize(wsgi_req->script_name, wsgi_req->script_name_len));
+#else
+			PyString_Concat(&zero, PyString_FromString("|"));
+			PyString_Concat(&zero, PyString_FromStringAndSize(wsgi_req->script_name, wsgi_req->script_name_len));
+#endif
+		}
+		else {
+			zero = PyString_FromStringAndSize(wsgi_req->script_name, wsgi_req->script_name_len);
+		}
+
+
 		if (PyDict_Contains(uwsgi->py_apps, zero)) {
-                	wsgi_req->app_id = PyInt_AsLong(PyDict_GetItem(uwsgi->py_apps, zero));
-                }
-                else {
-                	/* unavailable app for this SCRIPT_NAME */
-                        wsgi_req->app_id = -1;
+               		wsgi_req->app_id = PyInt_AsLong(PyDict_GetItem(uwsgi->py_apps, zero));
+        	}
+        	else {
+        		/* unavailable app for this SCRIPT_NAME */
+                	wsgi_req->app_id = -1;
 			if (wsgi_req->wsgi_script_len > 0 || (wsgi_req->wsgi_callable_len > 0 && wsgi_req->wsgi_module_len > 0)) {
 				if ((wsgi_req->app_id = init_uwsgi_app(NULL, NULL)) == -1) {
 					internal_server_error(wsgi_req->poll.fd, "wsgi application not found");
@@ -138,9 +155,13 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 					goto clear2;
 				}
 			}
-                }
-                Py_DECREF(zero);
-	} 
+		}
+
+		Py_DECREF(zero);
+	}
+	else {
+		wsgi_req->app_id = 0;
+	}
 
 
 	if (wsgi_req->app_id == -1) {
@@ -165,13 +186,13 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 
 	if (wsgi_req->protocol_len < 5) {
-		uwsgi_log( "INVALID PROTOCOL: %.*s", wsgi_req->protocol_len, wsgi_req->protocol);
+		uwsgi_log( "INVALID PROTOCOL: %.*s\n", wsgi_req->protocol_len, wsgi_req->protocol);
 		internal_server_error(wsgi_req->poll.fd, "invalid HTTP protocol !!!");
 		goto clear;
 
 	}
 	if (strncmp(wsgi_req->protocol, "HTTP/", 5)) {
-		uwsgi_log( "INVALID PROTOCOL: %.*s", wsgi_req->protocol_len, wsgi_req->protocol);
+		uwsgi_log( "INVALID PROTOCOL: %.*s\n", wsgi_req->protocol_len, wsgi_req->protocol);
 		internal_server_error(wsgi_req->poll.fd, "invalid HTTP protocol !!!");
 		goto clear;
 	}
@@ -190,7 +211,11 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 
 	for (i = 0; i < wsgi_req->var_cnt; i += 2) {
-		//uwsgi_log("%.*s: %.*s\n", wsgi_req->hvec[i].iov_len, wsgi_req->hvec[i].iov_base, wsgi_req->hvec[i+1].iov_len, wsgi_req->hvec[i+1].iov_base);
+/*
+#ifdef UWSGI_DEBUG
+		uwsgi_debug("%.*s: %.*s\n", wsgi_req->hvec[i].iov_len, wsgi_req->hvec[i].iov_base, wsgi_req->hvec[i+1].iov_len, wsgi_req->hvec[i+1].iov_base);
+#endif
+*/
 		pydictkey = PyString_FromStringAndSize(wsgi_req->hvec[i].iov_base, wsgi_req->hvec[i].iov_len);
 		pydictvalue = PyString_FromStringAndSize(wsgi_req->hvec[i + 1].iov_base, wsgi_req->hvec[i + 1].iov_len);
 		PyDict_SetItem(wsgi_req->async_environ, pydictkey, pydictvalue);
@@ -308,11 +333,26 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 	PyDict_SetItemString(wsgi_req->async_environ, "wsgi.url_scheme", zero);
 	Py_DECREF(zero);
 
+
+	wsgi_req->async_app = wi->wsgi_callable ;
+
+	PyDict_SetItemString(uwsgi->embedded_dict, "env", wsgi_req->async_environ);
+
+
+#ifdef UWSGI_ROUTING
+	uwsgi_log("routing %d routes %d\n", uwsgi->routing, uwsgi->nroutes);
+	if (uwsgi->routing && uwsgi->nroutes > 0) {
+		check_route(uwsgi, wsgi_req);
+	}
+#endif
+
+
 	// call
+
 #ifdef UWSGI_PROFILER
 	if (uwsgi->enable_profiler == 1) {
 		PyDict_SetItem(wi->pymain_dict, PyString_FromFormat("uwsgi_environ__%d", wsgi_req->app_id), wsgi_req->async_environ);
-		wsgi_req->async_result = python_call(wi->wsgi_cprofile_run, wsgi_req->async_args);
+		wsgi_req->async_result = python_call(wi->wsgi_cprofile_run, wsgi_req->async_args, 0);
 		if (wsgi_req->async_result) {
 			wsgi_req->async_result = PyDict_GetItemString(wi->pymain_dict, "uwsgi_out");
 			Py_INCREF((PyObject*)wsgi_req->async_result);
@@ -324,7 +364,7 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 
 		PyTuple_SetItem(wsgi_req->async_args, 0, wsgi_req->async_environ);
-		wsgi_req->async_result = python_call(wi->wsgi_callable, wsgi_req->async_args);
+		wsgi_req->async_result = python_call(wsgi_req->async_app, wsgi_req->async_args, uwsgi->catch_exceptions);
 
 #ifdef UWSGI_PROFILER
 	}
@@ -343,6 +383,36 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 		}
 
 
+	}
+	else if (uwsgi->catch_exceptions) {
+
+		wsgi_req->response_size += write(wsgi_req->poll.fd, wsgi_req->protocol, wsgi_req->protocol_len);
+		wsgi_req->response_size += write(wsgi_req->poll.fd, " 500 Internal Server Error\r\n", 28 );
+		wsgi_req->response_size += write(wsgi_req->poll.fd, "Content-type: text/plain\r\n\r\n", 28 );
+		wsgi_req->header_cnt = 1 ;
+		
+		/* 
+			sorry that is a hack to avoid the rewrite of PyErr_Print
+			temporarily map (using dup2) stderr to wsgi_req->poll.fd
+		*/
+		int tmp_stderr = dup(2);
+		if (tmp_stderr < 0) {
+			uwsgi_error("dup()");
+			goto clear;
+		}
+		// map 2 to wsgi_req
+		if (dup2(wsgi_req->poll.fd, 2) < 0) {
+			close(tmp_stderr);
+			uwsgi_error("dup2()");
+			goto clear;
+		}
+		// print the error
+		PyErr_Print();
+		// ...resume the original stderr, in case of error we are damaged forever !!!
+		if (dup2(tmp_stderr, 2) < 0) {
+			uwsgi_error("dup2()");
+		}
+		close(tmp_stderr);	
 	}
 
 clear:
