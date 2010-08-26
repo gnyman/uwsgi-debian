@@ -16,12 +16,13 @@ RUN_AT_STARTUP=1
 # Default socket location: /var/run/uwsgi/@@uwsgi_binary@@/<confname>/socket
 # Tip: you could override '--socket' in configuration file.
 DAEMON_OPTS=" \
-  --uid www-data \
-  --gid www-data \
-  --chmod-socket=660 \
   --master \
+  --no-orphans \
   --enable-threads \
   --disable-logging \
+  --chmod-socket=660 \
+  --uid www-data \
+  --gid www-data \
 "
 
 # Run default daemon even if init.d script found configuration file(s) for
@@ -40,9 +41,10 @@ ALWAYS_RUN_DEFAULT_DAEMON=1
 # Socket location: /var/run/uwsgi/default/@@uwsgi_binary@@.socket
 # Uid/gid: www-data
 DEFAULT_DAEMON_OPTS=" \
-  --chmod-socket=660 \
   --master \
+  --no-orphans \
   --processes 2 \
   --enable-threads \
   --disable-logging \
+  --chmod-socket=660 \
 "
