@@ -6,6 +6,7 @@ Description: Initialize section variable in ini.c
  'section_asked' variable wasn't be empty string.
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Last-Update: 2010-08-26
+Forwarded: http://lists.unbit.it/pipermail/uwsgi/2010-August/000599.html
 
 Index: uwsgi-0.9.6-rc1/ini.c
 ===================================================================
