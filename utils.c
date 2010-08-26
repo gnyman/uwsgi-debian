@@ -50,8 +50,6 @@ void set_harakiri(int sec) {
 	}
 }
 
-#ifndef UNBIT
-
 void daemonize(char *logfile) {
 	pid_t pid;
 	int fdin;
@@ -151,6 +149,7 @@ void logto(char *logfile) {
 			exit(1);
 		}
 #ifdef UWSGI_UDP
+		uwsgi.logfile = logfile;
 	}
 #endif
 
@@ -171,7 +170,6 @@ void logto(char *logfile) {
 }
 
 
-#endif
 
 char *uwsgi_get_cwd() {
 
@@ -204,17 +202,14 @@ char *uwsgi_get_cwd() {
 }
 
 void internal_server_error(int fd, char *message) {
-#ifndef UNBIT
         if (uwsgi.shared->options[UWSGI_OPTION_CGI_MODE] == 0) {
-#endif
                 uwsgi.wsgi_req->headers_size = write(fd, "HTTP/1.1 500 Internal Server Error\r\nContent-type: text/html\r\n\r\n", 63);
-#ifndef UNBIT
         }
         else {
                 uwsgi.wsgi_req->headers_size = write(fd, "Status: 500 Internal Server Error\r\nContent-type: text/html\r\n\r\n", 62);
         }
         uwsgi.wsgi_req->header_cnt = 2;
-#endif
+
         uwsgi.wsgi_req->response_size = write(fd, "<h1>uWSGI Error</h1>", 20);
         uwsgi.wsgi_req->response_size += write(fd, message, strlen(message));
 }
@@ -255,7 +250,7 @@ void uwsgi_as_root() {
                 }
         }
         else {
-		if (uwsgi.chroot && !uwsgi.is_a_reload) {
+                if (uwsgi.chroot && !uwsgi.is_a_reload) {
                         uwsgi_log("cannot chroot() as non-root user\n");
                         exit(1);
                 }
@@ -285,6 +280,7 @@ void uwsgi_close_request(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_r
 
         // close the connection with the webserver
 	if (!wsgi_req->fd_closed) {
+		// TODO find a way to discard pending data
 		close(wsgi_req->poll.fd);
 	}
         uwsgi->workers[0].requests++;
@@ -300,8 +296,8 @@ void uwsgi_close_request(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_r
 	}
 
 	// defunct process reaper
-        if (uwsgi->shared->options[UWSGI_OPTION_REAPER] == 1) {
-        	waitpid(-1, &waitpid_status, WNOHANG);
+        if (uwsgi->shared->options[UWSGI_OPTION_REAPER] == 1 || uwsgi->grunt) {
+        	while( waitpid(-1, &waitpid_status, WNOHANG) > 0) ;
 	}
         // reset request
 	memset(wsgi_req, 0, sizeof(struct wsgi_request));
@@ -327,6 +323,10 @@ void wsgi_req_setup(struct wsgi_request *wsgi_req, int async_id) {
 #endif
 	wsgi_req->hvec = &uwsgi.async_hvec[wsgi_req->async_id];
 	wsgi_req->buffer = uwsgi.async_buf[wsgi_req->async_id];
+
+#ifdef UWSGI_ROUTING
+	wsgi_req->ovector = uwsgi.async_ovector[wsgi_req->async_id];
+#endif
 
 	if (uwsgi.post_buffering > 0) {
 		wsgi_req->post_buffering_buf = uwsgi.async_post_buf[wsgi_req->async_id];
@@ -404,6 +404,12 @@ void sanitize_args(struct uwsgi_server *uwsgi) {
 	if (uwsgi->wsgi_config) {
 		uwsgi->single_interpreter = 1 ;
 	}
+
+	if (uwsgi->shared->options[UWSGI_OPTION_HARAKIRI] > 0) {
+		if (!uwsgi->post_buffering) {
+			 uwsgi_log(" *** WARNING: you have enabled harakiri without post buffering. Slow upload could be rejected on post-unbuffered webservers *** \n");
+		}
+	}
 }
 
 void env_to_arg(char *src, char *dst) {
@@ -480,10 +486,22 @@ void parse_sys_envs(char **envs, struct option *long_options) {
 void uwsgi_log(const char *fmt, ...) {
 	va_list ap;
 	char logpkt[4096];
-	int rlen;
+	int rlen = 0;
+
+	struct timeval tv;
+
+	if (uwsgi.logdate) {
+		gettimeofday(&tv, NULL);
+
+		memcpy( logpkt, ctime( (const time_t *) &tv.tv_sec), 24);
+		memcpy( logpkt + 24, " - ", 3);
+
+		rlen = 24 + 3 ;
+
+	}
 
 	va_start (ap, fmt);
-	rlen = vsnprintf(logpkt, 4096, fmt, ap );
+	rlen += vsnprintf(logpkt + rlen, 4096 - rlen, fmt, ap );
 	va_end(ap);
 
 	// do not check for errors

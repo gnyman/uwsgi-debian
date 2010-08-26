@@ -1,9 +1,6 @@
 #ifdef UWSGI_SPOOLER
 #include "uwsgi.h"
 
-#include <dirent.h>
-
-
 
 int spool_request(struct uwsgi_server *uwsgi, char *filename, int rn, char *buffer, int size) {
 
@@ -81,6 +78,9 @@ void spooler(struct uwsgi_server *uwsgi, PyObject * uwsgi_module_dict) {
 	int rlen = 0;
 	int datasize;
 
+	// prevent process blindly reading stdin to make mess
+	int nullfd;
+
 	struct uwsgi_header uh;
 
 	char *key;
@@ -116,6 +116,17 @@ void spooler(struct uwsgi_server *uwsgi, PyObject * uwsgi_module_dict) {
 	// asked by Marco Beri
 	uwsgi_log( "lowering spooler priority to %d\n", PRIO_MAX);
 	setpriority(PRIO_PROCESS, getpid(), PRIO_MAX);
+
+	nullfd = open("/dev/null", O_RDONLY);
+        if (nullfd < 0) {
+                uwsgi_error("open()");
+                exit(1);
+        }
+
+        if (nullfd != 0) {
+                dup2(nullfd, 0);
+		close(nullfd);
+        }
 
 	for (;;) {
 
@@ -238,7 +249,7 @@ void spooler(struct uwsgi_server *uwsgi, PyObject * uwsgi_module_dict) {
 						}
 
 
-						spool_result = python_call(spooler_callable, spool_tuple);
+						spool_result = python_call(spooler_callable, spool_tuple, 0);
 						if (!spool_result) {
 							PyErr_Print();
 							uwsgi_log( "error detected. spool request canceled.\n");

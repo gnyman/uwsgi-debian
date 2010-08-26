@@ -51,21 +51,21 @@ int bind_to_unix(char *socket_name, int listen_queue, int chmod_socket, int abst
 	}
 
 	// chmod unix socket for lazy users
-        if (chmod_socket == 1 && abstract_socket == 0) {
-                if (uwsgi.chmod_socket_value) {
-                        if (chmod(socket_name, uwsgi.chmod_socket_value) != 0) {
-                                uwsgi_error("chmod()");
-                        }
-                }
-                else {
-                        uwsgi_log( "chmod() socket to 666 for lazy and brave users\n");
-                        if (chmod(socket_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) != 0) {
-                                uwsgi_error("chmod()");
-                        }
-                }
-        }
+	if (chmod_socket == 1 && abstract_socket == 0) {
+		if (uwsgi.chmod_socket_value) {
+			if (chmod(socket_name, uwsgi.chmod_socket_value) != 0) {
+				uwsgi_error("chmod()");
+			}
+		}
+		else {
+			uwsgi_log( "chmod() socket to 666 for lazy and brave users\n");
+			if (chmod(socket_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) != 0) {
+				uwsgi_error("chmod()");
+			}
+		}
+	}
 
-        free(uws_addr);
+	free(uws_addr);
 
 	return serverfd;
 }
@@ -199,6 +199,47 @@ int bind_to_udp(char *socket_name) {
 }
 #endif
 
+int uwsgi_connect(char *socket_name, int timeout) {
+
+	char *tcp_port = strchr(socket_name, ':');	
+
+	if (tcp_port) {
+		tcp_port[0] = 0;
+		tcp_port++;
+		return connect_to_tcp(socket_name, atoi(tcp_port), timeout);
+	}
+	
+	return connect_to_unix(socket_name, timeout);
+}
+
+int connect_to_unix(char *socket_name, int timeout) {
+
+	struct pollfd uwsgi_poll;
+        struct sockaddr_un uws_addr;
+
+        memset(&uws_addr, 0, sizeof(struct sockaddr_un));
+
+        uws_addr.sun_family = AF_UNIX;
+        strlcpy(uws_addr.sun_path, socket_name, 102+1);
+
+        uwsgi_poll.fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (uwsgi_poll.fd < 0) {
+                uwsgi_error("socket()");
+                return -1;
+        }
+
+        uwsgi_poll.events = POLLIN;
+
+        if (timed_connect(&uwsgi_poll, (const struct sockaddr *) &uws_addr, sizeof(struct sockaddr_un), timeout)) {
+                uwsgi_error("connect()");
+                close(uwsgi_poll.fd);
+                return -1;
+        }
+
+        return uwsgi_poll.fd;
+	
+}
+
 int connect_to_tcp(char *socket_name, int port, int timeout) {
 
 	struct pollfd uwsgi_poll;
@@ -215,6 +256,8 @@ int connect_to_tcp(char *socket_name, int port, int timeout) {
 	else {
 		uws_addr.sin_addr.s_addr = inet_addr(socket_name);
 	}
+
+	socket_name[strlen(socket_name)] = ':' ;
 
 	uwsgi_poll.fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (uwsgi_poll.fd < 0) {
@@ -287,6 +330,9 @@ int bind_to_tcp(char *socket_name, int listen_queue, char *tcp_port) {
 	uwsgi_log( "binding on TCP port: %d\n", ntohs(uws_addr.sin_port));
 
 	if (bind(serverfd, (struct sockaddr *) &uws_addr, sizeof(uws_addr)) != 0) {
+		if (errno == EADDRINUSE) {
+			uwsgi_log("probably another instance of uWSGI is running on the same address.\n");
+		}
 		uwsgi_error("bind()");
 		exit(1);
 	}

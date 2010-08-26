@@ -38,6 +38,73 @@ PyObject *py_uwsgi_send(PyObject * self, PyObject * args) {
 	
 }
 
+#ifdef UWSGI_SENDFILE
+PyObject *py_uwsgi_advanced_sendfile(PyObject * self, PyObject * args) {
+	
+	PyObject *what;
+	char *filename;
+	size_t chunk;
+	off_t pos = 0;
+	size_t filesize = 0;
+	struct stat stat_buf;
+	
+	int fd = -1;
+
+	if (!PyArg_ParseTuple(args, "O|iii:sendfile", &what, &chunk, &pos, &filesize)) {
+                return NULL;
+        }
+
+	if (PyString_Check(what)) {
+		
+		filename = PyString_AsString(what);
+			
+		fd = open(filename, O_RDONLY);
+		if (fd < 0) {
+			uwsgi_error("open");
+			goto clear;	
+		}
+
+	}
+	else {
+        	fd = PyObject_AsFileDescriptor(what);
+		if (fd < 0) goto clear;
+
+		// check for mixing file_wrapper and sendfile
+		if (fd == uwsgi.wsgi_req->sendfile_fd) {
+			Py_INCREF(what);
+		}
+	}
+
+	if (!filesize) {
+		if (fstat(fd, &stat_buf)) {
+                        uwsgi_error("fstat()");
+                        goto clear2;
+                }
+                else {
+                	filesize = stat_buf.st_size;
+                }
+
+	}
+
+	if (!filesize) goto clear2;
+
+	if (!chunk) chunk = 4096;
+
+	uwsgi.wsgi_req->response_size += uwsgi_do_sendfile(uwsgi.wsgi_req->poll.fd, fd, filesize, chunk, &pos, 0);
+
+	close(fd);
+	Py_INCREF(Py_True);
+	return Py_True;
+
+clear2:
+	close(fd);
+clear:
+	Py_INCREF(Py_None);
+	return Py_None;
+	
+}
+#endif
+
 #ifdef UWSGI_ASYNC
 
 
@@ -585,55 +652,21 @@ PyObject *py_uwsgi_set_option(PyObject * self, PyObject * args) {
 }
 
 PyObject *py_uwsgi_load_plugin(PyObject * self, PyObject * args) {
-	uint8_t modifier;
+	int modifier;
 	char *plugin_name = NULL;
 	char *pargs = NULL;
-
-	void *plugin_handle;
-	int (*plugin_init) (struct uwsgi_server *, char *);
-	int (*plugin_request) (struct uwsgi_server *, struct wsgi_request *);
-	void (*plugin_after_request) (struct uwsgi_server *, struct wsgi_request *);
 
 	if (!PyArg_ParseTuple(args, "is|s:load_plugin", &modifier, &plugin_name, &pargs)) {
 		return NULL;
 	}
 
-	plugin_handle = dlopen(plugin_name, RTLD_NOW | RTLD_GLOBAL);
-	if (!plugin_handle) {
-		uwsgi_log( "%s\n", dlerror());
-	}
-	else {
-		plugin_init = dlsym(plugin_handle, "uwsgi_init");
-		if (plugin_init) {
-			if ((*plugin_init) (&uwsgi, pargs)) {
-				uwsgi_log( "plugin initialization returned error\n");
-				if (dlclose(plugin_handle)) {
-					uwsgi_log( "unable to unload plugin\n");
-				}
-
-				Py_INCREF(Py_None);
-				return Py_None;
-			}
-		}
-
-		plugin_request = dlsym(plugin_handle, "uwsgi_request");
-		if (plugin_request) {
-			uwsgi.shared->hooks[modifier] = plugin_request;
-			plugin_after_request = dlsym(plugin_handle, "uwsgi_after_request");
-			if (plugin_after_request) {
-				uwsgi.shared->after_hooks[modifier] = plugin_after_request;
-			}
-			Py_INCREF(Py_True);
-			return Py_True;
-
-		}
-		else {
-			uwsgi_log( "%s\n", dlerror());
-		}
+	if (uwsgi_load_plugin(&uwsgi, modifier, plugin_name, pargs, 1)) {
+		Py_INCREF(Py_None);
+		return Py_None;
 	}
 
-	Py_INCREF(Py_None);
-	return Py_None;
+	Py_INCREF(Py_True);
+	return Py_True;
 }
 
 #ifdef UWSGI_MULTICAST
@@ -658,6 +691,22 @@ PyObject *py_uwsgi_multicast(PyObject * self, PyObject * args) {
 	
 }
 #endif
+
+PyObject *py_uwsgi_has_hook(PyObject * self, PyObject * args) {
+	int modifier1;
+
+	if (!PyArg_ParseTuple(args, "i:has_hook", &modifier1)) {
+                return NULL;
+        }
+
+	if (uwsgi.shared->hooks[modifier1] != unconfigured_hook) {
+		Py_INCREF(Py_True);
+		return Py_True;
+	}
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
 
 PyObject *py_uwsgi_send_message(PyObject * self, PyObject * args) {
 
@@ -850,8 +899,25 @@ PyObject *py_uwsgi_worker_id(PyObject * self, PyObject * args) {
 	return PyInt_FromLong(uwsgi.mywid);
 }
 
+PyObject *py_uwsgi_logsize(PyObject * self, PyObject * args) {
+	return PyInt_FromLong(uwsgi.shared->logsize);
+}
+
+PyObject *py_uwsgi_mem(PyObject * self, PyObject * args) {
+
+	PyObject *ml = PyTuple_New(2);
+
+	get_memusage();
+	
+	PyTuple_SetItem(ml, 0, PyLong_FromLong(uwsgi.workers[uwsgi.mywid].rss_size));
+	PyTuple_SetItem(ml, 1, PyLong_FromLong(uwsgi.workers[uwsgi.mywid].vsz_size));
+
+	return ml;
+
+}
+
 PyObject *py_uwsgi_disconnect(PyObject * self, PyObject * args) {
-	uwsgi_log( "detaching uWSGI from current connection...\n");
+	uwsgi_log( "disconnecting worker %d (pid :%d) from session...\n", uwsgi.mywid, uwsgi.mypid);
 
 	struct wsgi_request *wsgi_req = current_wsgi_req(&uwsgi);
 
@@ -860,6 +926,52 @@ PyObject *py_uwsgi_disconnect(PyObject * self, PyObject * args) {
 
 	Py_INCREF(Py_True);
 	return Py_True;
+}
+
+PyObject *py_uwsgi_grunt(PyObject * self, PyObject * args) {
+
+	pid_t grunt_pid ;
+	struct wsgi_request *wsgi_req = current_wsgi_req(&uwsgi);
+
+	if (uwsgi.grunt) {
+		uwsgi_log( "spawning a grunt from worker %d (pid :%d)...\n", uwsgi.mywid, uwsgi.mypid);
+	}
+	else {
+		uwsgi_log( "grunt support is disabled !!!\n" );
+		goto clear;
+	}
+
+	grunt_pid = fork();
+	if (grunt_pid < 0) {
+		uwsgi_error("fork()");
+		goto clear;
+	}
+	else if (grunt_pid == 0) {
+		close(uwsgi.serverfd);
+		// create a new session
+		setsid();
+		// exit on SIGPIPE
+		signal(SIGPIPE, (void *) &end_me);
+		uwsgi.mywid = uwsgi.numproc + 1;
+		uwsgi.mypid = getpid();
+		memset(&uwsgi.workers[uwsgi.mywid], 0, sizeof(struct uwsgi_worker));
+		// this is pratically useless...
+		uwsgi.workers[uwsgi.mywid].id = uwsgi.mywid;
+		// this field will be overwrite after each call
+		uwsgi.workers[uwsgi.mywid].pid = uwsgi.mypid;
+		// take the gil to support threads in grunt (is this useful ?)
+                uwsgi.workers[uwsgi.mywid].i_have_gil = 1;
+		Py_INCREF(Py_True);
+		return Py_True;
+	}
+
+	// close connection on the worker
+	fclose(wsgi_req->async_post);
+        wsgi_req->fd_closed = 1 ;
+
+clear:
+	Py_INCREF(Py_None);
+	return Py_None;
 }
 
 #ifdef UWSGI_SPOOLER
@@ -886,11 +998,18 @@ static PyMethodDef uwsgi_advanced_methods[] = {
 	{"worker_id", py_uwsgi_worker_id, METH_VARARGS, ""},
 	{"log", py_uwsgi_log, METH_VARARGS, ""},
 	{"disconnect", py_uwsgi_disconnect, METH_VARARGS, ""},
+	{"grunt", py_uwsgi_grunt, METH_VARARGS, ""},
 	{"load_plugin", py_uwsgi_load_plugin, METH_VARARGS, ""},
 	{"lock", py_uwsgi_lock, METH_VARARGS, ""},
 	{"unlock", py_uwsgi_unlock, METH_VARARGS, ""},
 	{"send", py_uwsgi_send, METH_VARARGS, ""},
+#ifdef UWSGI_SENDFILE
+	{"sendfile", py_uwsgi_advanced_sendfile, METH_VARARGS, ""},
+#endif
 	{"set_warning_message", py_uwsgi_warning, METH_VARARGS, ""},
+	{"mem", py_uwsgi_mem, METH_VARARGS, ""},
+	{"has_hook", py_uwsgi_has_hook, METH_VARARGS, ""},
+	{"logsize", py_uwsgi_logsize, METH_VARARGS, ""},
 #ifdef UWSGI_MULTICAST
 	{"send_multicast_message", py_uwsgi_multicast, METH_VARARGS, ""},
 #endif
