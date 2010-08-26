@@ -16,8 +16,8 @@ RUN_AT_STARTUP=1
 # Default socket location: /var/run/uwsgi/@@uwsgi_binary@@/<confname>/socket
 # Tip: you could override '--socket' in configuration file.
 DAEMON_OPTS=" \
-  --uid $(id -u www-data) \
-  --gid $(id -g www-data) \
+  --uid www-data \
+  --gid www-data \
   --chmod-socket=660 \
   --master \
   --enable-threads \

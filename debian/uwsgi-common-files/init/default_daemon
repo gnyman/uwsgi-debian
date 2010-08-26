@@ -8,11 +8,6 @@
 #  2 if daemon could not be started
 do_start_default_daemon()
 {
-  local UWSGI_UID=$(id -u www-data 2>/dev/null)
-  [ -z "$UWSGI_UID" ] && UWSGI_UID=$(id -u root 2>/dev/null)
-  local UWSGI_GID=$(id -g www-data 2>/dev/null)
-  [ -z "$UWSGI_GID" ] && UWSGI_GID=$(id -u root 2>/dev/null)
-
   install_dir $RUNDIR
   install_dir $DEFAULT_DAEMON_RUNDIR $UWSGI_UID $UWSGI_GID
 
@@ -27,8 +22,8 @@ do_start_default_daemon()
     --daemonize $LOGDIR/default_daemon.${LOG_FILENAME_SUFFIX}.log \
     --pidfile $DEFAULT_DAEMON_PIDFILE \
     --socket $DEFAULT_DAEMON_SOCKET \
-    --uid $UWSGI_UID \
-    --gid $UWSGI_GID \
+    --uid www-data \
+    --gid www-data \
   "
   start-stop-daemon --start --quiet \
     --pidfile $DEFAULT_DAEMON_PIDFILE \
