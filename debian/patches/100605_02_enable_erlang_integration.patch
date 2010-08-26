@@ -1,13 +1,13 @@
 Description: Enable Erlang integration.
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
-Last-Update: 2010-06-09
+Last-Update: 2010-08-26
 
-Index: uwsgi-0.9.5.1/uwsgiconfig.py
+Index: uwsgi-0.9.6-rc1/uwsgiconfig.py
 ===================================================================
---- uwsgi-0.9.5.1.orig/uwsgiconfig.py	2010-06-05 08:14:43.000000000 +0300
-+++ uwsgi-0.9.5.1/uwsgiconfig.py	2010-06-05 08:14:49.000000000 +0300
-@@ -3,7 +3,7 @@
- XML=True
+--- uwsgi-0.9.6-rc1.orig/uwsgiconfig.py	2010-08-26 22:00:39.000000000 +0300
++++ uwsgi-0.9.6-rc1/uwsgiconfig.py	2010-08-26 22:09:05.000000000 +0300
+@@ -4,7 +4,7 @@
+ INI=True
  SNMP=True
  SCTP=False
 -ERLANG=False
