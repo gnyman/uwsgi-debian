@@ -1,2 +1,4 @@
 contrib
+nginx
+lighttpd
 django/uwsgi_admin
