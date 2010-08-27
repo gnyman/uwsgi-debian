@@ -29,11 +29,11 @@ case "$1" in
     configure)
       if [ -z "$2" ]; then # installing package
         if [ -e /etc/apache2/apache2.conf ]; then
-          a2enmod uwsgi >/dev/null || true
+          a2enmod @@module_name@@ >/dev/null || true
           apache_force_reload
         fi
       else # upgrading package
-        if [ -e /etc/apache2/mods-enabled/uwsgi.load ]; then
+        if [ -e /etc/apache2/mods-enabled/@@module_name@@.load ]; then
           apache_force_reload
         fi
       fi

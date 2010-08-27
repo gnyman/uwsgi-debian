@@ -112,7 +112,9 @@ Description: Perl PSGI plugin for uWSGI
 Package: libapache2-mod-uwsgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, uwsgi
-Description: uWSGI module for Apache2
+Conflicts: libapache2-mod-ruwsgi
+Replaces: libapache2-mod-ruwsgi
+Description: uWSGI module for Apache2 (mod_uwsgi)
  uWSGI is aimed for professional python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered python
  applications, implementing message/object passing, RPC, process management and
@@ -120,6 +122,26 @@ Description: uWSGI module for Apache2
  languages or platform.
  .
  This package provides Apache2 module for uWSGI.
+ .
+ This is the first module developed, it is stable but a bit hacky (it does not
+ fully use the Apache2 API).
+
+Package: libapache2-mod-ruwsgi
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, uwsgi
+Conflicts: libapache2-mod-uwsgi
+Replaces: libapache2-mod-uwsgi
+Description: uWSGI module for Apache2 (mod_Ruwsgi)
+ uWSGI is aimed for professional python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provides Apache2 module for uWSGI.
+ .
+ This is the second module developed and it's more Apache2 API friendly.
+ mod_Ruwsgi is provided starting from the 0.9.6-dev version.
 
 Package: uwsgi-extra
 Architecture: any

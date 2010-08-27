@@ -20,7 +20,7 @@ set -e
 case "$1" in
     remove)
       if [ -e /etc/apache2/apache2.conf ]; then
-        a2dismod uwsgi || true
+        a2dismod @@module_name@@ || true
       fi
     ;;
 

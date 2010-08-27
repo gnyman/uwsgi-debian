@@ -20,9 +20,19 @@ python_ver = $(call list_pkgname_suffixes,uwsgi-python)
 # List of packaged plugins' names
 plugins = $(call list_pkgname_suffixes,uwsgi-plugin-)
 
+# List of packaged Apache2 modules' names
+libapache2_mods = uwsgi Ruwsgi
+
+ruwsgi_to_lc = $(subst Ruwsgi,ruwsgi,$(1))
+ruwsgi_to_orig = $(subst ruwsgi,Ruwsgi,$(1))
+
 # List of templates to instantiate for each uwsgi-pythonX.Y package
 uwsgi_python_pkg_templates = dirs install default init.d logrotate \
                              manpages README.Debian
+
+# List of templates to instantiate for each libapache2-mod-X package
+# There is special-case template, not listed here: uwsgi.load.in
+libapache2_mod_pkg_templates = install postinst prerm
 
 # Returns substring after last '-' character
 last_pkgname_component = $(lastword $(subst -, ,$(1)))
@@ -39,12 +49,20 @@ clean::
 		$(RM) $(CURDIR)/$${name}_plugin.so; \
 		$(RM) $(CURDIR)/$(plugins_dir)/$$name/uwsgiplugin.pyc; \
 	done
-	# compiled mod_uwsgi
-	$(RM) -r $(CURDIR)/apache2/.libs $(addprefix $(CURDIR)/apache2/mod_uwsgi, .la .lo .slo)
+	# compiled Apache2 modules
+	$(RM) -r $(CURDIR)/apache2/.libs
+	$(RM) -r $(addprefix $(CURDIR)/apache2/mod_, $(foreach module_name, $(libapache2_mods), \
+		$(addprefix $(module_name), .la .lo .slo) \
+	))
 	# instantiated uwsgi-pythonX.Y templates
 	for type in $(uwsgi_python_pkg_templates); do \
 		$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .$$type,$(python_ver))); \
 	done
+	# instantiated libapache2-mod-X templates
+	for type in $(libapache2_mod_pkg_templates); do \
+		$(RM) $(addprefix $(CURDIR)/debian/libapache2-mod-,$(addsuffix .$$type, $(call ruwsgi_to_lc, $(libapache2_mods)))); \
+	done
+	$(RM) $(addprefix $(CURDIR)/debian/,$(addsuffix .load, $(libapache2_mods)))
 	# uwsgi-pythonX.Y manpages
 	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .8,$(python_ver)))
 	# instantiated uwsgi-plugin-N.install files
@@ -79,12 +97,15 @@ $(patsubst %,debian/stamp-plugin-%,$(plugins)):
 	$(default_python) $(builder) --plugin $(plugins_dir)/$(plugin_name)
 	touch $@
 
-build/libapache2-mod-uwsgi:: debian/stamp-libapache2-mod-uwsgi
+# Build libapache2-mod-% package
+$(patsubst %,build/libapache2-mod-%,$(call ruwsgi_to_lc,$(libapache2_mods))):: build/% : debian/stamp-%
 
-debian/stamp-libapache2-mod-uwsgi:
+# Build specific Apache2 module
+$(patsubst %,debian/stamp-libapache2-mod-%,$(call ruwsgi_to_lc,$(libapache2_mods))):
+	$(eval module_name = $(call ruwsgi_to_orig,$(call last_pkgname_component,$(notdir $@))))
 	apxs2 -c \
 		`apr-config --link-ld` `apu-config --link-ld` \
-		$(CURDIR)/apache2/mod_uwsgi.c
+		$(CURDIR)/apache2/mod_$(module_name).c
 	touch $@
 
 # Install uwsgi-python% package
@@ -102,6 +123,18 @@ $(patsubst %,install/uwsgi-plugin-%,$(plugins))::
 	sed -e 's/@@plugin_name@@/$(plugin_name)/g' \
 		< $(CURDIR)/debian/uwsgi-plugin.install.in \
 		> $(CURDIR)/debian/$(cdbs_curpkg).install
+
+# Install libapache2-mod-% package
+$(patsubst %,install/libapache2-mod-%,$(call ruwsgi_to_lc,$(libapache2_mods)))::
+	$(eval module_name = $(call ruwsgi_to_orig,$(call last_pkgname_component,$(notdir $@))))
+	sed -e 's/@@module_name@@/$(module_name)/g' \
+		< $(CURDIR)/debian/uwsgi.load.in \
+		> $(CURDIR)/debian/$(module_name).load
+	for type in $(libapache2_mod_pkg_templates); do \
+		sed -e 's/@@module_name@@/$(module_name)/g' \
+			< $(CURDIR)/debian/libapache2-mod.$${type}.in \
+			> $(CURDIR)/debian/$(notdir $@).$${type} ; \
+	done
 
 # Binary-post-install uwsgi-python% package
 $(patsubst %,binary-post-install/uwsgi-python%,$(python_ver))::
