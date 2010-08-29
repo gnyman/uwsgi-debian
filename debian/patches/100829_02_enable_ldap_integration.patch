@@ -1,7 +1,11 @@
-Index: uwsgi-collab/uwsgiconfig.py
+Description: Enable LDAP integration.
+Author: Leonid Borisenko <leo.borisenko@gmail.com>
+Last-Update: 2010-08-29
+
+Index: uwsgi-0.9.6/uwsgiconfig.py
 ===================================================================
---- uwsgi-collab.orig/uwsgiconfig.py	2010-08-29 11:41:34.000000000 +0300
-+++ uwsgi-collab/uwsgiconfig.py	2010-08-29 11:41:41.000000000 +0300
+--- uwsgi-0.9.6.orig/uwsgiconfig.py	2010-08-29 11:41:34.000000000 +0300
++++ uwsgi-0.9.6/uwsgiconfig.py	2010-08-29 11:41:41.000000000 +0300
 @@ -20,7 +20,7 @@
  UGREEN=False
  HTTP=True
