@@ -44,7 +44,7 @@ Package: uwsgi-python2.5
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python2.5,
  uwsgi-common (= ${binary:Version})
-Recommends: libapache2-mod-uwsgi
+Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-extra
 Description: fast, self-healing, developer-friendly WSGI server (Python 2.5)
  uWSGI is aimed for professional python webapps deployment and development.
@@ -59,7 +59,7 @@ Package: uwsgi-python2.6
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python2.6,
  uwsgi-common (= ${binary:Version})
-Recommends: libapache2-mod-uwsgi
+Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-extra
 Description: fast, self-healing, developer-friendly WSGI server (Python 2.6)
  uWSGI is aimed for professional python webapps deployment and development.
@@ -74,7 +74,7 @@ Package: uwsgi-python3.1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python3.1,
  uwsgi-common (= ${binary:Version})
-Recommends: libapache2-mod-uwsgi
+Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-extra
 Description: Fast, self-healing, developer-friendly WSGI server (Python 3.1)
  uWSGI is aimed for professional python webapps deployment and development.
