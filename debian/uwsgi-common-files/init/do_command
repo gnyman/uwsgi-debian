@@ -1,6 +1,5 @@
 # This is shell script, sourced by uWSGI init.d script
 
-. /usr/lib/uwsgi/init/default_daemon
 . /usr/lib/uwsgi/init/specific_daemon
 
 do_command()
@@ -8,19 +7,7 @@ do_command()
   local COMMAND=$1
   shift
 
-  # Convert command 'X-default' to just 'X' (i.e. strip suffix '-default').
-  local COMMAND_TO_DEFAULT=no
-  local WITH_STRIPPED_SUFFIX=${COMMAND%-default}
-  [ "$WITH_STRIPPED_SUFFIX" = "$COMMAND" ] || COMMAND_TO_DEFAULT=yes
-  COMMAND="$WITH_STRIPPED_SUFFIX"
-
   [ "$VERBOSE" != no ] && log_progress_msg "->"
-
-  # If command is like 'start-default', 'stop-default' etc.
-  if [ "$COMMAND_TO_DEFAULT" = yes ]; then
-    do_with_default_daemon $COMMAND
-    return "$?"
-  fi
 
   # If command is given with arguments, i.e. 'start smth smth_else'
   if [ ! -z "$1" ]; then
@@ -44,38 +31,8 @@ do_command()
   fi
 
   # Command actions.
-  #
-  # Default daemon should receive command only if:
-  # * there is no user-defined configuration files
-  # * or user explicitly allows default daemon to start anyway.
-  if [ -z "$ALL_CONFNAMES" -o "$ALWAYS_RUN_DEFAULT_DAEMON" = 1 ]; then
-    do_with_default_daemon $COMMAND
-    ERRORS=$(expr $ERRORS + $?)
-  fi
   do_with_given_specific_daemons $COMMAND $ALL_CONFNAMES
   ERRORS=$(expr $ERRORS + $?)
-
-  return "$ERRORS"
-}
-
-do_with_default_daemon()
-{
-  local COMMAND=$1
-
-  local ERRORS=0
-  case "$COMMAND" in
-    start)        do_start_default_daemon ;;
-    stop)         do_stop_default_daemon ;;
-    force-reload) do_force_reload_default_daemon ;;
-    reload|*)     do_reload_default_daemon ;;
-  esac
-  case "$?" in
-    0) [ "$VERBOSE" != no ] && log_progress_msg "<default daemon>" ;;
-    1) [ "$VERBOSE" != no ] && log_progress_msg "(<default daemon>)" ;;
-    *) [ "$VERBOSE" != no ] && log_progress_msg "<default daemon>!"
-       ERRORS=$(expr $ERRORS + 1)
-    ;;
-  esac
 
   return "$ERRORS"
 }

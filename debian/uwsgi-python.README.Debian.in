@@ -1,31 +1,12 @@
 Contents:
-  1. The default uWSGI daemon
-  2. Automatic starting of additional instances of uWSGI
-  3. Owner, group and permissions of UNIX socket and pidfile
-  4. Commands recognized by init.d script
-  5. Controling additional instances of uWSGI
-  6. Status of executing init.d command for specific instance
+  1. Automatic starting of instances of uWSGI
+  2. Owner, group and permissions of UNIX socket and pidfile
+  3. Commands recognized by init.d script
+  4. Controling specific instances of uWSGI
+  5. Status of executing init.d command for specific instance
 
-The default uWSGI daemon
-========================
-
-The special uWSGI instance runned automatically by init.d script, without need
-to manually create any configuration file, is called '<default daemon>'.
-
-You could control specifically this instance by passing commands to init.d script
-with suffix '-default'. For example:
-
-    /etc/init.d/@@uwsgi_binary@@ restart-default
-
-For setting options of '<default daemon>' or for disabling it, look into
-/etc/default/@@uwsgi_binary@@.
-
-Service files of default uWSGI daemon are located on:
-  * UNIX socket | /var/run/uwsgi/default/@@uwsgi_binary@@.socket
-  * pidfile     | /var/run/uwsgi/default/@@uwsgi_binary@@.pid
-
-Automatic starting of additional instances of uWSGI
-===================================================
+Automatic starting of instances of uWSGI
+========================================
 
 init.d script automatically starts one instance of @@uwsgi_binary@@ for each
 XML configuration file found in /etc/uwsgi/@@uwsgi_binary@@/.
@@ -45,7 +26,7 @@ Example of more realistic configuration file:
 For list of options passed by default to each started instance see
 /etc/default/@@uwsgi_binary@@.
 
-Service files of additional uWSGI instance are located in directory named after
+Service files of started uWSGI instance are located in directory named after
 configuration file (without '.xml' extension):
   * UNIX socket | /var/run/uwsgi/@@uwsgi_binary@@/<confname>/socket
   * pidfile     | /var/run/uwsgi/@@uwsgi_binary@@/<confname>/pid
@@ -78,20 +59,15 @@ You can issue to init.d script following commands:
   * stop         | stops daemon
   * reload       | sends to daemon SIGHUP signal
   * force-reload | sends to daemon SIGTERM signal
-  * restart      | issue 'stop', then 'start' commands
-  * status       | show status of daemon (runned/not runned)
+  * restart      | issues 'stop', then 'start' commands
+  * status       | shows status of daemon instance (runned/not runned)
 
-As mentioned, to control the default uWSGI daemon, you should use specific
-command with '-default' suffix. For example: 'start-default' etc.
+'status' command must be issued with exactly one argument: '<confname>'.
 
-Exception is the 'status' command. It can be executed:
-  * without arguments -- to show status of '<default daemon>' instance
-  * with one argument -- to show status of instance with given '<confname>'
+Controling specific instances of uWSGI
+======================================
 
-Controling additional instances of uWSGI
-========================================
-
-You could control these instances by executing
+You could control specific instance(s) by issueing:
 
     /etc/init.d/@@uwsgi_binary@@ <command> <confname> <confname> ...
 

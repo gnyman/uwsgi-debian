@@ -1,4 +1,4 @@
-"/var/log/uwsgi/default_daemon.@@uwsgi_binary@@.log" "/var/log/uwsgi/@@uwsgi_binary@@/*.log" {
+"/var/log/uwsgi/@@uwsgi_binary@@/*.log" {
   daily
   rotate 5
   compress

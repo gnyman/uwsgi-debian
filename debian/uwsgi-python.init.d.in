@@ -20,9 +20,6 @@ CONFDIR=/etc/uwsgi/@@uwsgi_binary@@
 
 RUNDIR=/var/run/uwsgi
 UWSGI_RUNDIR=$RUNDIR/@@uwsgi_binary@@
-DEFAULT_DAEMON_RUNDIR=$RUNDIR/default
-DEFAULT_DAEMON_PIDFILE=$DEFAULT_DAEMON_RUNDIR/@@uwsgi_binary@@.pid
-DEFAULT_DAEMON_SOCKET=$DEFAULT_DAEMON_RUNDIR/@@uwsgi_binary@@.socket
 
 LOGDIR=/var/log/uwsgi
 UWSGI_LOGDIR=$LOGDIR/@@uwsgi_binary@@
@@ -48,14 +45,14 @@ LOG_FILENAME_SUFFIX=@@uwsgi_binary@@
 WHAT=$1
 shift
 case "$WHAT" in
-  start|start-default)
-    [ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC " "$NAME"
+  start)
+    [ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
     do_command "$WHAT" "$@"
     RETVAL="$?"
     [ "$VERBOSE" != no ] && log_end_msg "$RETVAL"
   ;;
 
-  stop|stop-default)
+  stop)
     [ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
     do_command "$WHAT" "$@"
     RETVAL="$?"
@@ -64,9 +61,7 @@ case "$WHAT" in
 
   status)
     if [ -z "$1" ]; then
-      status_of_proc -p $DEFAULT_DAEMON_PIDFILE "$DAEMON" "$NAME" \
-        && exit 0 \
-        || exit $?
+      [ "$VERBOSE" != no ] && log_failure_msg "which one?"
     else
       status_of_proc -p $(find_specific_pidfile $1) "$DAEMON" "$NAME" \
         && exit 0 \
@@ -74,34 +69,29 @@ case "$WHAT" in
     fi
   ;;
 
-  reload|reload-default)
+  reload)
     [ "$VERBOSE" != no ] && log_daemon_msg "Reloading $DESC" "$NAME"
     do_command "$WHAT" "$@"
     RETVAL="$?"
     [ "$VERBOSE" != no ] && log_end_msg "$RETVAL"
   ;;
 
-  force-reload|force-reload-default)
+  force-reload)
     [ "$VERBOSE" != no ] && log_daemon_msg "Forced reloading $DESC" "$NAME"
     do_command "$WHAT" "$@"
     RETVAL="$?"
     [ "$VERBOSE" != no ] && log_end_msg "$RETVAL"
   ;;
 
-  restart|restart-default)
-    SUFFIX_DEFAULT=""
-    if [ "$WHAT" = "restart-default" ]; then
-      SUFFIX_DEFAULT="-default"
-    fi
-
+  restart)
     [ "$VERBOSE" != no ] && log_daemon_msg "Restarting $DESC" "$NAME"
     CURRENT_VERBOSE=$VERBOSE
     VERBOSE=no
-    do_command "stop$SUFFIX_DEFAULT" "$@"
+    do_command stop "$@"
     VERBOSE=$CURRENT_VERBOSE
     case "$?" in
       0)
-        do_command "start$SUFFIX_DEFAULT" "$@"
+        do_command start "$@"
         RETVAL="$?"
         [ "$VERBOSE" != no ] && log_end_msg "$RETVAL"
       ;;
