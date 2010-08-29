@@ -11,9 +11,9 @@ void ldap2uwsgi(char *ldapname, char *uwsginame) {
 	int i;
 
 	for(i=0;i<strlen(ldapname);i++) {
-		if (isupper(ldapname[i])) {
+		if (isupper( (int)ldapname[i])) {
 			*ptr++= '-';
-			*ptr++= tolower(ldapname[i]);
+			*ptr++= tolower( (int) ldapname[i]);
 		}
 		else {
 			*ptr++= ldapname[i] ;
@@ -29,7 +29,7 @@ int calc_ldap_name(char *name) {
 	int counter = 0;
 
 	for(i=0;i<strlen(name);i++) {
-		if (isupper(name[i])) {
+		if (isupper( (int) name[i])) {
 			counter++;
 		}
 	}
@@ -73,7 +73,7 @@ void uwsgi_ldap_schema_dump_ldif(struct option *lo) {
                 for(i=0;i<strlen(aopt->name);i++) {
                         if (aopt->name[i] == '-') {
                                 i++;
-                                uwsgi_log("%c", toupper(aopt->name[i]));
+                                uwsgi_log("%c", toupper( (int) aopt->name[i]));
                         }
                         else {
                                 uwsgi_log("%c", aopt->name[i]);
@@ -113,7 +113,7 @@ next:
                 for(i=0;i<strlen(aopt->name);i++) {
                         if (aopt->name[i] == '-') {
                                 i++;
-                                uwsgi_log("%c", toupper(aopt->name[i]));
+                                uwsgi_log("%c", toupper( (int) aopt->name[i]));
                         }
                         else {
                                 uwsgi_log("%c", aopt->name[i]);
@@ -163,7 +163,7 @@ void uwsgi_ldap_schema_dump(struct option *lo) {
 		for(i=0;i<strlen(aopt->name);i++) {
 			if (aopt->name[i] == '-') {
 				i++;
-				uwsgi_log("%c", toupper(aopt->name[i]));
+				uwsgi_log("%c", toupper( (int) aopt->name[i]));
 			}
 			else {
 				uwsgi_log("%c", aopt->name[i]);
@@ -203,7 +203,7 @@ next:
 		for(i=0;i<strlen(aopt->name);i++) {
 			if (aopt->name[i] == '-') {
 				i++;
-				uwsgi_log("%c", toupper(aopt->name[i]));
+				uwsgi_log("%c", toupper( (int) aopt->name[i]));
 			}
 			else {
 				uwsgi_log("%c", aopt->name[i]);

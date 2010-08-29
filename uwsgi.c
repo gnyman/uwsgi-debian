@@ -75,6 +75,8 @@ static struct option long_options[] = {
 #endif
 		{"disable-logging", no_argument, 0, 'L'},
 
+		{"callable", required_argument, 0, LONG_ARGS_CALLABLE},
+
 		{"pidfile", required_argument, 0, LONG_ARGS_PIDFILE},
 		{"chroot", required_argument, 0, LONG_ARGS_CHROOT},
 		{"gid", required_argument, 0, LONG_ARGS_GID},
@@ -84,6 +86,7 @@ static struct option long_options[] = {
 		{"pyargv", required_argument, 0, LONG_ARGS_PYARGV},
 #ifdef UWSGI_INI
 		{"ini", required_argument, 0, LONG_ARGS_INI},
+		{"ini-paste", required_argument, 0, LONG_ARGS_INI_PASTE},
 #endif
 #ifdef UWSGI_PASTE
 		{"paste", required_argument, 0, LONG_ARGS_PASTE},
@@ -156,14 +159,53 @@ static struct option long_options[] = {
 #ifdef UWSGI_HTTP
 		{"http", required_argument, 0, LONG_ARGS_HTTP},
 		{"http-only", no_argument, &uwsgi.http_only, 1},
+		{"http-var", required_argument, 0, LONG_ARGS_HTTP_VAR},
 #endif
 		{"catch-exceptions", no_argument, &uwsgi.catch_exceptions, 1},
 		{"mode", required_argument, 0, LONG_ARGS_MODE},
 		{"env", required_argument, 0, LONG_ARGS_ENV},
 		{"vacuum", no_argument, &uwsgi.vacuum, 1},
+		{"ping", required_argument, 0, LONG_ARGS_PING},
+		{"ping-timeout", required_argument, 0, LONG_ARGS_PING_TIMEOUT},
 		{"version", no_argument, 0, LONG_ARGS_VERSION},
 		{0, 0, 0, 0}
 	};
+
+void ping(struct uwsgi_server *uwsgi) {
+
+	struct uwsgi_header uh;
+	struct pollfd uwsgi_poll;
+	
+	// use a 3 secs timeout by default
+	if (!uwsgi->ping_timeout) uwsgi->ping_timeout = 3 ;
+
+        uwsgi_poll.fd = uwsgi_connect(uwsgi->ping, uwsgi->ping_timeout);
+	if (uwsgi_poll.fd < 0) {
+		exit(1);
+	}
+
+	uh.modifier1 = UWSGI_MODIFIER_PING;
+        uh.pktsize = 0;
+        uh.modifier2 = 0;
+        if (write(uwsgi_poll.fd, &uh, 4) != 4) {
+                uwsgi_error("write()");
+                exit(2);
+        }
+        uwsgi_poll.events = POLLIN;
+        if (!uwsgi_parse_response(&uwsgi_poll, uwsgi->ping_timeout, &uh, NULL)) {
+                exit(1);
+        }
+        else {
+                if (uh.pktsize > 0) {
+                        exit(2);
+                }
+                else {
+                        exit(0);
+                }
+        }
+
+}
+
 
 int find_worker_id(pid_t pid) {
 	int i;
@@ -230,6 +272,7 @@ void grace_them_all() {
 
 void reap_them_all() {
 	int i;
+	uwsgi.to_heaven = 1;
 	uwsgi_log("...brutally killing workers...\n");
 	for (i = 1; i <= uwsgi.numproc; i++) {
 		kill(uwsgi.workers[i].pid, SIGTERM);
@@ -310,14 +353,23 @@ static void unconfigured_after_hook(struct uwsgi_server *uwsgi, struct wsgi_requ
 
 static void vacuum(void) {
 
+	struct sockaddr_un sa;
+	socklen_t sa_len = sizeof(struct sockaddr_un);
+
 	if (uwsgi.vacuum) {
 		if (getpid() == masterpid) {
-			if (uwsgi.socket_name && uwsgi.bind_to_unix) {
-				if (unlink(uwsgi.socket_name)) {
-					uwsgi_error("unlink()");
-				}
-				else {
-					uwsgi_log("VACUUM: unix socket removed.\n");
+			if (chdir(uwsgi.cwd)) {
+				uwsgi_error("chdir()");
+			}
+			memset(&sa, 0, sa_len);
+			if (!getsockname(uwsgi.serverfd, (struct sockaddr*)&sa, &sa_len)) {
+				if (sa.sun_family == AF_UNIX) {
+					if (unlink(sa.sun_path)) {
+						uwsgi_error("unlink()");
+					}
+					else {
+						uwsgi_log("VACUUM: unix socket removed.\n");
+					}
 				}
 			}
 			if (uwsgi.pidfile && !uwsgi.uid) {
@@ -362,7 +414,6 @@ int main(int argc, char *argv[], char *envp[]) {
 	int working_workers = 0;
 	int blocking_workers = 0;
 
-	char *cwd = NULL;
 	int ready_to_reload = 0;
 	int ready_to_die = 0;
 
@@ -382,9 +433,13 @@ int main(int argc, char *argv[], char *envp[]) {
 	signal(SIGHUP, SIG_IGN);
 	signal(SIGTERM, SIG_IGN);
 
-	atexit(vacuum);
+	// initialize masterpid with a default value
+	masterpid = getpid();
 
 	memset(&uwsgi, 0, sizeof(struct uwsgi_server));
+	uwsgi.cwd = uwsgi_get_cwd();
+
+	atexit(vacuum);
 
 
 #ifdef UWSGI_DEBUG
@@ -485,6 +540,11 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	if (optind < argc) {
 		char *lazy = argv[optind];
+		char *qc = strchr(lazy, ':');
+		if (qc) {
+			qc[0] = 0 ;
+			uwsgi.callable = qc + 1;
+		}
 		if (!strcmp(lazy+strlen(lazy)-3, ".py")) {
 			uwsgi.file_config = lazy;
 		}
@@ -510,14 +570,17 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	parse_sys_envs(environ, long_options);
 
+	if (uwsgi.ping) {
+		ping(&uwsgi);
+	}
+
 	if (uwsgi.binary_path == argv[0]) {
-		cwd = uwsgi_get_cwd();
 		uwsgi.binary_path = malloc(strlen(argv[0]) + 1);
 		if (uwsgi.binary_path == NULL) {
 			uwsgi_error("malloc()");
 			exit(1);
 		}
-		strlcpy(uwsgi.binary_path, argv[0], strlen(argv[0]) + 1);
+		memcpy(uwsgi.binary_path, argv[0], strlen(argv[0]) + 1);
 	}
 
 	if (uwsgi.shared->options[UWSGI_OPTION_CGI_MODE] == 0) {
@@ -552,7 +615,7 @@ int main(int argc, char *argv[], char *envp[]) {
 			uwsgi_error("fopen");
 			exit(1);
 		}
-		if (fprintf(pidfile, "%d\n", getpid()) < 0) {
+		if (fprintf(pidfile, "%d\n", (int) getpid()) < 0) {
 			uwsgi_log( "could not write pidfile.\n");
 		}
 		fclose(pidfile);
@@ -603,7 +666,7 @@ int main(int argc, char *argv[], char *envp[]) {
 	sanitize_args(&uwsgi);
 
 #ifdef UWSGI_HTTP
-        if (uwsgi.http) {
+        if (uwsgi.http && !uwsgi.is_a_reload) {
                 char *tcp_port = strchr(uwsgi.http, ':');
                 if (tcp_port) {
                         uwsgi.http_server_port = tcp_port+1;
@@ -636,7 +699,6 @@ int main(int argc, char *argv[], char *envp[]) {
 
 
                 if (uwsgi.http_only) {
-                        signal(SIGINT, (void *) &end_me);
                         http_loop(&uwsgi);
                         // never here
                         exit(1);
@@ -645,7 +707,7 @@ int main(int argc, char *argv[], char *envp[]) {
                 pid_t http_pid = fork();
 
                 if (http_pid > 0) {
-                        signal(SIGINT, (void *) &end_me);
+			masterpid = http_pid;
                         http_loop(&uwsgi);
                         // never here
                         exit(1);
@@ -654,6 +716,20 @@ int main(int argc, char *argv[], char *envp[]) {
                         uwsgi_error("fork()");
                         exit(1);
                 }
+
+		if (uwsgi.pidfile && !uwsgi.is_a_reload) {
+			uwsgi_log( "updating pidfile with pid %d\n", (int) getpid());
+			pidfile = fopen(uwsgi.pidfile, "w");
+			if (!pidfile) {
+				uwsgi_error("fopen");
+				exit(1);
+			}
+			if (fprintf(pidfile, "%d\n", (int) getpid()) < 0) {
+				uwsgi_log( "could not update pidfile.\n");
+			}
+			fclose(pidfile);
+		}
+
                 close(uwsgi.http_fd);
         }
 #endif
@@ -857,7 +933,6 @@ int main(int argc, char *argv[], char *envp[]) {
 				char *tcp_port = strchr(uwsgi.socket_name, ':');
 				if (tcp_port == NULL) {
 					uwsgi.serverfd = bind_to_unix(uwsgi.socket_name, uwsgi.listen_queue, uwsgi.chmod_socket, uwsgi.abstract_socket);
-					uwsgi.bind_to_unix = 1;
 				}
 				else {
 					uwsgi.serverfd = bind_to_tcp(uwsgi.socket_name, uwsgi.listen_queue, tcp_port);
@@ -1022,7 +1097,7 @@ int main(int argc, char *argv[], char *envp[]) {
 
 // parse xml anyway
 #ifdef UWSGI_XML
-	if (uwsgi.xml_config != NULL) {
+	if (uwsgi.xml_round2 && uwsgi.xml_config != NULL) {
 		uwsgi_xml_config(uwsgi.wsgi_req, NULL);
 	}
 #endif
@@ -1160,7 +1235,7 @@ int main(int argc, char *argv[], char *envp[]) {
 					memcpy(uwsgi.shared->snmp_community, uwsgi.snmp_community, 72);
 				}
 				else {
-					strlcpy(uwsgi.shared->snmp_community, uwsgi.snmp_community, 73);
+					memcpy(uwsgi.shared->snmp_community, uwsgi.snmp_community, strlen(uwsgi.snmp_community) + 1);
 				}
 			}
 			uwsgi_log( "filling SNMP table...");
@@ -1218,11 +1293,9 @@ int main(int argc, char *argv[], char *envp[]) {
 				}
 #endif
 				uwsgi_log( "binary reloading uWSGI...\n");
-				if (cwd) {
-					if (chdir(cwd)) {
-						uwsgi_error("chdir()");
-						exit(1);
-					}
+				if (chdir(uwsgi.cwd)) {
+					uwsgi_error("chdir()");
+					exit(1);
 				}
 				/* check fd table (a module can obviosly open some fd on initialization...) */
 				uwsgi_log( "closing all fds > 2 (_SC_OPEN_MAX = %ld)...\n", sysconf(_SC_OPEN_MAX));
@@ -1430,6 +1503,21 @@ int main(int argc, char *argv[], char *envp[]) {
 					}
 				}
 			}
+#endif
+			// TODO rewrite without using exit code (targeted at 0.9.7)
+
+#ifdef __sun__
+                        /* horrible hack... what the FU*K is doing Solaris ??? */
+                        if (WIFSIGNALED(waitpid_status)) {
+                                if (uwsgi.to_heaven) {
+                                        ready_to_reload++;
+                                        continue;
+                                }
+                                else if (uwsgi.to_hell) {
+                                        ready_to_die++;
+                                        continue;
+                                }
+                        }
 #endif
 			/* check for reloading */
 			if (WIFEXITED(waitpid_status)) {
@@ -2284,7 +2372,7 @@ void uwsgi_wsgi_config(char *filename) {
 	PyObject *app_list;
 	int ret;
 	Py_ssize_t i;
-	PyObject *app_mnt, *app_app;
+	PyObject *app_mnt, *app_app = NULL;
 	FILE *uwsgifile;
 
 	char *quick_callable = NULL;
@@ -2292,6 +2380,11 @@ void uwsgi_wsgi_config(char *filename) {
 	uwsgi.single_interpreter = 1;
 
 	if (filename) {
+
+		if (uwsgi.callable) {
+			quick_callable = uwsgi.callable ;
+		}
+
 		uwsgifile = fopen(filename, "r");
         	if (!uwsgifile) {
                 	uwsgi_error("fopen()");
@@ -2326,10 +2419,15 @@ void uwsgi_wsgi_config(char *filename) {
 	}
 	else {
 
-		quick_callable = strchr(uwsgi.wsgi_config, ':');
-		if (quick_callable) {
-			quick_callable[0] = 0 ;
-			quick_callable++;
+		if (uwsgi.callable) {
+			quick_callable = uwsgi.callable ;
+		}
+		else {
+			quick_callable = strchr(uwsgi.wsgi_config, ':');
+			if (quick_callable) {
+				quick_callable[0] = 0 ;
+				quick_callable++;
+			}
 		}
 
 		wsgi_module = PyImport_ImportModule(uwsgi.wsgi_config);
@@ -2395,8 +2493,18 @@ void uwsgi_wsgi_config(char *filename) {
 	}
 	else {
 		// quick callable -> thanks gunicorn for the idea
-		 app_app = PyDict_GetItemString(wsgi_dict, quick_callable);
-                 if (app_app) {
+		// we have extended the concept a bit...
+		if (quick_callable[strlen(quick_callable) -2 ] == '(' && quick_callable[strlen(quick_callable) -1] ==')') {
+			quick_callable[strlen(quick_callable) -2 ] = 0 ;
+			PyObject *tmp_callable = PyDict_GetItemString(wsgi_dict, quick_callable);
+			if (tmp_callable) {
+				app_app = python_call(tmp_callable, PyTuple_New(0), 0);
+			}
+		}
+		else {
+			app_app = PyDict_GetItemString(wsgi_dict, quick_callable);
+		}
+                if (app_app) {
                  	applications = PyDict_New();
                         if (!applications) {
                         	uwsgi_log( "could not initialize applications dictionary\n");
@@ -2407,11 +2515,11 @@ void uwsgi_wsgi_config(char *filename) {
                                 uwsgi_log( "unable to set default application\n");
                                 exit(1);
                         }
-                  }
-                  else {
+                 }
+                 else {
                         uwsgi_log( "\"%s\" callable not found.\n", quick_callable);
 			exit(1);
-                  } 
+                 } 
 	}
 
 	if (!PyDict_Check(applications)) {
@@ -2694,6 +2802,15 @@ void manage_opt(int i, char *optarg) {
 	case LONG_ARGS_CHDIR2:
 		uwsgi.chdir2 = optarg;
 		break;
+	case LONG_ARGS_PING:
+		uwsgi.ping = optarg;
+		break;
+	case LONG_ARGS_PING_TIMEOUT:
+		uwsgi.ping_timeout = atoi(optarg);
+		break;
+	case LONG_ARGS_CALLABLE:
+		uwsgi.callable = optarg;
+		break;
 #ifdef UWSGI_HTTP
 	case LONG_ARGS_HTTP:
 		uwsgi.http = optarg;
@@ -2812,6 +2929,17 @@ void manage_opt(int i, char *optarg) {
 		uwsgi.erlang_cookie = optarg;
 		break;
 #endif
+#ifdef UWSGI_HTTP
+	case LONG_ARGS_HTTP_VAR:
+		if (uwsgi.http_vars_cnt < 63) {
+			uwsgi.http_vars[uwsgi.http_vars_cnt] = optarg;
+			uwsgi.http_vars_cnt++;
+		}
+		else {
+			uwsgi_log( "you can specify at most 64 --http-var options\n");
+		}
+		break;
+#endif
 	case LONG_ARGS_PYTHONPATH:
 		if (uwsgi.python_path_cnt < 63) {
 			uwsgi.python_path[uwsgi.python_path_cnt] = optarg;
@@ -2840,6 +2968,31 @@ void manage_opt(int i, char *optarg) {
 #ifdef UWSGI_INI
 	case LONG_ARGS_INI:
 		uwsgi.ini = optarg;
+		break;
+	case LONG_ARGS_INI_PASTE:
+		uwsgi.ini = optarg;
+		if (uwsgi.ini[0] != '/') {
+			uwsgi.paste = malloc( 7 + strlen(uwsgi.cwd) + 1 + strlen(uwsgi.ini) + 1);
+			if (uwsgi.paste == NULL) {
+				uwsgi_error("malloc()");
+				exit(1);
+			}
+			memset(uwsgi.paste, 0, 7 + strlen(uwsgi.cwd) + strlen(uwsgi.ini) + 1);
+			memcpy(uwsgi.paste, "config:", 7);
+			memcpy(uwsgi.paste + 7, uwsgi.cwd, strlen(uwsgi.cwd));
+			uwsgi.paste[7 + strlen(uwsgi.cwd)] = '/';
+			memcpy(uwsgi.paste + 7 + strlen(uwsgi.cwd) + 1, uwsgi.ini, strlen(uwsgi.ini));
+		}
+		else {
+			uwsgi.paste = malloc( 7 + strlen(uwsgi.ini) + 1);
+			if (uwsgi.paste == NULL) {
+				uwsgi_error("malloc()");
+				exit(1);
+			}
+			memset(uwsgi.paste, 0, 7 + strlen(uwsgi.ini) + 1);
+			memcpy(uwsgi.paste, "config:", 7);
+			memcpy(uwsgi.paste + 7, uwsgi.ini, strlen(uwsgi.ini));
+		}
 		break;
 #endif
 #ifdef UWSGI_PASTE
@@ -2989,7 +3142,7 @@ void manage_opt(int i, char *optarg) {
 \t-v|--max-vars <n>\t\tset maximum number of vars/headers to <n>\n\
 \t-A|--sharedarea <n>\t\tcreate a shared memory area of <n> pages\n\
 \t-c|--cgi-mode\t\t\tset cgi mode\n\
-\t-C|--chmod-socket\t\tchmod socket to 666\n\
+\t-C|--chmod-socket[=NNN]\t\tchmod socket to 666 or NNN\n\
 \t-P|--profiler\t\t\tenable profiler\n\
 \t-m|--memory-report\t\tenable memory usage report\n\
 \t-i|--single-interpreter\t\tsingle interpreter mode\n\
@@ -3002,10 +3155,13 @@ void manage_opt(int i, char *optarg) {
 \t-R|--max-requests\t\tmaximum number of requests for each worker\n\
 \t-j|--test\t\t\ttest if uWSGI can import a module\n\
 \t-Q|--spooler <dir>\t\trun the spooler on directory <dir>\n\
+\t--callable <callable>\t\tset the callable (default 'application')\n\
 \t--pidfile <file>\t\twrite the masterpid to <file>\n\
 \t--chroot <dir>\t\t\tchroot to directory <dir> (only root)\n\
-\t--gid <id>\t\t\tsetgid to <id> (only root)\n\
-\t--uid <id>\t\t\tsetuid to <id> (only root)\n\
+\t--gid <id/groupname>\t\tsetgid to <id/groupname> (only root)\n\
+\t--uid <id/username>\t\tsetuid to <id/username> (only root)\n\
+\t--chdir <dir>\t\t\tchdir to <dir> before app loading\n\
+\t--chdir2 <dir>\t\t\tchdir to <dir> after module loading\n\
 \t--no-server\t\t\tinitialize the uWSGI server then exit. Useful for testing and using uwsgi embedded module\n\
 \t--no-defer-accept\t\tdisable the no-standard way to defer the accept() call (TCP_DEFER_ACCEPT, SO_ACCEPTFILTER...)\n\
 \t--paste <config:/egg:>\t\tload applications using paste.deploy.loadapp()\n\
@@ -3017,8 +3173,11 @@ void manage_opt(int i, char *optarg) {
 \t--post-buffering <bytes>\tbuffer HTTP POST request higher than <bytes> to disk\n\
 \t--post-buffering-bufsize <b>\tset the buffer size to <b> bytes for post-buffering\n\
 \t--prio <N>\t\t\tset process priority/nice to N\n\
+\t--no-orphans\t\t\tautomatically kill workers on master's dead\n\
 \t--udp <ip:port>\t\t\tbind master process to udp socket on ip:port\n\
+\t--multicast <group>\t\tset multicast group\n\
 \t--snmp\t\t\t\tenable SNMP support in the UDP server\n\
+\t--snmp-community <value>\tset SNMP community code to <value>\n\
 \t--erlang <name@ip>\t\tenable the Erlang server with node name <node@ip>\n\
 \t--erlang-cookie <cookie>\ttset the erlang cookie to <cookie>\n\
 \t--nagios\t\t\tdo a nagios check\n\
@@ -3027,9 +3186,32 @@ void manage_opt(int i, char *optarg) {
 \t--proxy-node <socket>\t\tadd the node <socket> to the proxy\n\
 \t--proxy-max-connections <n>\tset the max number of concurrent connections mnaged by the proxy\n\
 \t--wsgi-file <file>\t\tload the <file> wsgi file\n\
+\t--file <file>\t\t\tuse python file instead of python module for configuration\n\
 \t--async <n>\t\t\tenable async mode with n core\n\
 \t--logto <logfile|addr>\t\tlog to file/udp\n\
+\t--logdate\t\t\tadd timestamp to loglines\n\
+\t--ignore-script-name\t\tdisable uWSGI management of SCRIPT_NAME\n\
+\t--ini <inifile>\t\t\tpath of ini config file\n\
+\t--ini-paste <inifile>\t\tpath of ini config file that contains paste configuration\n\
+\t--ldap <url>\t\t\turl of LDAP uWSGIConfig resource\n\
+\t--ldap-schema\t\t\tdump uWSGIConfig LDAP schema\n\
+\t--ldap-schema-ldif\t\tdump uWSGIConfig LDAP schema in LDIF format\n\
+\t--grunt\t\t\t\tenable grunt workers\n\
+\t--ugreen\t\t\tenable uGreen support\n\
+\t--ugreen-stacksize <n>\t\tset uGreen stacksize to <n>\n\
 \t--stackless\t\t\tenable usage of tasklet (only on Stackless Python)\n\
+\t--no-site\t\t\tdo not import site.py on startup\n\
+\t--vhost\t\t\t\tenable virtual hosting\n\
+\t--routing\t\t\tenable uWSGI advanced routing\n\
+\t--http <addr>\t\t\tstart embedded HTTP server on <addr>\n\
+\t--http-only\t\t\tstart only the embedded HTTP server\n\
+\t--http-var KEY[=VALUE]\t\tadd var KEY to uwsgi requests made by the embedded HTTP server\n\
+\t--catch-exceptions\t\tprint exceptions in the browser\n\
+\t--mode\t\t\t\tset configuration mode\n\
+\t--env KEY=VALUE\t\t\tset environment variable\n\
+\t--vacuum\t\t\tclear the environment on exit (remove UNIX sockets and pidfiles)\n\
+\t--ping <addr>\t\t\tping a uWSGI server (returns 1 on failure 0 on success)\n\
+\t--ping-timeout <n>\t\tset ping timeout to <n>\n\
 \t--version\t\t\tprint server version\n\
 \t-d|--daemonize <logfile|addr>\tdaemonize and log into <logfile> or udp <addr>\n", uwsgi.binary_path);
 		exit(1);
@@ -3065,7 +3247,7 @@ void uwsgi_cluster_add_node(char *nodename, int workers) {
 		ucn = &uwsgi.shared->nodes[i];
 
 		if (ucn->name[0] == 0) {
-			strlcpy(ucn->name, nodename, 101);
+			memcpy(ucn->name, nodename, strlen(nodename) + 1);
 			ucn->workers = workers;
 			ucn->ucn_addr.sin_family = AF_INET;
 			ucn->ucn_addr.sin_port = htons(atoi(tcp_port + 1));
@@ -3086,3 +3268,4 @@ void uwsgi_cluster_add_node(char *nodename, int workers) {
 
 	uwsgi_log( "unable to add node %s\n", nodename);
 }
+
