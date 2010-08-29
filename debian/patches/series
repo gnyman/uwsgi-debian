@@ -1,2 +1,3 @@
 100605_02_enable_erlang_integration.patch
 100829_01_initialize_uwsgi_fd.patch
+100829_02_enable_ldap_integration.patch

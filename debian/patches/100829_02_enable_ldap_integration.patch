@@ -1,0 +1,13 @@
+Index: uwsgi-collab/uwsgiconfig.py
+===================================================================
+--- uwsgi-collab.orig/uwsgiconfig.py	2010-08-29 11:41:34.000000000 +0300
++++ uwsgi-collab/uwsgiconfig.py	2010-08-29 11:41:41.000000000 +0300
+@@ -20,7 +20,7 @@
+ UGREEN=False
+ HTTP=True
+ EVDIS=False
+-LDAP=False
++LDAP=True
+ WSGI2=False
+ ROUTING=False
+ STACKLESS=False
