@@ -1,1 +1,2 @@
 100605_02_enable_erlang_integration.patch
+100829_01_initialize_uwsgi_fd.patch
