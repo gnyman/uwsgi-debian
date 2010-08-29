@@ -8,26 +8,38 @@ Contents:
 Automatic starting of instances of uWSGI
 ========================================
 
-init.d script automatically starts one instance of @@uwsgi_binary@@ for each
-XML configuration file found in /etc/uwsgi/@@uwsgi_binary@@/.
+On boot init.d script automatically starts one instance of @@uwsgi_binary@@ for
+each INI/XML configuration file found in /etc/uwsgi/@@uwsgi_binary@@/.
 
-This XML file must have '.xml' extension and, at least, following content:
+INI file has higher precedence. If INI file was found, then XML file with the
+same name will be ignored.
+
+INI file must have '.ini' extension and may be empty.
+
+Example of INI file:
+
+    [uwsgi]
+    uid = uwsgi_user
+    gid = uwsgi_group
+    socket = /tmp/uwsgi.sock
+
+XML file must have '.xml' extension and, at least, following content:
 
     <uwsgi></uwsgi>
 
 Example of more realistic configuration file:
 
     <uwsgi>
-      <uid>1002</uid>
-      <gid>1002</gid>
-      <socket>/tmp/uwsgi.1002.sock</socket>
+      <uid>uwsgi_user</uid>
+      <gid>uwsgi_group</gid>
+      <socket>/tmp/uwsgi.sock</socket>
     </uwsgi>
 
 For list of options passed by default to each started instance see
 /etc/default/@@uwsgi_binary@@.
 
 Service files of started uWSGI instance are located in directory named after
-configuration file (without '.xml' extension):
+configuration file (without '.ini'/'.xml' extension):
   * UNIX socket | /var/run/uwsgi/@@uwsgi_binary@@/<confname>/socket
   * pidfile     | /var/run/uwsgi/@@uwsgi_binary@@/<confname>/pid
 
@@ -42,14 +54,13 @@ After starting of uWSGI instance init.d script tries to chown and/or chmod:
 If mentioned directory doesn't exist it will be created. Note that this
 directory will be chowned/chmodded only if it was created by init.d script.
 
-init.d script tries to parse XML configuration file for values of <uid> or
-<gid> tag. If this tag didn't found, init.d tries to parse DAEMON_OPTS for
-'--uid' or '--gid' option. If even this fails, then directory will be chowned
-to root:root.
+init.d script tries to parse configuration file for values of uid/gid. If such
+the key/tag didn't found, init.d tries to parse DAEMON_OPTS for '--uid' or
+'--gid' option. If even this fails, then directory will be chowned to
+root:root.
 
 Chmodding of UNIX socket is made by using uWSGI option '--chmod-socket' in
-DEFAULT_DAEMON_OPTS and DAEMON_OPTS. For value of these variables see
-/etc/default/@@uwsgi_binary@@.
+DAEMON_OPTS. For value of this variable see /etc/default/@@uwsgi_binary@@.
 
 Commands recognized by init.d script
 ====================================

@@ -17,11 +17,13 @@ do_command()
 
   local ERRORS=0
 
-  # List of names of user-defined configuration files.
+  # List of unique names of user-defined configuration files.
   local ALL_CONFNAMES=$(
-    ls -1 "$CONFDIR"/*.xml 2>/dev/null \
-    | sed 's/^.\+\/\(.\+\)\.xml$/\1/g' \
-    | tr '\n' ' '
+    ls -1 "$CONFDIR" 2>/dev/null \
+    | grep "\.\(ini\|xml\)$" \
+    | sed 's/^\(.\+\)\.\(ini\|xml\)$/\1/g' \
+    | uniq \
+    | tr '\n' ' ' \
   )
 
   # Do not start if disabled.
@@ -44,7 +46,7 @@ do_with_given_specific_daemons()
 
   local ERRORS=0
   for CONFNAME in "$@"; do
-    if [ ! -e $CONFDIR/$CONFNAME.xml ]; then
+    if [ -z $(path_to_conffile_with_name "$CONFNAME") ]; then
       [ "$VERBOSE" != no ] && log_progress_msg "$CONFNAME?"
     else
       case "$COMMAND" in

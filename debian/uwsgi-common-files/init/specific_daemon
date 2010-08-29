@@ -10,8 +10,8 @@ do_start_specific_daemon()
 {
   local CONFNAME=$1
 
-  local CONFFILE=$CONFDIR/$CONFNAME.xml
-  if [ ! -e "$CONFFILE" ]; then
+  local CONFFILE=$(path_to_conffile_with_name "$CONFNAME")
+  if [ -z "$CONFFILE" ]; then
     return 2
   fi
 
@@ -32,12 +32,20 @@ do_start_specific_daemon()
     --test > /dev/null \
       || return 1
 
+  local CONFFILE_OPTION_NAME
+  local CONFTYPE=$(type_of_conffile "$CONFFILE")
+  if [ "$CONFTYPE" = "ini" ]; then
+    CONFFILE_OPTION_NAME=ini
+  elif [ "$CONFTYPE" = "xml" ]; then
+    CONFFILE_OPTION_NAME=xmlconfig
+  fi
+
   local DAEMON_ARGS=" \
     $DAEMON_OPTS \
     --daemonize $UWSGI_LOGDIR/${CONFNAME}.${LOG_FILENAME_SUFFIX}.log \
     --pidfile $PIDFILE \
     --socket $SOCKET \
-    --xmlconfig $CONFFILE \
+    --${CONFFILE_OPTION_NAME} $CONFFILE \
   "
   start-stop-daemon --start --quiet \
     --pidfile $PIDFILE \
