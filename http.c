@@ -30,12 +30,23 @@ void http_end() {
 	exit(0);
 }
 
-static char *add_uwsgi_var(char *up, char *key, uint16_t keylen, char *val, uint16_t vallen, int header)
+void http_wait_end() {
+	pid_t wp_p;
+	int wp_c;
+	wp_p = waitpid(-1, &wp_c, 0); 
+	uwsgi_log("closing uWSGI embedded HTTP server.\n");
+	exit(0);
+}
+
+static char *add_uwsgi_var(char *up, char *key, uint16_t keylen, char *val, uint16_t vallen, int header, char *watermark)
 {
 
 	int i;
 
 	if (!header) {
+
+		if ( (up + 2 + keylen + 2 + vallen) > watermark ) return up ;
+
 		*up++ = (unsigned char) (keylen & 0xff);
 		*up++ = (unsigned char) ((keylen >> 8) & 0xff);
 
@@ -48,16 +59,18 @@ static char *add_uwsgi_var(char *up, char *key, uint16_t keylen, char *val, uint
 			if (key[i] == '-') {
 				key[i] = '_';
 			} else {
-				key[i] = toupper(key[i]);
+				key[i] = toupper( (int) key[i]);
 			}
 		}
 
 		if (strncmp("CONTENT_TYPE", key, keylen) && strncmp("CONTENT_LENGTH", key, keylen)) {
+			if ( (up + 2 + keylen + 5 + 2 + vallen) > watermark ) return up ;
 			*up++ = (unsigned char) (((uint16_t) keylen + 5) & 0xff);
 			*up++ = (unsigned char) ((((uint16_t) keylen + 5) >> 8) & 0xff);
 			memcpy(up, "HTTP_", 5);
 			up += 5;
 		} else {
+			if ( (up + 2 + keylen + 2 + vallen) > watermark ) return up ;
 			*up++ = (unsigned char) (keylen & 0xff);
 			*up++ = (unsigned char) ((keylen >> 8) & 0xff);
 		}
@@ -98,10 +111,29 @@ void http_loop(struct uwsgi_server * uwsgi)
 		exit(1);
 	}
 
+	// ignore broken pipes;
+	signal(SIGPIPE, SIG_IGN);
 	if (!uwsgi->http_only) {
 		signal(SIGCHLD, &http_end);
+		signal(SIGINT, &http_wait_end);
+	}
+	else {
+		signal(SIGINT, &http_end);
 	}
 
+	uwsgi->http_server_name = malloc(256);
+	if (!uwsgi->http_server_name) {
+		uwsgi_error("malloc()");
+		exit(1);
+	}
+
+	memset(uwsgi->http_server_name, 0, 256);
+	if (gethostname(uwsgi->http_server_name, 255)) {
+		uwsgi_error("gethostname()");
+		memcpy(uwsgi->http_server_name, "localhost", 9);
+	}
+
+	uwsgi_log("starting HTTP loop on %s (pid: %d)\n", uwsgi->http_server_name, (int) getpid());
 	for(;;) {
 
 		if (!uwsgi->http_only) {
@@ -128,6 +160,7 @@ void http_loop(struct uwsgi_server * uwsgi)
 		if (ret) {
 			uwsgi_log("pthread_create() = %d\n", ret);
 			free(ur);
+			// sleep a bit to allow some resource gaining
 			sleep(1);
 			continue;
 		}
@@ -158,8 +191,7 @@ static void *http_request(void *u_h_r)
 
 	size_t len;
 
-	int i,
-	 j;
+	int i, j;
 
 	char HTTP_header_key[1024];
 
@@ -167,8 +199,12 @@ static void *http_request(void *u_h_r)
 
 	ptr = tmp_buf;
 
+	int qs = 0;
+
 	up = uwsgipkt;
 
+	char *watermark = up + 4096 ;
+	char *watermark2 = tmp_buf + 4096 ;
 
 	up[0] = 0;
 	up[3] = 0;
@@ -186,31 +222,37 @@ static void *http_request(void *u_h_r)
 
 				if (state == uwsgi_http_method) {
 
-					up = add_uwsgi_var(up, "REQUEST_METHOD", 14, tmp_buf, ptr - tmp_buf, 0);
+					up = add_uwsgi_var(up, "REQUEST_METHOD", 14, tmp_buf, ptr - tmp_buf, 0, watermark);
 					ptr = tmp_buf;
 					state = uwsgi_http_uri;
 
 				} else if (state == uwsgi_http_uri) {
 
-					up = add_uwsgi_var(up, "REQUEST_URI", 11, tmp_buf, ptr - tmp_buf, 0);
+					up = add_uwsgi_var(up, "REQUEST_URI", 11, tmp_buf, ptr - tmp_buf, 0, watermark);
 
 					int path_info_len = ptr - tmp_buf;
 					for (j = 0; j < ptr - tmp_buf; j++) {
 						if (tmp_buf[j] == '?') {
 							path_info_len = j;
 							if (j + 1 < (ptr - tmp_buf)) {
-								up = add_uwsgi_var(up, "QUERY_STRING", 12, tmp_buf + j + 1, (ptr - tmp_buf) - (j + 1), 0);
+								up = add_uwsgi_var(up, "QUERY_STRING", 12, tmp_buf + j + 1, (ptr - tmp_buf) - (j + 1), 0, watermark);
+								qs = 1 ;
 							}
 							break;
 						}
 					}
-					up = add_uwsgi_var(up, "PATH_INFO", 9, tmp_buf, path_info_len, 0);
+
+					if (!qs) {
+						up = add_uwsgi_var(up, "QUERY_STRING", 12, NULL, 0, 0, watermark);
+					}
+					up = add_uwsgi_var(up, "PATH_INFO", 9, tmp_buf, path_info_len, 0, watermark);
 
 					ptr = tmp_buf;
 					state = uwsgi_http_protocol;
 
 				} else if (state == uwsgi_http_header_key_colon) {
 
+					if (ptr+1 > watermark2) { close(uwsgi_fd); goto clear;}
 					*ptr++ = 0;
 
 					memset(HTTP_header_key, 0, sizeof(HTTP_header_key));
@@ -219,6 +261,7 @@ static void *http_request(void *u_h_r)
 					state = uwsgi_http_header_val;
 				} else {
 					//check for overflow
+					if (ptr+1 > watermark2) { close(uwsgi_fd); goto clear;}
 					*ptr++ = buf[i];
 				}
 
@@ -236,8 +279,9 @@ static void *http_request(void *u_h_r)
 
 				if (state == uwsgi_http_header_val_r) {
 
-					up = add_uwsgi_var(up, HTTP_header_key, strlen(HTTP_header_key), tmp_buf, ptr - tmp_buf, 1);
+					up = add_uwsgi_var(up, HTTP_header_key, strlen(HTTP_header_key), tmp_buf, ptr - tmp_buf, 1, watermark);
 					if (!strcmp("CONTENT_LENGTH", HTTP_header_key)) {
+						if (ptr+1 > watermark2) { close(uwsgi_fd); goto clear;}
 						*ptr++ = 0;
 						http_body_len = atoi(tmp_buf);
 					}
@@ -245,26 +289,35 @@ static void *http_request(void *u_h_r)
 					state = uwsgi_http_header_key;
 				} else if (state == uwsgi_http_protocol_r) {
 
-					up = add_uwsgi_var(up, "SERVER_PROTOCOL", 15, tmp_buf, ptr - tmp_buf, 0);
+					up = add_uwsgi_var(up, "SERVER_PROTOCOL", 15, tmp_buf, ptr - tmp_buf, 0, watermark);
 					ptr = tmp_buf;
 					state = uwsgi_http_header_key;
 				} else if (state == uwsgi_http_end) {
 					need_to_read = 0;
 
 
-					if (uwsgi.http_server_name) {
-						up = add_uwsgi_var(up, "SERVER_NAME", 11, uwsgi.http_server_name, strlen(uwsgi.http_server_name), 0);
-					} else {
-						up = add_uwsgi_var(up, "SERVER_NAME", 11, "localhost", 9, 0);
-					}
+					up = add_uwsgi_var(up, "SERVER_NAME", 11, uwsgi.http_server_name, strlen(uwsgi.http_server_name), 0, watermark);
+					up = add_uwsgi_var(up, "SERVER_PORT", 11, uwsgi.http_server_port, strlen(uwsgi.http_server_port), 0, watermark);
 
-					up = add_uwsgi_var(up, "SERVER_PORT", 11, uwsgi.http_server_port, strlen(uwsgi.http_server_port), 0);
-					up = add_uwsgi_var(up, "SCRIPT_NAME", 11, "", 0, 0);
+					up = add_uwsgi_var(up, "SCRIPT_NAME", 11, "", 0, 0, watermark);
 
 					char *ip = inet_ntoa(ur->c_addr.sin_addr);
-					up = add_uwsgi_var(up, "REMOTE_ADDR", 11, ip, strlen(ip), 0);
+					up = add_uwsgi_var(up, "REMOTE_ADDR", 11, ip, strlen(ip), 0, watermark);
 
+					//up = add_uwsgi_var(up, "REMOTE_ADDR", 11, "127.0.0.1", 9, 0, watermark);
 					//up = add_uwsgi_var(up, "REMOTE_USER", 11, "unknown", 7, 0);
+
+					for(j=0;j<uwsgi.http_vars_cnt;j++) {
+						char *separator;
+						
+						separator = strchr(uwsgi.http_vars[j], '=');
+						if (separator) {
+							up = add_uwsgi_var(up, uwsgi.http_vars[j], separator - uwsgi.http_vars[j], separator + 1, strlen(separator + 1), 0, watermark);
+						}
+						else {
+							up = add_uwsgi_var(up, uwsgi.http_vars[j], strlen(uwsgi.http_vars[j]), NULL, 0, 0, watermark);
+						}
+					}
 
 					uwsgi_fd = uwsgi_connect(uwsgi.socket_name, 10);
 					if (uwsgi_fd >= 0) {
@@ -298,6 +351,10 @@ static void *http_request(void *u_h_r)
 						}
 						close(uwsgi_fd);
 					}
+					else {
+						close(uwsgi_fd);
+						goto clear;
+					}
 				}
 			} else if (buf[i] == ':') {
 
@@ -305,11 +362,13 @@ static void *http_request(void *u_h_r)
 					state = uwsgi_http_header_key_colon;
 				} else {
 					//check for overflow
+					if (ptr+1 > watermark2) { close(uwsgi_fd); goto clear;}
 					*ptr++ = buf[i];
 				}
 			} else {
 
 				//check for overflow
+				if (ptr+1 > watermark2) { close(uwsgi_fd); goto clear;}
 				*ptr++ = buf[i];
 			}
 
@@ -317,6 +376,7 @@ static void *http_request(void *u_h_r)
 
 	}
 
+clear:
 	close(clientfd);
 
 	free(ur);
