@@ -3,3 +3,4 @@
 100829_02_enable_ldap_integration.patch
 100830_01_enable_routing.patch
 100830_02_initialize_route_py.patch
+100830_03_enable_profiler.patch
