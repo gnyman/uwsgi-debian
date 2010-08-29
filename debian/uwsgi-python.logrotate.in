@@ -1,13 +1,9 @@
 "/var/log/uwsgi/@@uwsgi_binary@@/*.log" {
+  copytruncate
   daily
   rotate 5
   compress
   delaycompress
   missingok
   notifempty
-  create 0640 root root
-  sharedscripts
-  postrotate
-    /etc/init.d/@@uwsgi_binary@@ restart > /dev/null
-  endscript
 }
