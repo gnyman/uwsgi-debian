@@ -18,8 +18,8 @@ RUN_AT_STARTUP=1
 DAEMON_OPTS=" \
   --master \
   --no-orphans \
-  --enable-threads \
-  --disable-logging \
+  --processes 2 \
+  --logdate \
   --chmod-socket=660 \
   --uid www-data \
   --gid www-data \
