@@ -4,6 +4,13 @@
 # Run automatically at system startup?
 RUN_AT_STARTUP=1
 
+# At startup VERBOSE value is setted in 'no'. So when user invokes
+# @@uwsgi_binary@@ initscript, no output is showed.
+# It could be unexpected behaviour, because it is common practice for
+# initscript to ignore VERBOSE value.
+# Here VERBOSE is overriden to conform such the practice.
+VERBOSE=yes
+
 # init.d script starts instance of @@uwsgi_binary@@ daemon for each found
 # user-created configuration file.
 #
