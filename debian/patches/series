@@ -6,3 +6,4 @@
 100830_03_enable_profiler.patch
 100831_01_define_uwsgi_plugin_dir.patch
 100831_02_initialize_ret_in_embed_plugins.patch
+100831_03_define_embedded_plugins.patch

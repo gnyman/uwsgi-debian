@@ -1,0 +1,29 @@
+Description: Define embedded plugins.
+Author: Leonid Borisenko <leo.borisenko@gmail.com>
+
+Index: uwsgi-0.9.6/uwsgiconfig.py
+===================================================================
+--- uwsgi-0.9.6.orig/uwsgiconfig.py	2010-08-31 22:04:18.000000000 +0300
++++ uwsgi-0.9.6/uwsgiconfig.py	2010-08-31 22:05:39.000000000 +0300
+@@ -25,7 +25,7 @@
+ ROUTING=True
+ STACKLESS=False
+ #PLUGINS = ['psgi']
+-PLUGINS = []
++PLUGINS = ['lua', 'psgi']
+ USWALLOW=False
+ UNBIT=False
+ DEBUG=False
+@@ -117,12 +117,6 @@
+ 		if ret != 0:
+ 			sys.exit(1)
+ 
+-	if len(PLUGINS) > 0:
+-		print("*** uWSGI building plugins ***")
+-		for plugin in PLUGINS:
+-			print("*** building plugin: %s ***" % plugin)
+-			build_plugin("plugins/%s" % plugin)
+-
+ 	print("*** uWSGI linking ***")
+ 	ldline = "%s -o %s %s %s %s" % (GCC, bin_name, ' '.join(ldflags), ' '.join(map(add_o, gcc_list)), ' '.join(libs))
+ 	print(ldline)
