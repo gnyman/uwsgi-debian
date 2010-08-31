@@ -1,0 +1,15 @@
+Description: Add forgotten initialization of variable 'ret'.
+Author: Leonid Borisenko <leo.borisenko@gmail.com>
+
+Index: uwsgi-0.9.6/plugins.c
+===================================================================
+--- uwsgi-0.9.6.orig/plugins.c	2010-08-31 21:26:07.000000000 +0300
++++ uwsgi-0.9.6/plugins.c	2010-08-31 21:27:00.000000000 +0300
+@@ -1,6 +1,7 @@
+ #include "uwsgi.h"
+ 
+ void embed_plugins(struct uwsgi_server *uwsgi) {
++	int ret = 0;
+ 
+ #ifdef UWSGI_EMBED_PLUGIN_PSGI
+ 	if (uwsgi->plugin_arg_psgi)
