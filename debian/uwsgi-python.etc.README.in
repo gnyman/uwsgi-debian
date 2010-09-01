@@ -7,5 +7,5 @@ with additional option:
   * for XML: '--xmlconfig /etc/uwsgi/@@uwsgi_binary@@/<configuration file>'
 
 See more detailed information at:
-  * /usr/share/doc/@@uwsgi_binary@@/README.Debian
+  * /usr/share/doc/@@uwsgi_binary@@/README.Debian.gz
   * /etc/default/@@uwsgi_binary@@
