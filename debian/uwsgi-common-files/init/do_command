@@ -30,9 +30,13 @@ do_command()
     return 2
   fi
 
-  # Command actions.
-  do_with_given_specific_daemons $COMMAND $ALL_CONFNAMES
-  ERRORS=$(expr $ERRORS + $?)
+  if [ -z "$ALL_CONFNAMES" ]; then
+    log_progress_msg "(omitted; missing conffile(s) in /etc/uwsgi/${NAME})"
+  else
+    # Command actions.
+    do_with_given_specific_daemons $COMMAND $ALL_CONFNAMES
+    ERRORS=$(expr $ERRORS + $?)
+  fi
 
   return "$ERRORS"
 }
