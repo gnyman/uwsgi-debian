@@ -9,3 +9,4 @@
 100831_03_define_embedded_plugins.patch
 100901_01_fix_buffer_overflow_in_psgi_plugin.patch
 100901_02_enable_sctp.patch
+100901_03_enable_ugreen.patch
