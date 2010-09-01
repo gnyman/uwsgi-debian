@@ -26,7 +26,7 @@ do_command()
 
   # Do not start if disabled.
   if [ "$COMMAND" = start -a "$RUN_AT_STARTUP" != 1 ]; then
-    [ "$VERBOSE" != no ] && log_progress_msg "(disabled; see /etc/default/#{NAME})"
+    [ "$VERBOSE" != no ] && log_progress_msg "(disabled; see /etc/default/${NAME})"
     return 2
   fi
 
