@@ -7,3 +7,4 @@
 100831_01_define_uwsgi_plugin_dir.patch
 100831_02_initialize_ret_in_embed_plugins.patch
 100831_03_define_embedded_plugins.patch
+100901_01_fix_buffer_overflow_in_psgi_plugin.patch
