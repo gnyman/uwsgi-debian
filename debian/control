@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: Leonid Borisenko <leo.borisenko@gmail.com>
 Build-Depends: cdbs, debhelper (>= 7.0.50~), python, python2.5, python2.6,
  python-all-dev, python3.1, python3.1-dev, libxml2-dev, erlang-dev,
- libpcre3-dev, libldap2-dev, liblua5.1-0-dev, libperl-dev,
+ libpcre3-dev, libldap2-dev, liblua5.1-0-dev, libperl-dev, ruby, ruby-dev,
  apache2-threaded-dev, libapr1-dev, libaprutil1-dev, help2man
 Standards-Version: 3.9.1
 Homepage: http://projects.unbit.it/uwsgi/
@@ -108,6 +108,18 @@ Description: Perl PSGI plugin for uWSGI
  languages or platform.
  .
  This package provide Perl PSGI plugin for uWSGI.
+
+Package: uwsgi-plugin-rack
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi
+Description: Ruby Rack plugin for uWSGI
+ uWSGI is aimed for professional python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide Ruby Rack plugin for uWSGI.
 
 Package: libapache2-mod-uwsgi
 Architecture: any
