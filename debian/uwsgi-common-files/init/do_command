@@ -7,8 +7,6 @@ do_command()
   local COMMAND=$1
   shift
 
-  [ "$VERBOSE" != no ] && log_progress_msg "->"
-
   # If command is given with arguments, i.e. 'start smth smth_else'
   if [ ! -z "$1" ]; then
     do_with_given_specific_daemons $COMMAND "$@"
@@ -43,6 +41,8 @@ do_with_given_specific_daemons()
 {
   local COMMAND=$1
   shift
+
+  [ "$VERBOSE" != no -a -n "$1" ] && log_progress_msg "->"
 
   local ERRORS=0
   for CONFNAME in "$@"; do
