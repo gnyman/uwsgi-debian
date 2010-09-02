@@ -37,8 +37,10 @@ Description: fast, self-healing, developer-friendly WSGI server (common files)
  a plugin loading technology that can be used to add support for other
  languages or platform.
  .
- This package provides files with supplementary functions for init.d script of
- uWSGI server.
+ This package provides:
+   * files with supplementary functions for init.d script of uWSGI server
+   * uWSGI usage examples
+   * uWSGI test suite
 
 Package: uwsgi-python2.5
 Architecture: any

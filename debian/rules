@@ -20,6 +20,8 @@ python_ver = $(call list_pkgname_suffixes,uwsgi-python)
 # List of packaged plugins' names
 plugins = $(call list_pkgname_suffixes,uwsgi-plugin-)
 
+common_docs_collection_dir = $(CURDIR)/debian/uwsgi-common-files/docs
+
 # List of packaged Apache2 modules' names
 libapache2_mods = uwsgi Ruwsgi
 
@@ -37,6 +39,7 @@ libapache2_mod_pkg_templates = install postinst prerm
 # Returns substring after last '-' character
 last_pkgname_component = $(lastword $(subst -, ,$(1)))
 
+DEB_COMPRESS_EXCLUDE_uwsgi-common = .py .pl .xml .psgi .png
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
 clean::
@@ -54,6 +57,8 @@ clean::
 	$(RM) -r $(addprefix $(CURDIR)/apache2/mod_, $(foreach module_name, $(libapache2_mods), \
 		$(addprefix $(module_name), .la .lo .slo) \
 	))
+	# collected common docs
+	$(RM) $(common_docs_collection_dir)
 	# instantiated uwsgi-pythonX.Y templates
 	for type in $(uwsgi_python_pkg_templates); do \
 		$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .$$type,$(python_ver))); \
@@ -108,6 +113,28 @@ $(patsubst %,debian/stamp-libapache2-mod-%,$(call ruwsgi_to_lc,$(libapache2_mods
 		$(CURDIR)/apache2/mod_$(module_name).c
 	touch $@
 
+install/uwsgi-common::
+	mkdir $(common_docs_collection_dir)
+	cp -r $(CURDIR)/tests $(common_docs_collection_dir)
+	for subdir in conffile psgi wsgi; do \
+		mkdir -p $(common_docs_collection_dir)/examples/$$subdir; \
+	done
+	for file in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py; do\
+		cp $(CURDIR)/$$file $(common_docs_collection_dir)/examples; \
+	done
+	for file in mega.xml uwsgi.xml; do \
+		cp $(CURDIR)/$$file $(common_docs_collection_dir)/examples/conffile; \
+	done
+	for file in mojoapp.pl psgi.py test.psgi; do \
+		cp $(CURDIR)/$$file $(common_docs_collection_dir)/examples/psgi; \
+	done
+	for file in hello_world_rrdtool.py mjpeg_stream.py simple_app.py \
+	            simple_app_wsgi2.py testapp.py ugreenchat.py uploadtest.py \
+	            ; do \
+		cp $(CURDIR)/$$file $(common_docs_collection_dir)/examples/wsgi; \
+	done
+	chmod a-x $(common_docs_collection_dir)/examples/wsgi/ugreenchat.py
+
 # Install uwsgi-python% package
 $(patsubst %,install/uwsgi-python%,$(python_ver))::
 	help2man \
@@ -142,3 +169,6 @@ $(patsubst %,binary-post-install/uwsgi-python%,$(python_ver))::
 	sed -e 's/@@uwsgi_binary@@/$(package_name)/g' \
 		< $(CURDIR)/debian/uwsgi-python.etc.README.in \
 		> $(CURDIR)/debian/$(cdbs_curpkg)/etc/uwsgi/$(package_name)/README
+	$(eval sharedocdir = $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/doc)
+	ln -s ../uwsgi-common/tests $(sharedocdir)/$(cdbs_curpkg)/tests
+	ln -s ../uwsgi-common/examples $(sharedocdir)/$(cdbs_curpkg)/examples
