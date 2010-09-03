@@ -4,6 +4,7 @@ Contents:
   3. Commands recognized by init.d script
   4. Controling specific instances of uWSGI
   5. Status of executing init.d command for specific instance
+  6. Entirely custom configured uWSGI instance
 
 Automatic starting of instances of uWSGI
 ========================================
@@ -116,3 +117,12 @@ It means that:
   * starting 'moogl' is failed
 
 Return value of init.d script is the number of instances with '!' mark.
+
+Entirely custom configured uWSGI instance
+=========================================
+
+There is an example of simple custom init.d script in
+/usr/share/doc/@@uwsgi_binary@@/@@uwsgi_binary@@.init.d.custom
+
+It could be useful for starting entirely custom configured uWSGI server
+instance.

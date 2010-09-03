@@ -30,7 +30,7 @@ ruwsgi_to_orig = $(subst ruwsgi,Ruwsgi,$(1))
 
 # List of templates to instantiate for each uwsgi-pythonX.Y package
 uwsgi_python_pkg_templates = dirs install default init.d logrotate \
-                             manpages README.Debian
+                             docs manpages README.Debian init.d.custom
 
 # List of templates to instantiate for each libapache2-mod-X package
 # There is special-case template, not listed here: uwsgi.load.in
