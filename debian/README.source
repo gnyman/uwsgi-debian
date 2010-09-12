@@ -36,14 +36,3 @@ Algorithmically speaking (see it in debian/rules):
      'plugins' variable.
   4. In each of these rules 'uwsgiconfig.py --plugin <specific plugin location>'
      is executed.
-
-Why define '-fno-strict-aliasing' in CFLAGS for uwsgi-python2.*?
-================================================================
-
-uWSGI for Python 2.* should be compiled without '-fstrict-aliasing' to avoid
-warning 'dereferencing type-punned pointer will break strict-aliasing rules'
-about well-known Python 2.* API "feature".
-
-CDBS automatically adds '-O2' to CFLAGS and this optimization level includes
-'-fstrict-aliasing'. So it is overriden (with '-fno-strict-aliasing')
-specifically for packages 'uwsgi-python2.*'.
