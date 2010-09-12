@@ -258,7 +258,7 @@ PyObject *py_uwsgi_sharedarea_write(PyObject * self, PyObject * args) {
 		return NULL;
 	}
 
-	if (pos + strlen(value) >= uwsgi.page_size * uwsgi.sharedareasize) {
+	if (pos + (int) strlen(value) >= uwsgi.page_size * uwsgi.sharedareasize) {
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
@@ -373,6 +373,58 @@ PyObject *py_uwsgi_spooler_freq(PyObject * self, PyObject * args) {
 	
 }
 
+PyObject *py_uwsgi_spooler_jobs(PyObject * self, PyObject * args) {
+
+	DIR *sdir;
+        struct dirent *dp;
+	char *abs_path;
+        struct stat sf_lstat;
+
+	PyObject *jobslist = PyList_New(0);
+
+	sdir = opendir(uwsgi.spool_dir);
+
+                if (sdir) {
+                        while ((dp = readdir(sdir)) != NULL) {
+                                if (!strncmp("uwsgi_spoolfile_on_", dp->d_name, 19)) {
+					abs_path = malloc(strlen(uwsgi.spool_dir) + 1 + strlen(dp->d_name) + 1);
+					if (!abs_path) {
+						uwsgi_error("malloc()");
+						closedir(sdir);
+						goto clear;
+					}
+
+					memset(abs_path, 0 , strlen(uwsgi.spool_dir) + 1 + strlen(dp->d_name) + 1);
+
+					memcpy(abs_path, uwsgi.spool_dir, strlen(uwsgi.spool_dir));
+					memcpy(abs_path + strlen(uwsgi.spool_dir) , "/", 1);
+					memcpy(abs_path + strlen(uwsgi.spool_dir) + 1, dp->d_name, strlen(dp->d_name) );
+
+
+                                        if (lstat(abs_path, &sf_lstat)) {
+						free(abs_path);
+                                                continue;
+                                        }
+                                        if (!S_ISREG(sf_lstat.st_mode)) {
+						free(abs_path);
+                                                continue;
+                                        }
+                                        if (!access(abs_path, R_OK | W_OK)) {
+						if (PyList_Append(jobslist, PyString_FromString(abs_path))) {
+							PyErr_Print();
+						}
+					}
+					free(abs_path);
+				}
+			}
+			closedir(sdir);
+		}
+
+clear:
+	return jobslist;
+	
+}
+
 
 PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args) {
 	PyObject *spool_dict, *spool_vars;
@@ -479,6 +531,8 @@ PyObject *py_uwsgi_send_multi_message(PyObject * self, PyObject * args) {
 	char *buffer;
 	struct uwsgi_header uh;
 	PyObject *arg_cluster;
+	
+	PyObject *cluster_node;
 
 	PyObject *arg_host, *arg_port, *arg_message;
 
@@ -536,7 +590,7 @@ PyObject *py_uwsgi_send_multi_message(PyObject * self, PyObject * args) {
 	for (i = 0; i < clen; i++) {
 		multipoll[i].events = POLLIN;
 
-		PyObject *cluster_node = PyTuple_GetItem(arg_cluster, i);
+		cluster_node = PyTuple_GetItem(arg_cluster, i);
 		arg_host = PyTuple_GetItem(cluster_node, 0);
 		if (!PyString_Check(arg_host)) {
 			goto clear;
@@ -917,15 +971,120 @@ PyObject *py_uwsgi_mem(PyObject * self, PyObject * args) {
 }
 
 PyObject *py_uwsgi_disconnect(PyObject * self, PyObject * args) {
-	uwsgi_log( "disconnecting worker %d (pid :%d) from session...\n", uwsgi.mywid, uwsgi.mypid);
-
+	
 	struct wsgi_request *wsgi_req = current_wsgi_req(&uwsgi);
+	
+	uwsgi_log( "disconnecting worker %d (pid :%d) from session...\n", uwsgi.mywid, uwsgi.mypid);
 
 	fclose(wsgi_req->async_post);
 	wsgi_req->fd_closed = 1 ;
 
 	Py_INCREF(Py_True);
 	return Py_True;
+}
+
+PyObject *py_uwsgi_parse_file(PyObject * self, PyObject * args) {
+
+	char *filename;
+	int fd;
+	ssize_t len;
+	char *buffer, *ptrbuf, *bufferend, *keybuf;
+	uint16_t strsize = 0, keysize = 0;
+
+	struct uwsgi_header uh;
+	PyObject *zero;
+
+	if (!PyArg_ParseTuple(args, "s:parsefile", &filename)) {
+                return NULL;
+        }
+
+	fd = open(filename, O_RDONLY);
+	if (fd < 0) {
+		uwsgi_error("open()");
+		goto clear;
+	}
+
+	len = read(fd, &uh, 4);
+	if (len != 4) {
+		uwsgi_error("read()");
+		goto clear2;
+	}
+	
+	buffer = malloc(uh.pktsize);
+	if (!buffer) {
+		uwsgi_error("malloc()");
+		goto clear2;
+	}
+	len = read(fd, buffer, uh.pktsize);
+	if (len != uh.pktsize) {
+		uwsgi_error("read()");
+		free(buffer);
+		goto clear2;
+	}
+
+	ptrbuf = buffer ;
+	bufferend = ptrbuf + uh.pktsize ;
+
+	if (!uh.modifier1 || uh.modifier1 == UWSGI_MODIFIER_SPOOL_REQUEST) {
+		zero = PyDict_New();
+
+		while (ptrbuf < bufferend) {
+                	if (ptrbuf + 2 < bufferend) {
+                        	memcpy(&strsize, ptrbuf, 2);
+#ifdef __BIG_ENDIAN__
+                        	strsize = uwsgi_swap16(strsize);
+#endif
+                        	/* key cannot be null */
+                        	if (!strsize) {
+                                	uwsgi_log( "uwsgi key cannot be null.\n");
+					goto clear3;
+                        	}
+
+                        	ptrbuf += 2;
+                        	if (ptrbuf + strsize < bufferend) {
+                                	// var key
+                                	keybuf = ptrbuf;
+                                	keysize = strsize;
+                                	ptrbuf += strsize;
+                                	// value can be null (even at the end) so use <=
+                                	if (ptrbuf + 2 <= bufferend) {
+                                        	memcpy(&strsize, ptrbuf, 2);
+#ifdef __BIG_ENDIAN__
+                                        	strsize = uwsgi_swap16(strsize);
+#endif
+                                        	ptrbuf += 2;
+                                        	if (ptrbuf + strsize <= bufferend) {
+							PyDict_SetItem(zero, PyString_FromStringAndSize( keybuf, keysize ), PyString_FromStringAndSize( ptrbuf, strsize ));
+                                                	ptrbuf += strsize;
+                                        	}
+                                        	else {
+							goto clear3;
+                                        	}
+                                	}
+                                	else {
+						goto clear3;
+                                	}
+                        	}
+                	}
+                	else {
+				goto clear3;
+                	}
+        	}
+
+		return zero;
+
+	}
+
+	goto clear;
+
+clear3:
+	Py_DECREF(zero);
+clear2:
+	close(fd);
+clear:
+	Py_INCREF(Py_None);
+	return Py_None;
+	
 }
 
 PyObject *py_uwsgi_grunt(PyObject * self, PyObject * args) {
@@ -978,6 +1137,7 @@ clear:
 static PyMethodDef uwsgi_spooler_methods[] = {
 	{"send_to_spooler", py_uwsgi_send_spool, METH_VARARGS, ""},
 	{"set_spooler_frequency", py_uwsgi_spooler_freq, METH_VARARGS, ""},
+	{"spooler_jobs", py_uwsgi_spooler_jobs, METH_VARARGS, ""},
 	{NULL, NULL},
 };
 #endif
@@ -1016,6 +1176,7 @@ static PyMethodDef uwsgi_advanced_methods[] = {
 #ifdef UWSGI_ASYNC
 	{"async_sleep", py_uwsgi_async_sleep, METH_VARARGS, ""},
 #endif
+	{"parsefile", py_uwsgi_parse_file, METH_VARARGS, ""},
 	//{"call_hook", py_uwsgi_call_hook, METH_VARARGS, ""},
 	{NULL, NULL},
 };

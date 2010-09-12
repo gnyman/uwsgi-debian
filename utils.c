@@ -155,18 +155,20 @@ void logto(char *logfile) {
 
 
 	/* stdout */
-	if (dup2(fd, 1) < 0) {
-		uwsgi_error("dup2()");
-		exit(1);
+	if (fd != 1) {
+		if (dup2(fd, 1) < 0) {
+			uwsgi_error("dup2()");
+			exit(1);
+		}
+		close(fd);
 	}
 
 	/* stderr */
-	if (dup2(fd, 2) < 0) {
+	if (dup2(1, 2) < 0) {
 		uwsgi_error("dup2()");
 		exit(1);
 	}
 
-	close(fd);
 }
 
 
@@ -297,7 +299,7 @@ void uwsgi_close_request(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_r
 
 	// defunct process reaper
         if (uwsgi->shared->options[UWSGI_OPTION_REAPER] == 1 || uwsgi->grunt) {
-        	while( waitpid(-1, &waitpid_status, WNOHANG) > 0) ;
+        	while( waitpid(WAIT_ANY, &waitpid_status, WNOHANG) > 0) ;
 	}
         // reset request
 	memset(wsgi_req, 0, sizeof(struct wsgi_request));
@@ -422,7 +424,7 @@ void env_to_arg(char *src, char *dst) {
 	int i;
 	int val = 0 ;
 
-	for(i=0;i<strlen(src);i++) {
+	for(i=0;i< (int) strlen(src);i++) {
 		if (src[i] == '=') {
 			val = 1 ;
 		}
@@ -512,4 +514,12 @@ void uwsgi_log(const char *fmt, ...) {
 
 	// do not check for errors
 	rlen = write(2, logpkt, rlen);
+}
+
+inline int uwsgi_strncmp(char *src, int slen, char *dst, int dlen) {
+
+	if (slen != dlen) return 1;
+
+	return memcmp(src, dst, dlen);
+
 }

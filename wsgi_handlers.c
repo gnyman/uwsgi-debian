@@ -73,14 +73,24 @@ PyObject *py_eventfd_write(PyObject * self, PyObject * args) {
 int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) {
 
 	int i;
+	
+	size_t post_remains = wsgi_req->post_cl;
+	ssize_t post_chunk;
 
 	PyObject *zero, *wsgi_socket;
 
 	PyObject *pydictkey, *pydictvalue;
 
+	static PyObject *uwsgi_version = NULL;
+
 	char *path_info;
 	struct uwsgi_app *wi ;
 
+	int tmp_stderr;
+
+	if (uwsgi_version == NULL) {
+		uwsgi_version = PyString_FromString(UWSGI_VERSION);
+	}
 
 #ifdef UWSGI_ASYNC
 	if (wsgi_req->async_status == UWSGI_AGAIN) {
@@ -145,15 +155,11 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 		if (PyDict_Contains(uwsgi->py_apps, zero)) {
                		wsgi_req->app_id = PyInt_AsLong(PyDict_GetItem(uwsgi->py_apps, zero));
         	}
-        	else {
+        	else if (wsgi_req->script_name_len > 1 || uwsgi->default_app < 0) {
         		/* unavailable app for this SCRIPT_NAME */
                 	wsgi_req->app_id = -1;
 			if (wsgi_req->wsgi_script_len > 0 || (wsgi_req->wsgi_callable_len > 0 && wsgi_req->wsgi_module_len > 0)) {
-				if ((wsgi_req->app_id = init_uwsgi_app(NULL, NULL)) == -1) {
-					internal_server_error(wsgi_req->poll.fd, "wsgi application not found");
-                			Py_DECREF(zero);
-					goto clear2;
-				}
+				wsgi_req->app_id = init_uwsgi_app(NULL, NULL);
 			}
 		}
 
@@ -165,8 +171,14 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 
 	if (wsgi_req->app_id == -1) {
-		internal_server_error(wsgi_req->poll.fd, "wsgi application not found");
-		goto clear2;
+		// use default app ?
+		if (!uwsgi->no_default_app && uwsgi->default_app >= 0) {
+			wsgi_req->app_id = uwsgi->default_app ;
+		}
+		else {
+			internal_server_error(wsgi_req->poll.fd, "wsgi application not found");
+			goto clear2;
+		}
 
 	}
 
@@ -245,20 +257,19 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 	// set wsgi vars
 
 
-	if (uwsgi->post_buffering > 0 && wsgi_req->post_cl > uwsgi->post_buffering) {
+	if (uwsgi->post_buffering > 0 && wsgi_req->post_cl > (size_t) uwsgi->post_buffering) {
 		wsgi_req->async_post = tmpfile();
 		if (!wsgi_req->async_post) {
 			uwsgi_error("tmpfile()");
 			goto clear;
 		}
-		size_t post_remains = wsgi_req->post_cl;
-		ssize_t post_chunk;
+		
 
 		while(post_remains > 0) {
 			if (uwsgi->shared->options[UWSGI_OPTION_HARAKIRI] > 0) {
 				inc_harakiri(uwsgi->shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
 			}
-			if (post_remains > uwsgi->post_buffering_bufsize) {
+			if (post_remains > (size_t) uwsgi->post_buffering_bufsize) {
 				post_chunk = read(wsgi_req->poll.fd, wsgi_req->post_buffering_buf, uwsgi->post_buffering_bufsize);
 			}
 			else {
@@ -268,7 +279,7 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 				uwsgi_error("read()");
 				goto clear;
 			}
-			if (fwrite(wsgi_req->post_buffering_buf, post_chunk, 1, wsgi_req->async_post) <0) {
+			if (!fwrite(wsgi_req->post_buffering_buf, post_chunk, 1, wsgi_req->async_post)) {
 				uwsgi_error("fwrite()");
 				goto clear;
 			}
@@ -338,6 +349,8 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 	PyDict_SetItemString(uwsgi->embedded_dict, "env", wsgi_req->async_environ);
 
+	PyDict_SetItemString(wsgi_req->async_environ, "x-wsgiorg.uwsgi.version", uwsgi_version);
+
 
 #ifdef UWSGI_ROUTING
 	uwsgi_log("routing %d routes %d\n", uwsgi->routing, uwsgi->nroutes);
@@ -395,7 +408,7 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 			sorry that is a hack to avoid the rewrite of PyErr_Print
 			temporarily map (using dup2) stderr to wsgi_req->poll.fd
 		*/
-		int tmp_stderr = dup(2);
+		tmp_stderr = dup(2);
 		if (tmp_stderr < 0) {
 			uwsgi_error("dup()");
 			goto clear;
