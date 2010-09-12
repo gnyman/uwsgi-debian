@@ -174,15 +174,13 @@ static void *http_request(void *u_h_r)
 	char buf[4096];
 
 	char tmp_buf[4096];
-	char *ptr;
 
 	char uwsgipkt[4096];
-	char *up;
 
 	struct uwsgi_http_req *ur = (struct uwsgi_http_req *) u_h_r ;
 
 	int clientfd = ur->fd;
-	int uwsgi_fd;
+	int uwsgi_fd = -1;
 
 	int need_to_read = 1;
 	int state = uwsgi_http_method;
@@ -197,14 +195,17 @@ static void *http_request(void *u_h_r)
 
 	uint16_t ulen;
 
-	ptr = tmp_buf;
+	char *ptr = tmp_buf;
 
 	int qs = 0;
 
-	up = uwsgipkt;
+	char *up = uwsgipkt;
 
 	char *watermark = up + 4096 ;
 	char *watermark2 = tmp_buf + 4096 ;
+	
+	int path_info_len;
+	char *ip;
 
 	up[0] = 0;
 	up[3] = 0;
@@ -216,7 +217,7 @@ static void *http_request(void *u_h_r)
 			uwsgi_error("read()");
 			break;
 		}
-		for (i = 0; i < len; i++) {
+		for (i = 0; i < (int) len; i++) {
 
 			if (buf[i] == ' ') {
 
@@ -230,7 +231,7 @@ static void *http_request(void *u_h_r)
 
 					up = add_uwsgi_var(up, "REQUEST_URI", 11, tmp_buf, ptr - tmp_buf, 0, watermark);
 
-					int path_info_len = ptr - tmp_buf;
+					path_info_len = ptr - tmp_buf;
 					for (j = 0; j < ptr - tmp_buf; j++) {
 						if (tmp_buf[j] == '?') {
 							path_info_len = j;
@@ -301,7 +302,7 @@ static void *http_request(void *u_h_r)
 
 					up = add_uwsgi_var(up, "SCRIPT_NAME", 11, "", 0, 0, watermark);
 
-					char *ip = inet_ntoa(ur->c_addr.sin_addr);
+					ip = inet_ntoa(ur->c_addr.sin_addr);
 					up = add_uwsgi_var(up, "REMOTE_ADDR", 11, ip, strlen(ip), 0, watermark);
 
 					//up = add_uwsgi_var(up, "REMOTE_ADDR", 11, "127.0.0.1", 9, 0, watermark);
@@ -325,14 +326,20 @@ static void *http_request(void *u_h_r)
 						uwsgipkt[1] = (unsigned char) (ulen & 0xff);
 						uwsgipkt[2] = (unsigned char) ((ulen >> 8) & 0xff);
 
-						write(uwsgi_fd, uwsgipkt, ulen + 4);
+						if (write(uwsgi_fd, uwsgipkt, ulen + 4) < 0) {
+							uwsgi_error("write()");
+						}
 
 						if (http_body_len > 0) {
-							if (http_body_len >= len - (i + 1)) {
-								write(uwsgi_fd, buf + i + 1, len - (i + 1));
+							if (http_body_len >= (int) len - (i + 1)) {
+								if (write(uwsgi_fd, buf + i + 1, len - (i + 1)) < 0) {
+									uwsgi_error("write()");
+								}
 								http_body_len -= len - (i + 1);
 							} else {
-								write(uwsgi_fd, buf + i, http_body_len);
+								if (write(uwsgi_fd, buf + i, http_body_len) < 0) {
+									uwsgi_error("write()");
+								}
 								http_body_len = 0;
 							}
 
@@ -342,12 +349,16 @@ static void *http_request(void *u_h_r)
 									to_read = http_body_len;
 								}
 								len = read(clientfd, uwsgipkt, to_read);
-								write(uwsgi_fd, uwsgipkt, len);
+								if (write(uwsgi_fd, uwsgipkt, len) < 0) {
+									uwsgi_error("write()");
+								}
 								http_body_len -= len;
 							}
 						}
 						while ((len = read(uwsgi_fd, uwsgipkt, 4096)) > 0) {
-							write(clientfd, uwsgipkt, len);
+							if (write(clientfd, uwsgipkt, len) < 0) {
+								uwsgi_error("write()");
+							}
 						}
 						close(uwsgi_fd);
 					}
@@ -381,4 +392,6 @@ clear:
 
 	free(ur);
 	pthread_exit(NULL);
+	
+	return NULL;
 }

@@ -2,7 +2,7 @@
 
 /* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs -npsl -di1 */
 
-#define UWSGI_VERSION	"0.9.6"
+#define UWSGI_VERSION	"0.9.6.1"
 
 #define uwsgi_error(x)  uwsgi_log("%s: %s [%s line %d]\n", x, strerror(errno), __FILE__, __LINE__);
 #define uwsgi_debug(x, ...) uwsgi_log("[uWSGI DEBUG] " x, __VA_ARGS__);
@@ -90,6 +90,10 @@
 #define PRIO_MAX  20
 #endif
 
+#ifdef __HAIKU__
+#define WAIT_ANY (-1)
+#endif
+
 #define MAX_PYARGV 10
 
 #include <sys/ioctl.h>
@@ -100,8 +104,13 @@
 #elif defined(__sun__)
 #include <sys/sendfile.h>
 #include <sys/devpoll.h>
+#elif defined(__HAIKU__)
 #else
 #include <sys/event.h>
+#endif
+
+#ifdef __HAIKU__
+#include <kernel/OS.h>
 #endif
 
 #undef _XOPEN_SOURCE
@@ -177,6 +186,8 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define LONG_ARGS_INI_PASTE		17041
 #define LONG_ARGS_CALLABLE		17042
 #define LONG_ARGS_HTTP_VAR		17043
+#define LONG_ARGS_NO_DEFAULT_APP	17044
+#define LONG_ARGS_EVAL_CONFIG		17045
 
 
 
@@ -216,6 +227,7 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #endif
 #elif __APPLE__
 #include <libkern/OSByteOrder.h>
+#elif defined(__HAIKU__)
 #else
 #include <machine/endian.h>
 #endif
@@ -463,6 +475,7 @@ struct uwsgi_server {
 #endif
 
 	int ignore_script_name;
+	int no_default_app;
 	int logdate;
 
 	int serverfd;
@@ -687,6 +700,13 @@ struct uwsgi_server {
 	int xml_round2;
 
 	char *cwd;
+
+	char *eval;
+
+	int log_slow_requests;
+	int log_zero_headers;
+	int log_empty_body;
+	int log_high_memory;
 };
 
 struct uwsgi_cluster_node {
@@ -777,6 +797,7 @@ struct uwsgi_worker {
 char *uwsgi_get_cwd(void);
 
 void warn_pipe(void);
+void what_i_am_doing(void);
 void goodbye_cruel_world(void);
 void gracefully_kill(void);
 void reap_them_all(void);
@@ -812,8 +833,11 @@ void uwsgi_xml_config(struct wsgi_request *, struct option *);
 #endif
 
 void uwsgi_wsgi_config(char *);
+#ifdef UWSGI_PASTE
 void uwsgi_paste_config(void);
+#endif
 void uwsgi_wsgi_file_config(void);
+void uwsgi_eval_config(char *);
 
 void internal_server_error(int, char *);
 
@@ -1097,4 +1121,10 @@ void uwsgi_ini_config(char *, struct option*);
 void uwsgi_ldap_schema_dump(struct option*);
 void uwsgi_ldap_schema_dump_ldif(struct option*);
 void uwsgi_ldap_config(struct uwsgi_server *, struct option*);
+#endif
+
+#ifdef __clang__
+int uwsgi_strncmp(char *, int , char *, int );
+#else
+inline int uwsgi_strncmp(char *, int , char *, int );
 #endif

@@ -63,16 +63,46 @@ GCC = os.environ.get('CC', sysconfig.get_config_var('CC'))
 if not GCC:
 	GCC = 'gcc'
 
+
+def spcall(cmd):
+	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+
+	if p.wait() == 0:
+		if sys.version_info[0] > 2:
+			return p.stdout.read().rstrip().decode()
+		return p.stdout.read().rstrip()
+	else:
+		return None
+
+def spcall2(cmd):
+	p = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+
+	if p.wait() == 0:
+		if sys.version_info[0] > 2:
+			return p.stderr.read().rstrip().decode()
+		return p.stderr.read().rstrip()
+	else:
+		return None
+
+gcc_version = str(spcall2("%s -v" % GCC)).split('\n')[-1].split()[2]
+
+gcc_major = int(gcc_version.split('.')[0])
+gcc_minor = int(gcc_version.split('.')[1])
+
+
 gcc_list = ['utils', 'pyutils', 'protocol', 'socket', 'logging', 'wsgi_handlers', 'wsgi_headers', 'uwsgi_handlers', 'plugins', 'uwsgi']
 
-# large file support
-try:
-	cflags = ['-Wall', '-Werror', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64'] + os.environ.get("CFLAGS", "").split()
-except:
-	print("You need python headers to build uWSGI.")
-	sys.exit(1)
+cflags = ['-O2', '-Wall', '-Werror', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64'] + os.environ.get("CFLAGS", "").split()
+
+# add -fno-strict-aliasing only on python2 and gcc < 4.3
+if (sys.version_info[0] == 2) or (gcc_major < 4) or (gcc_major == 4 and gcc_minor < 3):
+	cflags = cflags + ['-fno-strict-aliasing']
+
+if gcc_major >= 4:
+	cflags = cflags + [ '-Wextra', '-Wno-unused-parameter', '-Wno-missing-field-initializers' ]
 
 cflags = cflags + ['-I' + sysconfig.get_python_inc(), '-I' + sysconfig.get_python_inc(plat_specific=True) ]
+
 ldflags = os.environ.get("LDFLAGS", "").split()
 libs = ['-lpthread', '-rdynamic'] + sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
 if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
@@ -90,13 +120,6 @@ def depends_on(what, dep):
 			print("%s needs %s support." % (what, d))
 			sys.exit(1)
 
-def spcall(cmd):
-	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-
-	if p.wait() == 0:
-		return p.stdout.read().rstrip().decode()
-	else:
-		return None
 
 def add_o(x):
 	if x == 'uwsgi':
@@ -236,7 +259,7 @@ def unbit_setup():
 
 def parse_vars():
 
-	global UGREEN
+	global UGREEN, ASYNC, PROXY
 	
 	version = sys.version_info
 	uver = "%d.%d" % (version[0], version[1])
@@ -256,8 +279,15 @@ def parse_vars():
 	if uwsgi_os in kvm_list:
 		libs.append('-lkvm')
 
-	if uwsgi_os == 'OpenBSD' or uwsgi_cpu[0:3] == 'arm':
+	if uwsgi_os == 'OpenBSD' or uwsgi_cpu[0:3] == 'arm' or uwsgi_os == 'Haiku':
 		UGREEN = False
+
+	if uwsgi_os == 'Haiku':
+		ASYNC = False
+		PROXY = False
+		libs.remove('-rdynamic')
+		libs.remove('-lpthread')
+		libs.append('-lroot')
 
 	if EMBEDDED:
 		cflags.append('-DUWSGI_EMBEDDED')

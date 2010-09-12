@@ -136,7 +136,7 @@ clear:
 	}
 	if (wsgi_req->async_post && !wsgi_req->fd_closed) {
 		fclose(wsgi_req->async_post);
-		if (!uwsgi->post_buffering || wsgi_req->post_cl <= uwsgi->post_buffering) {
+		if (!uwsgi->post_buffering || wsgi_req->post_cl <= (size_t) uwsgi->post_buffering) {
 			wsgi_req->fd_closed = 1 ;
 
 		}
@@ -210,6 +210,8 @@ int uwsgi_python_call(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req,
 }
 
 void init_pyargv(struct uwsgi_server *uwsgi) {
+	
+    char *ap;
 
 #ifdef PYTHREE
 	wchar_t pname[6];
@@ -229,7 +231,7 @@ void init_pyargv(struct uwsgi_server *uwsgi) {
         	}
         	memset(wcargv, 0, sizeof( wchar_t ) * (strlen(uwsgi->pyargv)+1));
 #endif
-                char *ap;
+                
 #ifdef __sun__
                 // FIX THIS !!!
                 ap = strtok(uwsgi->pyargv, " ");
