@@ -145,6 +145,9 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 #else
 			PyString_Concat(&zero, PyString_FromString("|"));
 			PyString_Concat(&zero, PyString_FromStringAndSize(wsgi_req->script_name, wsgi_req->script_name_len));
+#ifdef UWSGI_DEBUG
+			uwsgi_debug("VirtualHost SCRIPT_NAME=%s\n", PyString_AsString(zero)); 
+#endif
 #endif
 		}
 		else {
@@ -155,7 +158,7 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 		if (PyDict_Contains(uwsgi->py_apps, zero)) {
                		wsgi_req->app_id = PyInt_AsLong(PyDict_GetItem(uwsgi->py_apps, zero));
         	}
-        	else if (wsgi_req->script_name_len > 1 || uwsgi->default_app < 0) {
+        	else if (wsgi_req->script_name_len > 1 || uwsgi->default_app < 0 || uwsgi->vhost) {
         		/* unavailable app for this SCRIPT_NAME */
                 	wsgi_req->app_id = -1;
 			if (wsgi_req->wsgi_script_len > 0 || (wsgi_req->wsgi_callable_len > 0 && wsgi_req->wsgi_module_len > 0)) {
@@ -192,6 +195,14 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 		// set the interpreter
 		PyThreadState_Swap(wi->interpreter);
+		if (wi->chdir) {
+#ifdef UWSGI_DEBUG
+			uwsgi_debug("chdir to %s\n", wi->chdir);
+#endif
+			if (chdir(wi->chdir)) {
+				uwsgi_error("chdir()");
+			}
+		}
 	}
 
 	wi->requests++;
@@ -443,7 +454,25 @@ clear2:
 }
 
 void uwsgi_after_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) {
+	if (uwsgi->shared->options[UWSGI_OPTION_LOGGING]) {
+                log_request(wsgi_req);
+        }
+        else {
+                if (uwsgi->shared->options[UWSGI_OPTION_LOG_ZERO]) {
+                        if (wsgi_req->response_size == 0) { log_request(wsgi_req); return; }
+                }
+                if (uwsgi->shared->options[UWSGI_OPTION_LOG_SLOW]) {
+                        if ((uint32_t) wsgi_req_time >= uwsgi->shared->options[UWSGI_OPTION_LOG_SLOW]) { log_request(wsgi_req); return; }
+                }
+                if (uwsgi->shared->options[UWSGI_OPTION_LOG_4xx]) {
+                        if (wsgi_req->status >= 400 && wsgi_req->status <= 499) { log_request(wsgi_req); return; }
+                }
+                if (uwsgi->shared->options[UWSGI_OPTION_LOG_5xx]) {
+                        if (wsgi_req->status >= 500 && wsgi_req->status <= 599) { log_request(wsgi_req); return; }
+                }
+                if (uwsgi->shared->options[UWSGI_OPTION_LOG_BIG]) {
+                        if (wsgi_req->response_size >= uwsgi->shared->options[UWSGI_OPTION_LOG_BIG]) { log_request(wsgi_req); return; }
+                }
+        }
 
-	if (uwsgi->shared->options[UWSGI_OPTION_LOGGING])
-		log_request(wsgi_req);
 }

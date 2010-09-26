@@ -340,7 +340,7 @@ int wsgi_req_recv(struct wsgi_request *wsgi_req) {
 
 	UWSGI_SET_IN_REQUEST;
 
-        if (uwsgi.shared->options[UWSGI_OPTION_LOGGING]) gettimeofday(&wsgi_req->start_of_request, NULL);
+        gettimeofday(&wsgi_req->start_of_request, NULL);
 
 	if (!uwsgi_parse_response(&wsgi_req->poll, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT], (struct uwsgi_header *) wsgi_req, wsgi_req->buffer)) {
 		return -1;
@@ -406,6 +406,18 @@ void sanitize_args(struct uwsgi_server *uwsgi) {
 	if (uwsgi->wsgi_config) {
 		uwsgi->single_interpreter = 1 ;
 	}
+
+#ifdef UWSGI_INI
+	if (uwsgi->ini) {
+		uwsgi->single_interpreter = 1 ;
+	}
+#endif
+
+#ifdef UWSGI_PASTE
+	if (uwsgi->paste) {
+		uwsgi->single_interpreter = 1 ;
+	}
+#endif
 
 	if (uwsgi->shared->options[UWSGI_OPTION_HARAKIRI] > 0) {
 		if (!uwsgi->post_buffering) {
@@ -523,3 +535,27 @@ inline int uwsgi_strncmp(char *src, int slen, char *dst, int dlen) {
 	return memcmp(src, dst, dlen);
 
 }
+
+void uwsgi_log_verbose(const char *fmt, ...) {
+
+        va_list ap;
+        char logpkt[4096];
+        int rlen = 0;
+
+        struct timeval tv;
+
+        gettimeofday(&tv, NULL);
+
+        memcpy( logpkt, ctime( (const time_t *) &tv.tv_sec), 24);
+        memcpy( logpkt + 24, " - ", 3);
+
+        rlen = 24 + 3 ;
+
+        va_start (ap, fmt);
+        rlen += vsnprintf(logpkt + rlen, 4096 - rlen, fmt, ap );
+        va_end(ap);
+
+        // do not check for errors
+        rlen = write(2, logpkt, rlen);
+}
+
