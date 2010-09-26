@@ -11,7 +11,9 @@ Description: Distinguish ssize_t error code from size_t value.
  one shot), GCC warns about 'comparison of unsigned expression < 0 is always
  false'.
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
-Last-Update: 2010-09-12
+Forwarded: http://lists.unbit.it/pipermail/uwsgi/2010-September/000666.html
+Applied-Upstream: 0.9.7-dev, http://projects.unbit.it/hg/uwsgi/rev/6c5d6fb3c78d
+Last-Update: 2010-09-26
 
 Index: uwsgi-0.9.6.1/plugins/lua/lua_plugin.c
 ===================================================================
