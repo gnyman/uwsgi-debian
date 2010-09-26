@@ -150,6 +150,11 @@ static struct option long_options[] = {
 		UWSGI_PLUGIN_LONGOPT_RACK
 		{"logto", required_argument, 0, LONG_ARGS_LOGTO},
 		{"logdate", no_argument, &uwsgi.logdate, 1},
+		{"log-zero", no_argument, 0, LONG_ARGS_LOG_ZERO},
+                {"log-slow", required_argument, 0, LONG_ARGS_LOG_SLOW},
+                {"log-4xx", no_argument, 0, LONG_ARGS_LOG_4xx},
+                {"log-5xx", no_argument, 0, LONG_ARGS_LOG_5xx},
+                {"log-big", required_argument, 0, LONG_ARGS_LOG_BIG},
 		{"chdir", required_argument, 0, LONG_ARGS_CHDIR},
 		{"chdir2", required_argument, 0, LONG_ARGS_CHDIR2},
 		{"grunt", no_argument, &uwsgi.grunt, 1},
@@ -173,6 +178,23 @@ static struct option long_options[] = {
 		{"version", no_argument, 0, LONG_ARGS_VERSION},
 		{0, 0, 0, 0}
 	};
+
+#ifdef __linux__
+int get_linux_tcp_info(int fd) {
+        struct tcp_info ti;
+        socklen_t tis = sizeof(struct tcp_info) ;
+
+        if (!getsockopt(fd, IPPROTO_TCP, TCP_INFO, &ti, &tis)) {
+                if (ti.tcpi_unacked >= ti.tcpi_sacked) {
+                        uwsgi_log_verbose("*** uWSGI listen queue of socket %d full !!! (%d/%d) ***\n", fd, ti.tcpi_unacked, ti.tcpi_sacked);
+                }
+		return 1;
+        }
+
+	return 0;	
+}
+#endif
+
 
 void ping(struct uwsgi_server *uwsgi) {
 
@@ -455,6 +477,9 @@ int main(int argc, char *argv[], char *envp[]) {
 	PyObject *udp_response;
 #endif
 	
+#ifdef __linux__
+	int get_tcp_info = 0;
+#endif
 	
 #ifdef UWSGI_HTTP
 	pid_t http_pid;
@@ -1000,6 +1025,9 @@ int main(int argc, char *argv[], char *envp[]) {
 				}
 				else {
 					uwsgi.serverfd = bind_to_tcp(uwsgi.socket_name, uwsgi.listen_queue, tcp_port);
+#ifdef __linux__
+					get_tcp_info = 1;
+#endif
 				}
 
 				if (uwsgi.serverfd < 0) {
@@ -1500,6 +1528,12 @@ int main(int argc, char *argv[], char *envp[]) {
 				check_interval.tv_sec = uwsgi.shared->options[UWSGI_OPTION_MASTER_INTERVAL];
 				if (!check_interval.tv_sec)
 					check_interval.tv_sec = 1;
+
+#ifdef __linux__
+				if (get_tcp_info) {
+					get_tcp_info = get_linux_tcp_info(uwsgi.serverfd);
+				}
+#endif
 				for (i = 1; i <= uwsgi.numproc; i++) {
 					/* first check for harakiri */
 					if (uwsgi.workers[i].harakiri > 0) {
@@ -2035,6 +2069,23 @@ int init_uwsgi_app(PyObject * force_wsgi_dict, PyObject * my_callable) {
 	wi = &uwsgi.wsgi_apps[id];
 
 	memset(wi, 0, sizeof(struct uwsgi_app));
+
+// dynamic chdir ?
+
+	if (uwsgi.wsgi_req->chdir_len > 0) {
+		wi->chdir = malloc(uwsgi.wsgi_req->chdir_len + 1);
+		if (wi->chdir == NULL) {
+			uwsgi_error("malloc()");
+		}
+		memcpy(wi->chdir, uwsgi.wsgi_req->chdir, uwsgi.wsgi_req->chdir_len);
+		wi->chdir[uwsgi.wsgi_req->chdir_len] = 0;
+#ifdef UWSGI_DEBUG
+		uwsgi_debug("chdir to %s\n", wi->chdir);
+#endif
+		if (chdir(wi->chdir)) {
+			uwsgi_error("chdir()");
+		}
+	}
 
 	if (uwsgi.single_interpreter == 0) {
 		wi->interpreter = Py_NewInterpreter();
@@ -3206,6 +3257,21 @@ void manage_opt(int i, char *optarg) {
 	case 'L':
 		uwsgi.shared->options[UWSGI_OPTION_LOGGING] = 0;
 		break;
+	case LONG_ARGS_LOG_ZERO:
+                uwsgi.shared->options[UWSGI_OPTION_LOG_ZERO] = 1;
+                break;
+        case LONG_ARGS_LOG_SLOW:
+                uwsgi.shared->options[UWSGI_OPTION_LOG_SLOW] = atoi(optarg);
+                break;
+        case LONG_ARGS_LOG_4xx:
+                uwsgi.shared->options[UWSGI_OPTION_LOG_4xx] = 1;
+                break;
+        case LONG_ARGS_LOG_5xx:
+                uwsgi.shared->options[UWSGI_OPTION_LOG_5xx] = 1;
+                break;
+        case LONG_ARGS_LOG_BIG:
+                uwsgi.shared->options[UWSGI_OPTION_LOG_BIG] = atoi(optarg);
+                break;
 #ifdef UWSGI_SPOOLER
 	case 'Q':
 		uwsgi.spool_dir = malloc(PATH_MAX);
@@ -3381,6 +3447,11 @@ void manage_opt(int i, char *optarg) {
 \t--async <n>\t\t\tenable async mode with n core\n\
 \t--logto <logfile|addr>\t\tlog to file/udp\n\
 \t--logdate\t\t\tadd timestamp to loglines\n\
+\t--log-zero\t\t\tlog requests with 0 response size\n\
+\t--log-slow <t>\t\t\tlog requests slower than <t> milliseconds\n\
+\t--log-4xx\t\t\tlog requests with status code 4xx\n\
+\t--log-5xx\t\t\tlog requests with status code 5xx\n\
+\t--log-big <n>\t\t\tlog requests bigger than <n> bytes\n\
 \t--ignore-script-name\t\tdisable uWSGI management of SCRIPT_NAME\n\
 \t--no-default-app\t\tdo not fallback unknown SCRIPT_NAME requests\n\
 \t--ini <inifile>\t\t\tpath of ini config file\n\

@@ -2,10 +2,12 @@
 
 /* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs -npsl -di1 */
 
-#define UWSGI_VERSION	"0.9.6.1"
+#define UWSGI_VERSION	"0.9.6.4"
 
 #define uwsgi_error(x)  uwsgi_log("%s: %s [%s line %d]\n", x, strerror(errno), __FILE__, __LINE__);
 #define uwsgi_debug(x, ...) uwsgi_log("[uWSGI DEBUG] " x, __VA_ARGS__);
+
+#define wsgi_req_time ((wsgi_req->end_of_request.tv_sec * 1000000 + wsgi_req->end_of_request.tv_usec) - (wsgi_req->start_of_request.tv_sec * 1000000 + wsgi_req->start_of_request.tv_usec))/1000
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -188,6 +190,11 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define LONG_ARGS_HTTP_VAR		17043
 #define LONG_ARGS_NO_DEFAULT_APP	17044
 #define LONG_ARGS_EVAL_CONFIG		17045
+#define LONG_ARGS_LOG_ZERO              17048
+#define LONG_ARGS_LOG_SLOW              17049
+#define LONG_ARGS_LOG_4xx               17050
+#define LONG_ARGS_LOG_5xx               17051
+#define LONG_ARGS_LOG_BIG               17052
 
 
 
@@ -241,6 +248,11 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define UWSGI_OPTION_CGI_MODE		6
 #define UWSGI_OPTION_THREADS		7
 #define UWSGI_OPTION_REAPER		8
+#define UWSGI_OPTION_LOG_ZERO           9
+#define UWSGI_OPTION_LOG_SLOW           10
+#define UWSGI_OPTION_LOG_4xx            11
+#define UWSGI_OPTION_LOG_5xx            12
+#define UWSGI_OPTION_LOG_BIG            13
 
 #define UWSGI_MODIFIER_ADMIN_REQUEST		10
 #define UWSGI_MODIFIER_SPOOL_REQUEST		17
@@ -307,6 +319,7 @@ struct uwsgi_app {
 #endif
 
 	int requests;
+	char *chdir;
 
 };
 
@@ -393,6 +406,9 @@ struct wsgi_request {
 	uint16_t wsgi_callable_len;
 	char *pyhome;
 	uint16_t pyhome_len;
+
+	char *chdir;
+	uint16_t chdir_len;
 
 	int fd_closed;
 
@@ -1034,6 +1050,7 @@ void env_to_arg(char *, char *);
 void parse_sys_envs(char **, struct option *);
 
 void uwsgi_log(const char *, ...);
+void uwsgi_log_verbose(const char *, ...);
 
 
 #ifdef UWSGI_EVDIS
