@@ -1,0 +1,71 @@
+Description: Tune build-in features at uwsgiconfig.py
+ By default, some features of uWSGI are disabled in uwsgiconfig.py. This patch
+ tunes uwsgiconfig.py for building-in all possible features of uWSGI.
+ .
+ Enable following features:
+   * SCTP support
+   * Erlang integration
+   * Profiler
+   * uGreen (integrated green threads)
+   * support of configuration via LDAP
+   * WSGI2 support
+   * Routing system
+ .
+ Embed following plugins:
+   * Lua plugin
+   * PSGI plugin
+   * Rack plugin
+ .
+ Also, define directory where packaged plugins are installed.
+Author: Leonid Borisenko <leo.borisenko@gmail.com>
+Last-Update: 2010-09-26
+
+Index: uwsgi-0.9.6.4/uwsgiconfig.py
+===================================================================
+--- uwsgi-0.9.6.4.orig/uwsgiconfig.py	2010-09-26 11:35:20.000000000 +0300
++++ uwsgi-0.9.6.4/uwsgiconfig.py	2010-09-26 11:38:42.000000000 +0300
+@@ -3,35 +3,35 @@
+ XML=True
+ INI=True
+ SNMP=True
+-SCTP=False
+-ERLANG=False
++SCTP=True
++ERLANG=True
+ SPOOLER=True
+ EMBEDDED=True
+ UDP=True
+ MULTICAST=True
+ THREADING=True
+ SENDFILE=True
+-PROFILER=False
++PROFILER=True
+ NAGIOS=True
+ PROXY=True
+ PASTE=True
+ MINTERPRETERS=True
+ ASYNC=True
+-UGREEN=False
++UGREEN=True
+ HTTP=True
+ EVDIS=False
+-LDAP=False
+-WSGI2=False
+-ROUTING=False
++LDAP=True
++WSGI2=True
++ROUTING=True
+ STACKLESS=False
+ #PLUGINS = ['psgi']
+-PLUGINS = []
++PLUGINS = ['lua', 'psgi', 'rack']
+ USWALLOW=False
+ UNBIT=False
+ DEBUG=False
+ EMBED_PLUGINS=True
+ UWSGI_BIN_NAME = 'uwsgi'
+-UWSGI_PLUGIN_DIR = '.'
++UWSGI_PLUGIN_DIR = '/usr/lib/uwsgi/plugins'
+ 
+ 
+ # specific compilation flags
