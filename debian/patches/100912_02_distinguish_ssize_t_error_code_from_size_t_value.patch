@@ -1,113 +1,24 @@
 Description: Distinguish ssize_t error code from size_t value.
- 'write'/'writev' returns ssize_t value, which could contain error code (-1) or
+ 'writev' returns ssize_t value, which could contain error code (-1) or
  number of written bytes.
- .
- When returned value compared with size_t variable without explicit casting,
- GCC warns about 'comparison between signed and unsigned integer expressions'.
- Note that before explicit casting to unsigned size_t returned value should be
- checked for error code.
  .
  When returned value assigned to size_t variable and checked for error code (in
  one shot), GCC warns about 'comparison of unsigned expression < 0 is always
  false'.
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: http://lists.unbit.it/pipermail/uwsgi/2010-September/000666.html
-Applied-Upstream: 0.9.7-dev, http://projects.unbit.it/hg/uwsgi/rev/6c5d6fb3c78d
 Last-Update: 2010-09-26
 
-Index: uwsgi-0.9.6.1/plugins/lua/lua_plugin.c
+Index: uwsgi-0.9.6.4/plugins/rack/rack_plugin.c
 ===================================================================
---- uwsgi-0.9.6.1.orig/plugins/lua/lua_plugin.c	2010-09-12 21:06:28.000000000 +0300
-+++ uwsgi-0.9.6.1/plugins/lua/lua_plugin.c	2010-09-12 21:09:24.000000000 +0300
-@@ -91,6 +91,7 @@
- 	const char *http ;
- 	size_t slen ;
- 	char *ptrbuf;
-+	ssize_t wsize;
- 
- 	/* Standard WSAPI request */
- 	if (!wsgi_req->uh.pktsize) {
-@@ -144,7 +145,7 @@
- 			perror("write()");
- 			return -1 ;
- 		}
--		if (write(wsgi_req->poll.fd, http, slen) != slen) {
-+		if ((wsize = write(wsgi_req->poll.fd, http, slen)) < 0 || (size_t)wsize != slen) {
- 			perror("write()");
- 			return -1 ;
- 		}
-@@ -159,7 +160,7 @@
- 	lua_pushnil(ulua.L);
-         while(lua_next(ulua.L, -3) != 0) {
- 		http = lua_tolstring(ulua.L, -2, &slen);
--		if (write(wsgi_req->poll.fd, http, slen) != slen) {
-+		if ((wsize = write(wsgi_req->poll.fd, http, slen)) < 0 || (size_t)wsize != slen) {
- 			perror("write()");
- 			return -1 ;
- 		}
-@@ -168,7 +169,7 @@
- 			return -1 ;
- 		}
- 		http = lua_tolstring(ulua.L, -1, &slen);
--		if (write(wsgi_req->poll.fd, http, slen) != slen) {
-+		if ((wsize = write(wsgi_req->poll.fd, http, slen)) < 0 || (size_t)wsize != slen) {
- 			perror("write()");
- 			return -1 ;
- 		}
-@@ -190,7 +191,7 @@
-         while ( (i = lua_pcall(ulua.L, 0, 1, 0)) == 0) {
-                 if (lua_type(ulua.L, -1) == LUA_TSTRING) {
- 			http = lua_tolstring(ulua.L, -1, &slen);
--			if (write(wsgi_req->poll.fd, http, slen) != slen) {
-+			if ((wsize = write(wsgi_req->poll.fd, http, slen)) < 0 || (size_t)wsize != slen) {
- 				perror("write()");
- 				return -1 ;
- 			}
-Index: uwsgi-0.9.6.1/plugins/psgi/psgi_plugin.c
-===================================================================
---- uwsgi-0.9.6.1.orig/plugins/psgi/psgi_plugin.c	2010-09-12 21:09:24.000000000 +0300
-+++ uwsgi-0.9.6.1/plugins/psgi/psgi_plugin.c	2010-09-12 21:09:24.000000000 +0300
-@@ -175,6 +175,7 @@
- 	struct http_status_codes *http_sc;
- 
- 	int i,vi, base ;
-+	ssize_t wsize;
- 
- 	/* Standard PSGI request */
-         if (!wsgi_req->uh.pktsize) {
-@@ -321,9 +322,10 @@
- 	wsgi_req->hvec[vi].iov_base = "\r\n" ; wsgi_req->hvec[vi].iov_len = 2 ;
- 
- 
--	if ( (wsgi_req->response_size = writev(wsgi_req->poll.fd, wsgi_req->hvec, vi+1)) < 0) {
-+	if ( (wsize = writev(wsgi_req->poll.fd, wsgi_req->hvec, vi+1)) < 0) {
- 		uwsgi_error("writev()");
- 	}
-+	wsgi_req->response_size = (size_t) wsize;
- 
- 
- 	hitem = av_fetch(response, 2, 0) ;
-Index: uwsgi-0.9.6.1/plugins/rack/rack_plugin.c
-===================================================================
---- uwsgi-0.9.6.1.orig/plugins/rack/rack_plugin.c	2010-09-12 21:09:37.000000000 +0300
-+++ uwsgi-0.9.6.1/plugins/rack/rack_plugin.c	2010-09-12 21:10:37.000000000 +0300
-@@ -250,6 +250,7 @@
- 
- 	int error;
- 	int i;
-+	ssize_t wsize;
- 
- 	struct http_status_codes *http_sc;
- 
-@@ -331,9 +332,10 @@
+--- uwsgi-0.9.6.4.orig/plugins/rack/rack_plugin.c	2010-09-26 07:09:00.000000000 +0300
++++ uwsgi-0.9.6.4/plugins/rack/rack_plugin.c	2010-09-26 09:16:53.000000000 +0300
+@@ -331,7 +331,7 @@
          	wsgi_req->hvec[4].iov_base = "\r\n";
          	wsgi_req->hvec[4].iov_len = 2 ;
  
 -		if ( (wsgi_req->response_size = writev(wsgi_req->poll.fd, wsgi_req->hvec, 5)) < 0) {
-+		if ( (wsize = writev(wsgi_req->poll.fd, wsgi_req->hvec, 5)) < 0) {
++		if ( !(wsgi_req->response_size = writev(wsgi_req->poll.fd, wsgi_req->hvec, 5)) ) {
                  	uwsgi_error("writev()");
          	}
-+		wsgi_req->response_size = (size_t) wsize;
  
- 		VALUE headers = RARRAY(ret)->ptr[1] ;
- 		if (rb_respond_to( headers, rb_intern("each") )) {

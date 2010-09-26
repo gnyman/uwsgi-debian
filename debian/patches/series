@@ -5,7 +5,6 @@
 100831_01_define_uwsgi_plugin_dir.patch
 100831_02_initialize_ret_in_embed_plugins.patch
 100831_03_define_embedded_plugins.patch
-100901_01_fix_buffer_overflow_in_psgi_plugin.patch
 100901_02_enable_sctp.patch
 100901_03_enable_ugreen.patch
 100912_01_declare_possibly_clobbered_variables_as_volatile.patch
