@@ -46,7 +46,7 @@ clean::
 	# uWSGI executables
 	$(RM) $(CURDIR)/uwsgi $(addprefix $(CURDIR)/uwsgi-python, $(python_ver))
 	# intermediate compiled files
-	$(RM) $(CURDIR)/*.o $(CURDIR)/*.pyc
+	$(RM) $(CURDIR)/*.o $(CURDIR)/uwsgiconfig.pyc
 	# plugins
 	for name in $(plugins); do \
 		$(RM) $(CURDIR)/$${name}_plugin.so; \
