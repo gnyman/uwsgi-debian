@@ -139,15 +139,10 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 		if (uwsgi->vhost) {
 			zero = PyString_FromStringAndSize(wsgi_req->host, wsgi_req->host_len);
-#ifdef PYTHREE
-			zero = PyString_Concat(zero, PyString_FromString("|"));
-			zero = PyString_Concat(zero, PyString_FromStringAndSize(wsgi_req->script_name, wsgi_req->script_name_len));
-#else
 			PyString_Concat(&zero, PyString_FromString("|"));
 			PyString_Concat(&zero, PyString_FromStringAndSize(wsgi_req->script_name, wsgi_req->script_name_len));
 #ifdef UWSGI_DEBUG
 			uwsgi_debug("VirtualHost SCRIPT_NAME=%s\n", PyString_AsString(zero)); 
-#endif
 #endif
 		}
 		else {
@@ -239,8 +234,13 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 		uwsgi_debug("%.*s: %.*s\n", wsgi_req->hvec[i].iov_len, wsgi_req->hvec[i].iov_base, wsgi_req->hvec[i+1].iov_len, wsgi_req->hvec[i+1].iov_base);
 #endif
 */
+#ifdef PYTHREE
+		pydictkey = PyUnicode_DecodeLatin1(wsgi_req->hvec[i].iov_base, wsgi_req->hvec[i].iov_len, "ignore");
+		pydictvalue = PyUnicode_DecodeLatin1(wsgi_req->hvec[i + 1].iov_base, wsgi_req->hvec[i + 1].iov_len, "ignore");
+#else
 		pydictkey = PyString_FromStringAndSize(wsgi_req->hvec[i].iov_base, wsgi_req->hvec[i].iov_len);
 		pydictvalue = PyString_FromStringAndSize(wsgi_req->hvec[i + 1].iov_base, wsgi_req->hvec[i + 1].iov_len);
+#endif
 		PyDict_SetItem(wsgi_req->async_environ, pydictkey, pydictvalue);
 		Py_DECREF(pydictkey);
 		Py_DECREF(pydictvalue);
@@ -360,7 +360,7 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 	PyDict_SetItemString(uwsgi->embedded_dict, "env", wsgi_req->async_environ);
 
-	PyDict_SetItemString(wsgi_req->async_environ, "x-wsgiorg.uwsgi.version", uwsgi_version);
+	PyDict_SetItemString(wsgi_req->async_environ, "uwsgi.version", uwsgi_version);
 
 
 #ifdef UWSGI_ROUTING

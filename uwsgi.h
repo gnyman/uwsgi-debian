@@ -2,7 +2,7 @@
 
 /* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs -npsl -di1 */
 
-#define UWSGI_VERSION	"0.9.6.4"
+#define UWSGI_VERSION	"0.9.6.5"
 
 #define uwsgi_error(x)  uwsgi_log("%s: %s [%s line %d]\n", x, strerror(errno), __FILE__, __LINE__);
 #define uwsgi_debug(x, ...) uwsgi_log("[uWSGI DEBUG] " x, __VA_ARGS__);
@@ -272,13 +272,13 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define PyInt_FromLong	PyLong_FromLong
 #define PyInt_AsLong	PyLong_AsLong
 #define PyInt_Check	PyLong_Check
-#define PyString_Check	PyUnicode_Check
-#define	PyString_FromStringAndSize	PyUnicode_FromStringAndSize
-#define	PyString_FromFormat	PyUnicode_FromFormat
-#define	PyString_FromString	PyUnicode_FromString
-#define	PyString_Size		PyUnicode_GET_DATA_SIZE
-#define	PyString_Concat		PyUnicode_Concat
-#define	PyString_AsString	(char *) PyUnicode_AS_UNICODE
+#define PyString_Check	PyBytes_Check
+#define	PyString_FromStringAndSize	PyBytes_FromStringAndSize
+#define	PyString_FromFormat	PyBytes_FromFormat
+#define	PyString_FromString	PyBytes_FromString
+#define	PyString_Size		PyBytes_Size
+#define	PyString_Concat		PyBytes_Concat
+#define	PyString_AsString	PyBytes_AsString
 #define PyFile_FromFile(A,B,C,D) PyFile_FromFd(fileno((A)), (B), (C), -1, NULL, NULL, NULL, 0)
 #endif
 
