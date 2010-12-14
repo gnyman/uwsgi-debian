@@ -46,6 +46,7 @@ Package: uwsgi-python2.5
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python2.5,
  uwsgi-common (= ${binary:Version})
+Provides: httpd-wsgi
 Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-plugin-rack, uwsgi-extra
 Description: fast, self-healing, developer-friendly WSGI server (Python 2.5)
@@ -61,6 +62,7 @@ Package: uwsgi-python2.6
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python2.6,
  uwsgi-common (= ${binary:Version})
+Provides: httpd-wsgi
 Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-plugin-rack, uwsgi-extra
 Description: fast, self-healing, developer-friendly WSGI server (Python 2.6)
@@ -76,6 +78,7 @@ Package: uwsgi-python3.1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python3.1,
  uwsgi-common (= ${binary:Version})
+Provides: httpd-wsgi
 Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-plugin-rack, uwsgi-extra
 Description: Fast, self-healing, developer-friendly WSGI server (Python 3.1)
