@@ -1958,11 +1958,8 @@ void init_uwsgi_vars() {
 		if (snprintf(venv_version, 15, "/lib/python%d.%d", PY_MAJOR_VERSION, PY_MINOR_VERSION) == -1) {
 			return ;
 		}
-#ifdef PYTHREE
-		venv_path = PyString_Concat( venv_path, PyString_FromString(venv_version) );
-#else
+
 		PyString_Concat( &venv_path, PyString_FromString(venv_version) );
-#endif
 
 		if ( PyList_Insert(pypath, 0, venv_path) ) {
 			PyErr_Print();
@@ -1976,12 +1973,21 @@ void init_uwsgi_vars() {
 	}
 #endif
 
+#ifdef PYTHREE
+	if (PyList_Insert(pypath, 0, PyUnicode_FromString(".")) != 0) {
+#else
 	if (PyList_Insert(pypath, 0, PyString_FromString(".")) != 0) {
+#endif
 		PyErr_Print();
 	}
 
 	for (i = 0; i < uwsgi.python_path_cnt; i++) {
+#ifdef PYTHREE
+		// use PyUnicode_FromString as we are talking about FS object
+		if (PyList_Insert(pypath, 0, PyUnicode_FromString(uwsgi.python_path[i])) != 0) {
+#else
 		if (PyList_Insert(pypath, 0, PyString_FromString(uwsgi.python_path[i])) != 0) {
+#endif
 			PyErr_Print();
 		}
 		else {
@@ -2043,13 +2049,8 @@ int init_uwsgi_app(PyObject * force_wsgi_dict, PyObject * my_callable) {
 
 	if (uwsgi.vhost) {
         	zero = PyString_FromStringAndSize(uwsgi.wsgi_req->host, uwsgi.wsgi_req->host_len);
-#ifdef PYTHREE
-                zero = PyString_Concat(zero, PyString_FromString("|"));
-                zero = PyString_Concat(zero, PyString_FromStringAndSize(uwsgi.wsgi_req->script_name, uwsgi.wsgi_req->script_name_len));
-#else
                 PyString_Concat(&zero, PyString_FromString("|"));
                 PyString_Concat(&zero, PyString_FromStringAndSize(uwsgi.wsgi_req->script_name, uwsgi.wsgi_req->script_name_len));
-#endif
         }
         else {
 		zero = PyString_FromStringAndSize(uwsgi.wsgi_req->script_name, uwsgi.wsgi_req->script_name_len);
@@ -2696,7 +2697,11 @@ void uwsgi_wsgi_config(char *filename) {
 					uwsgi_log( "could not initialize applications dictionary\n");
 					exit(1);
 				}
+#ifdef PYTHREE
+				if (PyDict_SetItem(applications, PyBytes_FromString(""), app_app)) {
+#else
 				if (PyDict_SetItemString(applications, "", app_app)) {
+#endif
 					PyErr_Print();
 					uwsgi_log( "unable to set default application\n");
 					exit(1);

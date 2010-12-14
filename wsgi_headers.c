@@ -11,6 +11,10 @@ PyObject *py_uwsgi_spit(PyObject * self, PyObject * args) {
 	PyObject *h_key, *h_value;
 	int i, j;
 
+#ifdef PYTHREE
+	PyObject *zero;
+#endif
+
 	struct wsgi_request *wsgi_req = current_wsgi_req(&uwsgi);
 
 	int base = 0;
@@ -22,7 +26,11 @@ PyObject *py_uwsgi_spit(PyObject * self, PyObject * args) {
 		goto clear;
 	}
 
+#ifdef PYTHREE
+	if (!PyUnicode_Check(head)) {
+#else
 	if (!PyString_Check(head)) {
+#endif
 		uwsgi_log( "http status must be a string !\n");
 		goto clear;
 	}
@@ -43,7 +51,13 @@ PyObject *py_uwsgi_spit(PyObject * self, PyObject * args) {
 		wsgi_req->hvec[1].iov_base = " ";
 		wsgi_req->hvec[1].iov_len = 1;
 #ifdef PYTHREE
-		wsgi_req->hvec[2].iov_base = PyBytes_AsString(PyUnicode_AsASCIIString(head));
+		zero = PyUnicode_AsLatin1String(head);
+		if (!zero) {
+			PyErr_Print();
+			goto clear;
+		}
+		wsgi_req->hvec[2].iov_base = PyBytes_AsString(zero);
+		Py_DECREF(zero);
 		wsgi_req->hvec[2].iov_len = strlen(wsgi_req->hvec[2].iov_base);
 #else
 		wsgi_req->hvec[2].iov_base = PyString_AsString(head);
@@ -59,7 +73,13 @@ PyObject *py_uwsgi_spit(PyObject * self, PyObject * args) {
 		wsgi_req->hvec[0].iov_base = "Status: ";
 		wsgi_req->hvec[0].iov_len = 8;
 #ifdef PYTHREE
-		wsgi_req->hvec[1].iov_base = PyBytes_AsString(PyUnicode_AsASCIIString(head));
+		zero = PyUnicode_AsLatin1String(head);  
+                if (!zero) {
+                        PyErr_Print();
+                        goto clear;
+                }
+		wsgi_req->hvec[1].iov_base = PyBytes_AsString(zero);
+		Py_DECREF(zero);
 		wsgi_req->hvec[1].iov_len = strlen(wsgi_req->hvec[1].iov_base);
 #else
 		wsgi_req->hvec[1].iov_base = PyString_AsString(head);
@@ -105,7 +125,13 @@ PyObject *py_uwsgi_spit(PyObject * self, PyObject * args) {
 			goto clear;
 		}
 #ifdef PYTHREE
-		wsgi_req->hvec[j].iov_base = PyBytes_AsString(PyUnicode_AsASCIIString(h_key));
+		zero = PyUnicode_AsLatin1String(h_key);  
+                if (!zero) {
+                        PyErr_Print();
+                        goto clear;
+                }
+		wsgi_req->hvec[j].iov_base = PyBytes_AsString(zero);
+		Py_DECREF(zero);
 		wsgi_req->hvec[j].iov_len = strlen(wsgi_req->hvec[j].iov_base);
 #else
 		wsgi_req->hvec[j].iov_base = PyString_AsString(h_key);
@@ -114,7 +140,13 @@ PyObject *py_uwsgi_spit(PyObject * self, PyObject * args) {
 		wsgi_req->hvec[j + 1].iov_base = h_sep;
 		wsgi_req->hvec[j + 1].iov_len = H_SEP_SIZE;
 #ifdef PYTHREE
-		wsgi_req->hvec[j + 2].iov_base = PyBytes_AsString(PyUnicode_AsASCIIString(h_value));
+		zero = PyUnicode_AsLatin1String(h_value);  
+                if (!zero) {
+                        PyErr_Print();
+                        goto clear;
+                }
+		wsgi_req->hvec[j + 2].iov_base = PyBytes_AsString(zero);
+		Py_DECREF(zero);
 		wsgi_req->hvec[j + 2].iov_len = strlen(wsgi_req->hvec[j + 2].iov_base);
 #else
 		wsgi_req->hvec[j + 2].iov_base = PyString_AsString(h_value);

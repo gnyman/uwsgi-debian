@@ -1,5 +1,11 @@
 *** september 2010 ***
 
+ * 0.9.6.5 [20100929]
+
+- PEP 3333 support
+- fix --pythonpath with --wsgi-file
+- x-wsgiorg.uwsgi.version renamed to uwsgi.version
+
  * 0.9.6.4 [20100925]
 
 - fix a stupid bug in conditional logging backport
