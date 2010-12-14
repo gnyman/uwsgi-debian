@@ -37,7 +37,7 @@ path_to_conffile_with_name()
 # Extract extension of configuration file from it's path/name.
 type_of_conffile()
 {
-  echo ${1: -3}
+  echo "$1" | sed 's/^.*\(ini\|xml\)$/\1/g'
 }
 
 # Get value of user-defined id (specifically, 'uid' or 'gid') for uWSGI
