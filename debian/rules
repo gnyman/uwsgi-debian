@@ -30,7 +30,8 @@ ruwsgi_to_orig = $(subst ruwsgi,Ruwsgi,$(1))
 
 # List of templates to instantiate for each uwsgi-pythonX.Y package
 uwsgi_python_pkg_templates = dirs install default init.d logrotate \
-                             docs manpages README.Debian init.d.custom
+                             docs manpages README.Debian init.d.custom \
+                             postinst prerm
 
 # List of templates to instantiate for each libapache2-mod-X package
 # There is special-case template, not listed here: uwsgi.load.in
@@ -81,11 +82,21 @@ $(patsubst %,build/uwsgi-python%,$(python_ver)):: build/% : %
 # Build uwsgi-python% executable
 $(patsubst %,uwsgi-python%,$(python_ver)):
 	$(eval python = $(call last_pkgname_component,$@))
+	$(eval alternative_priority = $(or \
+		$(if $(findstring python2.6, $@), 75), \
+		$(if $(findstring python2.5, $@), 50), \
+		$(if $(findstring python3.1, $@), 25), \
+		10 \
+	))
 	/usr/bin/$(python) $(builder) --build
 	for type in $(uwsgi_python_pkg_templates); do \
 		sed -e 's/@@uwsgi_binary@@/$@/g' \
 			< $(CURDIR)/debian/uwsgi-python.$${type}.in \
 			> $(CURDIR)/debian/$@.$${type}; \
+		if [ "$${type}x" = "postinstx" ]; then \
+			sed -ie 's/@@uwsgi_alternative_priority@@/$(alternative_priority)/g' \
+				$(CURDIR)/debian/$@.$${type}; \
+		fi; \
 	done
 	mv $(CURDIR)/uwsgi $(CURDIR)/$@
 
