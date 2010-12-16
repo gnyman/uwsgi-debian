@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for passenger
+# postinst script for libapache2-mod-@@module_name@@
 #
 # see: dh_installdeb(1)
 

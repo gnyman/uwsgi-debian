@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for passenger
+# prerm script for @@uwsgi_binary@@
 #
 # see: dh_installdeb(1)
 
