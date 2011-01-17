@@ -1,3 +1,22 @@
+*** december 2010 ***
+
+ * 0.9.6.6 [20101230]
+
+- support for YAML configuration files
+- backported python module aliasing from 0.9.7-dev
+- better apache2 module (support for SetEnv directive, fixed REQUEST_URI and improved connection handling)
+- uwsgi.post_fork_hook implementation (to execute function after fork()) (thanks George Kollias)
+- option --gid calls setgroups() after setgid() (thanks Jorge Cardona)
+- fixed uGreen compilation (and uGreen is now built by default)
+- fixed timeout and thundering herd problem in async modes (many thanks to Test157 for giving us a good async-test-app)
+- disable TCP_INFO in older Linux kernels (thanks Bo Shi)
+- enable TCP_INFO in FreeBSD (limited usage due to FreeBSD kernel support)
+- fixed static virtualhosting mode using xml files (thanks Andrea Notari of Link I.T. spa)
+- new option --close-on-exec (thanks Jean-Baptiste Quenot)
+- use HTTP_HOST var (and fallback to SERVER_NAME) in virtual hosting mode
+- fixed a buffer overflow in automatic socket_name allocation (spotted by Riccardo Magliocchetti)
+- Official support for Nexenta
+
 *** september 2010 ***
 
  * 0.9.6.5 [20100929]

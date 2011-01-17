@@ -11,6 +11,11 @@ def send_request(env, client):
 
 	while 1:
 		yield env['x-wsgiorg.fdevent.readable'](client.fileno(), 10)
+
+		if env['x-wsgiorg.fdevent.timeout']:
+			print("request timed out !!!")
+			return
+
 		buf = client.recv(4096)
 		if len(buf) == 0:
 			break
@@ -31,6 +36,11 @@ def application(env, start_response):
 	c = s.connect_ex(('www.google.it', 80))
 	if c == errno.EINPROGRESS:
 		yield env['x-wsgiorg.fdevent.writable'](s.fileno(), 10)
+	
+		if env['x-wsgiorg.fdevent.timeout']:
+			print("request timed out !!!")
+			return
+
 		for r in send_request(env, s):
 			yield r
 	elif c == errno.EISCONN: 

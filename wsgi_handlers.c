@@ -33,7 +33,7 @@ PyObject *py_uwsgi_write(PyObject * self, PyObject * args) {
 #ifdef UWSGI_ASYNC
 
 PyObject *py_eventfd_read(PyObject * self, PyObject * args) {
-        int fd, timeout;
+        int fd, timeout=0;
 
 	struct wsgi_request *wsgi_req = current_wsgi_req(&uwsgi);
 
@@ -45,6 +45,9 @@ PyObject *py_eventfd_read(PyObject * self, PyObject * args) {
                 wsgi_req->async_waiting_fd = fd ;
                 wsgi_req->async_waiting_fd_type = ASYNC_IN ;
                 wsgi_req->async_waiting_fd_monitored = 0 ;
+		if (timeout) {
+			wsgi_req->async_timeout = time(NULL) + timeout;
+		}
         }
 
         return PyString_FromString("") ;
@@ -52,7 +55,7 @@ PyObject *py_eventfd_read(PyObject * self, PyObject * args) {
 
 
 PyObject *py_eventfd_write(PyObject * self, PyObject * args) {
-        int fd, timeout;
+        int fd, timeout=0;
 
 	struct wsgi_request *wsgi_req = current_wsgi_req(&uwsgi);
 
@@ -64,6 +67,9 @@ PyObject *py_eventfd_write(PyObject * self, PyObject * args) {
                 wsgi_req->async_waiting_fd = fd ;
                 wsgi_req->async_waiting_fd_type = ASYNC_OUT ;
                 wsgi_req->async_waiting_fd_monitored = 0 ;
+		if (timeout) {
+			wsgi_req->async_timeout = time(NULL) + timeout;
+		}
         }
 
         return PyString_FromString("") ;

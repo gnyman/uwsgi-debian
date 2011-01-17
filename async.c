@@ -320,6 +320,11 @@ void async_expire_timeouts(struct uwsgi_server *uwsgi) {
 			if (wsgi_req->async_timeout <= deadline) {
 				wsgi_req->async_timeout = 0 ;
 				wsgi_req->async_timeout_expired = 1 ;
+				if (wsgi_req->async_waiting_fd != -1) {
+                                        async_del(uwsgi->async_queue, wsgi_req->async_waiting_fd, wsgi_req->async_waiting_fd_type);
+                                        wsgi_req->async_waiting_fd = -1;
+                                        wsgi_req->async_waiting_fd_monitored = 0;
+                                }
 			}	
                 }
                 wsgi_req = next_wsgi_req(uwsgi, wsgi_req) ;
