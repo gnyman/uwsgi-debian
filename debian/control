@@ -18,8 +18,8 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
   | uwsgi-python2.5 (>= ${binary:Version})
   | uwsgi-python3.1 (>= ${binary:Version})
 Description: fast, self-healing, developer-friendly WSGI server
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -31,8 +31,8 @@ Package: uwsgi-common
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: fast, self-healing, developer-friendly WSGI server (common files)
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -50,8 +50,8 @@ Provides: httpd-wsgi
 Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-plugin-rack, uwsgi-extra
 Description: fast, self-healing, developer-friendly WSGI server (Python 2.5)
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -66,8 +66,8 @@ Provides: httpd-wsgi
 Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-plugin-rack, uwsgi-extra
 Description: fast, self-healing, developer-friendly WSGI server (Python 2.6)
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -81,9 +81,9 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, python3.1,
 Provides: httpd-wsgi
 Recommends: libapache2-mod-uwsgi | libapache2-mod-ruwsgi
 Suggests: uwsgi-plugin-lua, uwsgi-plugin-psgi, uwsgi-plugin-rack, uwsgi-extra
-Description: Fast, self-healing, developer-friendly WSGI server (Python 3.1)
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+Description: fast, self-healing, developer-friendly WSGI server (Python 3.1)
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -94,8 +94,8 @@ Package: uwsgi-plugin-lua
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi
 Description: Lua WSAPI plugin for uWSGI
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -106,8 +106,8 @@ Package: uwsgi-plugin-psgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi
 Description: Perl PSGI plugin for uWSGI
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -118,8 +118,8 @@ Package: uwsgi-plugin-rack
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi
 Description: Ruby Rack plugin for uWSGI
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -132,8 +132,8 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, uwsgi
 Conflicts: libapache2-mod-ruwsgi
 Replaces: libapache2-mod-ruwsgi
 Description: uWSGI module for Apache2 (mod_uwsgi)
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -149,8 +149,8 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, uwsgi
 Conflicts: libapache2-mod-uwsgi
 Replaces: libapache2-mod-uwsgi
 Description: uWSGI module for Apache2 (mod_Ruwsgi)
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
@@ -164,8 +164,8 @@ Package: uwsgi-extra
 Architecture: any
 Depends: ${misc:Depends}
 Description: fast, self-healing, developer-friendly WSGI server (extra files)
- uWSGI is aimed for professional python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered python
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
