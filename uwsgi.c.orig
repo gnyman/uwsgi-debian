@@ -85,7 +85,6 @@ static struct option long_options[] = {
 		{"python-path", required_argument, 0, LONG_ARGS_PYTHONPATH},
 		{"pp", required_argument, 0, LONG_ARGS_PYTHONPATH},
 		{"pyargv", required_argument, 0, LONG_ARGS_PYARGV},
-		{"pymodule-alias", required_argument, 0, LONG_ARGS_PYMODULE_ALIAS},
 #ifdef UWSGI_INI
 		{"ini", required_argument, 0, LONG_ARGS_INI},
 		{"ini-paste", required_argument, 0, LONG_ARGS_INI_PASTE},
@@ -174,7 +173,6 @@ static struct option long_options[] = {
 		{"http-var", required_argument, 0, LONG_ARGS_HTTP_VAR},
 #endif
 		{"catch-exceptions", no_argument, &uwsgi.catch_exceptions, 1},
-		{"close-on-exec", no_argument, &uwsgi.close_on_exec, 1},
 		{"mode", required_argument, 0, LONG_ARGS_MODE},
 		{"env", required_argument, 0, LONG_ARGS_ENV},
 		{"vacuum", no_argument, &uwsgi.vacuum, 1},
@@ -190,12 +188,6 @@ int get_linux_tcp_info(int fd) {
         socklen_t tis = sizeof(struct tcp_info) ;
 
         if (!getsockopt(fd, IPPROTO_TCP, TCP_INFO, &ti, &tis)) {
-
-		// a check for older linux kernels and FreeBSD
-		if (!ti.tcpi_sacked) {
-			return 0;
-		}
-
                 if (ti.tcpi_unacked >= ti.tcpi_sacked) {
                         uwsgi_log_verbose("*** uWSGI listen queue of socket %d full !!! (%d/%d) ***\n", fd, ti.tcpi_unacked, ti.tcpi_sacked);
                 }
@@ -443,27 +435,6 @@ static void vacuum(void) {
 	}
 }
 
-PyObject *get_uwsgi_pydict(char *module) {
-
-        PyObject *wsgi_module, *wsgi_dict;
-
-        wsgi_module = PyImport_ImportModule(module);
-        if (!wsgi_module) {
-                PyErr_Print();
-                return NULL;
-        }
-
-        wsgi_dict = PyModule_GetDict(wsgi_module);
-        if (!wsgi_dict) {
-                PyErr_Print();
-                return NULL;
-        }
-
-        return wsgi_dict;
-
-}
-
-
 int main(int argc, char *argv[], char *envp[]) {
 
 	uint64_t master_cycles = 0;
@@ -515,10 +486,6 @@ int main(int argc, char *argv[], char *envp[]) {
 	
 #ifdef UWSGI_HTTP
 	pid_t http_pid;
-#endif
-
-#ifdef UWSGI_EMBEDDED
-	PyObject *uwsgi_dict;
 #endif
 
 #ifdef UNBIT
@@ -812,7 +779,7 @@ int main(int argc, char *argv[], char *envp[]) {
 
                 if (!uwsgi.socket_name) {
 
-                        uwsgi.socket_name = malloc(102);
+                        uwsgi.socket_name = malloc(64);
                         if (!uwsgi.socket_name) {
                                 uwsgi_error("malloc()");
                                 exit(1);
@@ -820,7 +787,7 @@ int main(int argc, char *argv[], char *envp[]) {
 
 
 
-			snprintf(uwsgi.socket_name, 102, "%d_%d.sock", (int) time(NULL), (int) getpid());
+			snprintf(uwsgi.socket_name, 64, "%d_%d.sock", (int) time(NULL), (int) getpid());
                         
 
 
@@ -1084,24 +1051,6 @@ int main(int argc, char *argv[], char *envp[]) {
 		else {
 			uwsgi.numproc = 0 ;
 		}
-
-		 // if async mode is selected with preforking put the serverfd in non-blocking mode to avoid thundering herd
-                if (uwsgi.async > 1 && uwsgi.numproc > 1) {
-                        uwsgi_log("putting server socket in non-blocking mode\n");
-                        uwsgi.fcntl_arg = fcntl(uwsgi.serverfd, F_GETFL, NULL);
-                        if (uwsgi.fcntl_arg < 0) {
-                                uwsgi_error("fcntl()");
-                                exit(1);
-                        }
-                        uwsgi.fcntl_arg |= O_NONBLOCK;
-                        if (fcntl(uwsgi.serverfd, F_SETFL, uwsgi.fcntl_arg) < 0) {
-                                uwsgi_error("fcntl()");
-                                exit(1);
-                        }
-
-        		uwsgi.fcntl_arg &= (~O_NONBLOCK);
-                }
-
 
 #ifdef UWSGI_PROXY
 		if (uwsgi.proxy_socket_name) {
@@ -1770,19 +1719,6 @@ int main(int argc, char *argv[], char *envp[]) {
 		}
 	}
 
-#ifdef UWSGI_EMBEDDED
-        // call the post_fork_hook
-        uwsgi_dict = get_uwsgi_pydict("uwsgi");
-        if (uwsgi_dict) {
-                PyObject *pfh = PyDict_GetItemString(uwsgi_dict, "post_fork_hook");
-                if (pfh) {
-                        python_call(pfh, PyTuple_New(0), 0);
-                }
-        }
-        PyErr_Clear();
-#endif
-
-
 
 	// postpone the queue initialization as kevent do not pass kfd after fork()
 #ifdef UWSGI_ASYNC
@@ -1929,17 +1865,6 @@ int main(int argc, char *argv[], char *envp[]) {
 					continue;
 				}
 
-// on linux we do not need to reset the socket to blocking state
-#ifndef __linux__
-				if (uwsgi.numproc > 1) {
-					/* re-set blocking socket */
-        				if (fcntl(uwsgi.wsgi_req->poll.fd, F_SETFL, uwsgi.fcntl_arg) < 0) {
-                				uwsgi_error("fcntl()");
-                				return -1;
-        				}
-				}
-#endif
-
 				if (wsgi_req_recv(uwsgi.wsgi_req)) {
 					continue;
 				}
@@ -1955,7 +1880,6 @@ int main(int argc, char *argv[], char *envp[]) {
 					uwsgi.wsgi_req->async_status = UWSGI_AGAIN ;
 					uwsgi.wsgi_req->async_waiting_fd = -1 ;
 					uwsgi.wsgi_req->async_waiting_fd_monitored = 0 ;
-					uwsgi.wsgi_req->async_timeout = 0;
 				}
 
 				async_del(uwsgi.async_queue, uwsgi.async_events[i].ASYNC_FD, uwsgi.async_events[i].ASYNC_EV);
@@ -2002,104 +1926,10 @@ reqclear:
 	return 0;
 }
 
-char *uwsgi_concat2(char *one, char *two) {
-
-        char *buf;
-        size_t len = strlen(one) + strlen(two) + 1;
-
-
-        buf = malloc(len);
-	if (!buf) {
-		exit(1);
-	}
-        buf[len-1] = 0;
-
-        memcpy( buf, one, strlen(one));
-        memcpy( buf + strlen(one) , two, strlen(two));
-
-        return buf;
-
-}
-
-
-PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
-
-        FILE *pyfile;
-        struct _node *py_file_node = NULL;
-        PyObject *py_compiled_node, *py_file_module;
-        int is_a_package = 0;
-        struct stat pystat;
-        char *real_filename = filename;
-
-
-        pyfile = fopen(filename, "r");
-        if (!pyfile) {
-                uwsgi_error("fopen()");
-                exit(1);
-        }
-
-        if (fstat(fileno(pyfile), &pystat)) {
-                uwsgi_error("fstat()");
-                exit(1);
-        }
-
-        if (S_ISDIR(pystat.st_mode)) {
-                is_a_package = 1;
-                fclose(pyfile);
-                real_filename = uwsgi_concat2(filename, "/__init__.py");
-                pyfile = fopen(real_filename, "r");
-                if (!pyfile) {
-                        uwsgi_error("fopen()");
-                        exit(1);
-                }
-        }
-
-        py_file_node = PyParser_SimpleParseFile(pyfile, real_filename, Py_file_input);
-        if (!py_file_node) {
-                PyErr_Print();
-                uwsgi_log( "failed to parse file %s\n", real_filename);
-                exit(1);
-        }
-
-        fclose(pyfile);
-
-        py_compiled_node = (PyObject *) PyNode_Compile(py_file_node, real_filename);
-
-        if (!py_compiled_node) {
-                PyErr_Print();
-                uwsgi_log( "failed to compile python file %s\n", real_filename);
-                exit(1);
-        }
-
-        py_file_module = PyImport_ExecCodeModule(name, py_compiled_node);
-        if (!py_file_module) {
-                PyErr_Print();
-                exit(1);
-        }
-
-        Py_DECREF(py_compiled_node);
-
-        if( is_a_package) {
-                PyObject *py_file_module_dict = PyModule_GetDict(py_file_module);
-                if (py_file_module_dict) {
-                        PyDict_SetItemString(py_file_module_dict, "__path__", Py_BuildValue("[O]",PyString_FromString(filename)));
-                }
-                free(real_filename);
-        }
-
-        return py_file_module;
-
-}
-
-
 void init_uwsgi_vars() {
 
 	int i;
 	PyObject *pysys, *pysys_dict, *pypath;
-
-	PyObject *modules = PyImport_GetModuleDict();
-
-	PyObject *tmp_module;
 
 #ifdef UWSGI_MINTERPRETERS
 	char venv_version[15] ;
@@ -2173,33 +2003,6 @@ void init_uwsgi_vars() {
 		}
 	}
 
-	for(i=0;i<uwsgi.pymodule_alias_cnt;i++) {
-                // split key=value
-                char *value = strchr(uwsgi.pymodule_alias[i], '=');
-                if (!value) {
-                        uwsgi_log("invalid pymodule-alias syntax\n");
-                        continue;
-                }
-                value[0] = 0;
-                if (!strchr(value+1, '/')) {
-                        // this is a standard pymodule
-                        tmp_module = PyImport_ImportModule(value+1);
-                        if (!tmp_module) {
-                                PyErr_Print();
-                                exit(1);
-                        }
-
-                        PyDict_SetItemString(modules, uwsgi.pymodule_alias[i], tmp_module);
-                }
-                else {
-                        // this is a filepath that need to be mapped
-                        tmp_module = uwsgi_pyimport_by_filename(uwsgi.pymodule_alias[i], value+1);
-                }
-                uwsgi_log("mapped virtual pymodule \"%s\" to real pymodule \"%s\"\n", uwsgi.pymodule_alias[i], value+1);
-                // reset original value
-                value[0] = '=';
-        }
-
 }
 
 int init_uwsgi_app(PyObject * force_wsgi_dict, PyObject * my_callable) {
@@ -2253,18 +2056,13 @@ int init_uwsgi_app(PyObject * force_wsgi_dict, PyObject * my_callable) {
 
 
 	if (uwsgi.vhost) {
-                if (uwsgi.wsgi_req->host_len > 0) {
-                        zero = PyString_FromStringAndSize(uwsgi.wsgi_req->host, uwsgi.wsgi_req->host_len);
-                        PyString_Concat(&zero, PyString_FromString("|"));
-                        PyString_Concat(&zero, PyString_FromStringAndSize(uwsgi.wsgi_req->script_name, uwsgi.wsgi_req->script_name_len));
-                }
-                else {
-                        zero = PyString_FromStringAndSize(uwsgi.wsgi_req->script_name, uwsgi.wsgi_req->script_name_len);
-                }
+        	zero = PyString_FromStringAndSize(uwsgi.wsgi_req->host, uwsgi.wsgi_req->host_len);
+                PyString_Concat(&zero, PyString_FromString("|"));
+                PyString_Concat(&zero, PyString_FromStringAndSize(uwsgi.wsgi_req->script_name, uwsgi.wsgi_req->script_name_len));
         }
         else {
-                zero = PyString_FromStringAndSize(uwsgi.wsgi_req->script_name, uwsgi.wsgi_req->script_name_len);
-        }
+		zero = PyString_FromStringAndSize(uwsgi.wsgi_req->script_name, uwsgi.wsgi_req->script_name_len);
+	}
 
 	if (!zero) {
 		Py_FatalError("cannot get mountpoint python object !\n");
@@ -3398,15 +3196,6 @@ void manage_opt(int i, char *optarg) {
 			uwsgi_log( "you can specify at most 64 --pythonpath options\n");
 		}
 		break;
-	case LONG_ARGS_PYMODULE_ALIAS:
-        	if (uwsgi.pymodule_alias_cnt < MAX_PYMODULE_ALIAS) {
-        		uwsgi.pymodule_alias[uwsgi.pymodule_alias_cnt] = optarg;
-        		uwsgi.pymodule_alias_cnt++;
-        	}
-        	else {
-        		uwsgi_log( "you can specify at most %d --pymodule-alias options\n", MAX_PYMODULE_ALIAS);
-        	}
-		break;
 	case LONG_ARGS_LIMIT_AS:
 		uwsgi.rl.rlim_cur = (atoi(optarg)) * 1024 * 1024;
 		uwsgi.rl.rlim_max = uwsgi.rl.rlim_cur;
@@ -3653,7 +3442,6 @@ void manage_opt(int i, char *optarg) {
 \t--python-path <dir>\t\tadd <dir> to PYTHONPATH\n\
 \t--pp <dir>\t\t\tadd <dir> to PYTHONPATH\n\
 \t--pyargv <args>\t\t\tassign args to python sys.argv\n\
-\t--pymodule-alias <name=value>\tmap virtual name module to value\n\
 \t--limit-as <MB>\t\t\tlimit the address space of processes to MB megabytes\n\
 \t--limit-post <bytes>\t\tlimit HTTP content_length size to <bytes>\n\
 \t--post-buffering <bytes>\tbuffer HTTP POST request higher than <bytes> to disk\n\
@@ -3685,7 +3473,6 @@ void manage_opt(int i, char *optarg) {
 \t--ignore-script-name\t\tdisable uWSGI management of SCRIPT_NAME\n\
 \t--no-default-app\t\tdo not fallback unknown SCRIPT_NAME requests\n\
 \t--ini <inifile>\t\t\tpath of ini config file\n\
-\t--yaml <ymlfile>\t\tpath of yaml config file\n\
 \t--ini-paste <inifile>\t\tpath of ini config file that contains paste configuration\n\
 \t--ldap <url>\t\t\turl of LDAP uWSGIConfig resource\n\
 \t--ldap-schema\t\t\tdump uWSGIConfig LDAP schema\n\
@@ -3701,7 +3488,6 @@ void manage_opt(int i, char *optarg) {
 \t--http-only\t\t\tstart only the embedded HTTP server\n\
 \t--http-var KEY[=VALUE]\t\tadd var KEY to uwsgi requests made by the embedded HTTP server\n\
 \t--catch-exceptions\t\tprint exceptions in the browser\n\
-\t--close-on-exec\t\t\tset close-on-exec flag for every request socket\n\
 \t--mode\t\t\t\tset configuration mode\n\
 \t--env KEY=VALUE\t\t\tset environment variable\n\
 \t--vacuum\t\t\tclear the environment on exit (remove UNIX sockets and pidfiles)\n\

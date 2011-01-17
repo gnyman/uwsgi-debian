@@ -284,10 +284,10 @@ static void u_green_request(struct uwsgi_server *uwsgi, struct wsgi_request *wsg
 
 void u_green_init(struct uwsgi_server *uwsgi) {
 
-	static struct wsgi_request *wsgi_req ;
+	struct wsgi_request *wsgi_req = uwsgi->wsgi_requests ;
 
-	static int i;
-	static size_t u_stack_size = UGREEN_DEFAULT_STACKSIZE ;
+	int i;
+	size_t u_stack_size = UGREEN_DEFAULT_STACKSIZE ;
 
 
 	PyMethodDef *uwsgi_function;
@@ -305,7 +305,6 @@ void u_green_init(struct uwsgi_server *uwsgi) {
 		exit(1);
 	}
 
-        wsgi_req = uwsgi->wsgi_requests ;
 
 	for(i=0;i<uwsgi->async;i++) {
 		uwsgi->ugreen_contexts[i] = malloc( sizeof(ucontext_t) );

@@ -1,18 +1,18 @@
 /* 
         
-    *** uWSGI/mod_uwsgi ***
+*** uWSGI/mod_uwsgi ***
 
-    Copyright 2009-2010 Unbit S.a.s. <info@unbit.it>
-        
-    This program is free software; you can redistribute it and/or
-    modify it under the terms of the GNU General Public License
-    as published by the Free Software Foundation; either version 2
-    of the License, or (at your option) any later version.
+Copyright 2009-2010 Unbit S.a.s. <info@unbit.it>
+     
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
@@ -264,7 +264,6 @@ static int uwsgi_handler(request_rec *r) {
 	char uwsgi_http_status[13] ;
 	int uwsgi_http_status_read = 0;
 	
-
 	apr_bucket_brigade *bb;
 
 	if (strcmp(r->handler, "uwsgi-handler"))
@@ -286,7 +285,6 @@ static int uwsgi_handler(request_rec *r) {
 		ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "uwsgi: unable to create socket: %s", strerror(errno));
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
-
 
 	if ( (ret = timed_connect(&uwsgi_poll, (struct sockaddr *) &c->s_addr, c->addr_size, c->socket_timeout, r) ) != 0) {
 
@@ -323,7 +321,7 @@ static int uwsgi_handler(request_rec *r) {
 	vecptr = uwsgi_add_var(uwsgi_vars, vecptr, "SERVER_NAME", (char *) ap_get_server_name(r), &pkt_size) ;
 	vecptr = uwsgi_add_var(uwsgi_vars, vecptr, "SERVER_PORT", apr_psprintf(r->pool, "%u",ap_get_server_port(r)), &pkt_size) ;
 	vecptr = uwsgi_add_var(uwsgi_vars, vecptr, "SERVER_PROTOCOL", r->protocol, &pkt_size) ;
-	vecptr = uwsgi_add_var(uwsgi_vars, vecptr, "REQUEST_URI", r->uri, &pkt_size) ;
+	vecptr = uwsgi_add_var(uwsgi_vars, vecptr, "REQUEST_URI", r->unparsed_uri, &pkt_size) ;
 	vecptr = uwsgi_add_var(uwsgi_vars, vecptr, "REMOTE_ADDR", r->connection->remote_ip, &pkt_size) ;
 	vecptr = uwsgi_add_var(uwsgi_vars, vecptr, "REMOTE_USER", r->user ? r->user : "", &pkt_size) ;
 	if (r->user) {
@@ -394,6 +392,13 @@ static int uwsgi_handler(request_rec *r) {
 			}
 		}
 	}
+
+	/* environment variables */
+	headers = apr_table_elts(r->subprocess_env);
+	h = (apr_table_entry_t*) headers->elts;
+	for (i = 0; i < headers->nelts; ++i) {
+		vecptr = uwsgi_add_var(uwsgi_vars, vecptr, h[i].key, h[i].val, &pkt_size) ;
+	}	
 	
 
 	uwsgi_vars[0].iov_base = pkt_header;
@@ -456,12 +461,17 @@ static int uwsgi_handler(request_rec *r) {
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 		else if (cnt > 0) {
-			if (uwsgi_poll.revents & POLLIN) {
+			if (uwsgi_poll.revents & POLLIN || uwsgi_poll.revents & POLLHUP) {
 				cnt = recv(uwsgi_poll.fd, buf, 4096, 0) ;
 				if (cnt < 0) {
-					ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "uwsgi: recv() %s", strerror(errno));
-					apr_brigade_destroy(bb);
-					return HTTP_INTERNAL_SERVER_ERROR;
+					if (errno != ECONNRESET) {
+						ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "uwsgi: recv() %s", strerror(errno));
+						apr_brigade_destroy(bb);
+						return HTTP_INTERNAL_SERVER_ERROR;
+					}
+					else {
+						break;
+					}
 				}
 				else if (cnt > 0) {
 					if (!c->cgi_mode && uwsgi_http_status_read < 12) {
@@ -482,21 +492,17 @@ static int uwsgi_handler(request_rec *r) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
 					apr_brigade_write(bb, NULL, NULL, buf, cnt);
-					hret = ap_fflush(r->output_filters, bb) ;
-					if (hret != APR_SUCCESS) {
-						close(uwsgi_poll.fd);
-						apr_brigade_destroy(bb);
-						return hret;
-					}
 				}
 				else {
+					// EOF
 					break;
 				}
 			}
 
-			if (uwsgi_poll.revents & POLLHUP || uwsgi_poll.revents & POLLERR || uwsgi_poll.revents & POLLNVAL) {
-				break;
-			}
+			// error
+			if (uwsgi_poll.revents & POLLERR || uwsgi_poll.revents & POLLNVAL) {
+                                break;
+                        }
 		}
 		else {
 			ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, "uwsgi: poll() %s", strerror(errno));

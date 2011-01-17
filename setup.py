@@ -18,7 +18,7 @@ class uWSGIBuilder(build_ext):
 class uWSGIInstall(install):
 
 	def run(self):
-		# hack, hack and still hack. We need to find a solution for 0.9.6
+		# hack, hack and still hack. We need to find a solution
 		if self.record:
 			record_file = open(self.record,'w')
 		uc.parse_vars()
@@ -34,7 +34,7 @@ class uWSGIDistribution(Distribution):
 
 
 setup(name='uWSGI',
-      version='0.9.6.5',
+      version='0.9.6.6',
       description='The uWSGI server',
       author='Unbit',
       author_email='info@unbit.it',

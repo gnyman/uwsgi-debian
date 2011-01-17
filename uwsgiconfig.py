@@ -2,6 +2,7 @@
 
 XML=True
 INI=True
+YAML=True
 SNMP=True
 SCTP=False
 ERLANG=False
@@ -17,7 +18,7 @@ PROXY=True
 PASTE=True
 MINTERPRETERS=True
 ASYNC=True
-UGREEN=False
+UGREEN=True
 HTTP=True
 EVDIS=False
 LDAP=False
@@ -165,6 +166,9 @@ def unbit_setup():
 
 	global INI
 	INI=False
+
+	global YAML
+	YAML=False
 
 	global SNMP
 	SNMP=False
@@ -321,6 +325,10 @@ def parse_vars():
 	if INI:
 		cflags.append("-DUWSGI_INI")
 		gcc_list.append('ini')
+
+	if YAML:
+		cflags.append("-DUWSGI_YAML")
+		gcc_list.append('yaml')
 
 	if DEBUG:
 		cflags.append("-DUWSGI_DEBUG")

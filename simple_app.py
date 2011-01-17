@@ -1,6 +1,11 @@
 import uwsgi
+import os
 
 print "!!! uWSGI version:", uwsgi.version
+
+print os.getgid()
+print os.getuid()
+print os.getgroups()
 
 def ciao():
 	print "modifica su /tmp"
