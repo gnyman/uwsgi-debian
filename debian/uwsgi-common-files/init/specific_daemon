@@ -38,6 +38,8 @@ do_start_specific_daemon()
     CONFFILE_OPTION_NAME=ini
   elif [ "$CONFTYPE" = "xml" ]; then
     CONFFILE_OPTION_NAME=xmlconfig
+  elif [ "$CONFTYPE" = "yaml" -o "$CONFTYPE" = "yml" ]; then
+    CONFFILE_OPTION_NAME=yaml
   fi
 
   local DAEMON_ARGS=" \

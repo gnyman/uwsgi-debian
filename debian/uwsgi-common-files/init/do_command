@@ -18,8 +18,9 @@ do_command()
   # List of unique names of user-defined configuration files.
   local ALL_CONFNAMES=$(
     ls -1 "$CONFDIR" 2>/dev/null \
-    | grep "\.\(ini\|xml\)$" \
-    | sed 's/^\(.\+\)\.\(ini\|xml\)$/\1/g' \
+    | grep "\.\(ini\|xml\|yaml\|yml\)$" \
+    | sed 's/^\(.\+\)\.\(ini\|xml\|yaml\|yml\)$/\1/g' \
+    | sort \
     | uniq \
     | tr '\n' ' ' \
   )
