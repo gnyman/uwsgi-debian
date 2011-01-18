@@ -1,4 +1,4 @@
-Description: Distinguish ssize_t error code from size_t value.
+Description: Distinguish ssize_t error code from size_t value
  'writev' returns ssize_t value, which could contain error code (-1) or
  number of written bytes.
  .

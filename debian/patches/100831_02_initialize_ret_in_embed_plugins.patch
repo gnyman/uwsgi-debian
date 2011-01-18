@@ -1,4 +1,4 @@
-Description: Add forgotten initialization of variable 'ret'.
+Description: Add forgotten initialization of variable 'ret'
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: http://lists.unbit.it/pipermail/uwsgi/2010-September/000639.html
 Last-Update: 2010-09-26

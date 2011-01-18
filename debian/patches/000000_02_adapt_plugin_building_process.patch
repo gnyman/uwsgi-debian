@@ -1,12 +1,13 @@
 Description: Adapt plugin building process
-  Proceed with following changes:
-    * don't build embedded plugins in moment when uWSGI binary is builded. Any
-      of these plugins is builded separately for it's own package
-    * place builded plugin in current directory instead of UWSGI_PLUGIN_DIR
-      (as UWSGI_PLUGIN_DIR is redefined in another patch to directory in
-      /usr/lib hierarchy)
+ Proceed with following changes:
+   * don't build embedded plugins in moment when uWSGI binary is builded. Any
+     of these plugins is builded separately for it's own package
+   * place builded plugin in current directory instead of UWSGI_PLUGIN_DIR
+     (as UWSGI_PLUGIN_DIR is redefined in another patch to directory in
+     /usr/lib hierarchy)
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
-Last-Update: 2010-09-26
+Forwarded: not-needed
+Last-Update: 2011-01-18
 
 Index: uwsgi-0.9.6.4/uwsgiconfig.py
 ===================================================================

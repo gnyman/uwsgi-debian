@@ -1,6 +1,10 @@
-Description: Fix interpreter path in 'ugreenchat.py'.
+Description: Fix interpreter path in 'ugreenchat.py'
+ Packaged ugreenchat.py is placed to /usr/share/doc/uwsgi-common/examples, so
+ Lintian warns about relative interpreter path with informational tag
+ (I: example-interpreter-not-absolute).
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
-Last-Update: 2011-01-17
+Forwarded: not-needed
+Last-Update: 2011-01-18
 
 Index: uwsgi/ugreenchat.py
 ===================================================================

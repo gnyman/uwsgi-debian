@@ -6,7 +6,6 @@ Description: Tune build-in features at uwsgiconfig.py
    * SCTP support
    * Erlang integration
    * Profiler
-   * uGreen (integrated green threads)
    * support of configuration via LDAP
    * WSGI2 support
    * Routing system
@@ -18,7 +17,8 @@ Description: Tune build-in features at uwsgiconfig.py
  .
  Also, define directory where packaged plugins are installed.
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
-Last-Update: 2010-09-26
+Forwarded: not-needed
+Last-Update: 2011-01-18
 
 Index: uwsgi/uwsgiconfig.py
 ===================================================================

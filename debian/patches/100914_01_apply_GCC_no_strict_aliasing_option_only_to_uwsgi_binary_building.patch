@@ -1,4 +1,4 @@
-Description: Apply '-fno-strict-aliasing' option only in uWSGI binary building.
+Description: Apply '-fno-strict-aliasing' option only in uWSGI binary building
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: http://lists.unbit.it/pipermail/uwsgi/2010-September/000666.html
 Last-Update: 2010-09-14
