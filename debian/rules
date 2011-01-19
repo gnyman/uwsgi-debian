@@ -49,7 +49,9 @@ DEB_CLEAN_EXCLUDE = ugreen.c.orig utils.c.orig uwsgi.c.orig uwsgi.h.orig
 DEB_COMPRESS_EXCLUDE_uwsgi-common = .py .pl .xml .psgi .png
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
-clean::
+DEB_PHONY_RULES += safe-clean
+
+safe-clean:
 	# uWSGI executables
 	$(RM) $(CURDIR)/uwsgi $(addprefix $(CURDIR)/uwsgi-python, $(python_ver))
 	# intermediate compiled files
@@ -81,6 +83,8 @@ clean::
 	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-plugin-,$(addsuffix .install,$(plugins)))
 	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
+
+clean:: safe-clean
 
 # Build uwsgi-python% package
 $(patsubst %,build/uwsgi-python%,$(python_ver)):: build/% : %
