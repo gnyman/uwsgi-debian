@@ -2,20 +2,34 @@
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 
+# Common variables
+# ================
+
+vendor = $(shell \
+	if dpkg-vendor --derives-from Ubuntu; then \
+		echo ubuntu; \
+	else \
+		echo debian; \
+	fi \
+)
+
+# List of Python's versions, for which uWSGI should be built
+available_python_versions = $(strip \
+	$(shell cat $(CURDIR)/debian/available-python-versions.$(vendor)) \
+)
+first_available_python_version = $(word 1, $(available_python_versions))
+
 default_python = /usr/bin/python
-builder = $(CURDIR)/uwsgiconfig.py
+uwsgi_builder = $(CURDIR)/uwsgiconfig.py
 plugins_dir = plugins
 
 # Search in debian/control for packages with name $(1)% and extract % in list.
 list_pkgname_suffixes = $(strip \
 	$(shell \
-		grep "^Package: $(1)" $(CURDIR)/debian/control \
+		grep "^Package: $(1)" $(CURDIR)/debian/control.in \
 		| sed 's/Package: $(1)//' \
 	) \
 )
-
-# List of Python's versions, for which uWSGI should be built
-python_ver = $(call list_pkgname_suffixes,uwsgi-python)
 
 # List of packaged plugins' names
 plugins = $(call list_pkgname_suffixes,uwsgi-plugin-)
@@ -40,6 +54,9 @@ libapache2_mod_pkg_templates = install postinst prerm
 # Returns substring after last '-' character
 last_pkgname_component = $(lastword $(subst -, ,$(1)))
 
+# CDBS-specific variables
+# =======================
+
 # As for uWSGI 0.9.6.6 there are some *.orig files in upstream tarball.
 #
 # dh_clean deletes all *.orig files by default, but upstream files shouldn't
@@ -51,9 +68,53 @@ DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
 DEB_PHONY_RULES += safe-clean
 
+# Rules
+# =====
+
+# Instantiate debian/control from template debian/control.in
+debian/control::
+	$(eval control_parts = uwsgi uwsgi-python)
+	$(RM) $(addprefix $(CURDIR)/debian/control-parts/, $(control_parts))
+	# Instantiate templates in debian/control-parts.
+	for python_version in $(available_python_versions); do \
+		if [ "x$$python_version" = "x$(first_available_python_version)" ]; then \
+			UWSGI_TPL_LEADING=' '; \
+		else \
+			UWSGI_TPL_LEADING=' | '; \
+		fi; \
+		sed \
+			-e "s/^/$$UWSGI_TPL_LEADING/" \
+			-e "s/@@python_version@@/$$python_version/g" \
+			< $(CURDIR)/debian/control-parts/uwsgi.in \
+			>> $(CURDIR)/debian/control-parts/uwsgi; \
+		if [ "x$$python_version" != "x$(first_available_python_version)" ]; then \
+			echo >> $(CURDIR)/debian/control-parts/uwsgi-python; \
+		fi; \
+		sed \
+			-e "s/@@python_version@@/$$python_version/g" \
+			< $(CURDIR)/debian/control-parts/uwsgi-python.in \
+			>> $(CURDIR)/debian/control-parts/uwsgi-python; \
+	done
+	# Instantiate debian/control from template debian/control.in with using
+	# substitution files from debian/control-parts.
+	sed \
+		-e '/^ @@uwsgi_python_dependency@@$$/ {' \
+		-e '  r $(CURDIR)/debian/control-parts/uwsgi' \
+		-e '  d' \
+		-e '}' \
+		-e '/^#@@uwsgi_python_packages@@$$/ {' \
+		-e '  r $(CURDIR)/debian/control-parts/uwsgi-python' \
+		-e '  d' \
+		-e '}' \
+		< $(CURDIR)/debian/control.in \
+		> $(CURDIR)/debian/control
+	$(RM) $(addprefix $(CURDIR)/debian/control-parts/, $(control_parts))
+
+# safe-clean target just deletes intermediate files and doesn't produce any new
+# files
 safe-clean:
 	# uWSGI executables
-	$(RM) $(CURDIR)/uwsgi $(addprefix $(CURDIR)/uwsgi-python, $(python_ver))
+	$(RM) $(CURDIR)/uwsgi $(addprefix $(CURDIR)/uwsgi-python, $(available_python_versions))
 	# intermediate compiled files
 	$(RM) $(CURDIR)/*.o $(CURDIR)/uwsgiconfig.pyc
 	# plugins
@@ -70,7 +131,7 @@ safe-clean:
 	$(RM) $(common_docs_collection_dir)
 	# instantiated uwsgi-pythonX.Y templates
 	for type in $(uwsgi_python_pkg_templates); do \
-		$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .$$type,$(python_ver))); \
+		$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .$$type,$(available_python_versions))); \
 	done
 	# instantiated libapache2-mod-X templates
 	for type in $(libapache2_mod_pkg_templates); do \
@@ -78,19 +139,23 @@ safe-clean:
 	done
 	$(RM) $(addprefix $(CURDIR)/debian/,$(addsuffix .load, $(libapache2_mods)))
 	# uwsgi-pythonX.Y manpages
-	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .8,$(python_ver)))
+	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python,$(addsuffix .8,$(available_python_versions)))
 	# instantiated uwsgi-plugin-N.install files
 	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-plugin-,$(addsuffix .install,$(plugins)))
 	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
 
+# clean target deletes intermediate files and instantiate debian/control
+# from template debian/control.in
+#
+# debian/control target is invoked automagically by CDBS
 clean:: safe-clean
 
 # Build uwsgi-python% package
-$(patsubst %,build/uwsgi-python%,$(python_ver)):: build/% : %
+$(patsubst %,build/uwsgi-python%,$(available_python_versions)):: build/% : %
 
 # Build uwsgi-python% executable
-$(patsubst %,uwsgi-python%,$(python_ver)):
+$(patsubst %,uwsgi-python%,$(available_python_versions)):
 	$(eval python = $(call last_pkgname_component,$@))
 	$(eval alternative_priority = $(or \
 		$(if $(findstring python2.6, $@), 75), \
@@ -98,12 +163,12 @@ $(patsubst %,uwsgi-python%,$(python_ver)):
 		$(if $(findstring python3.1, $@), 25), \
 		10 \
 	))
-	/usr/bin/$(python) $(builder) --build
+	/usr/bin/$(python) $(uwsgi_builder) --build
 	for type in $(uwsgi_python_pkg_templates); do \
 		sed -e 's/@@uwsgi_binary@@/$@/g' \
 			< $(CURDIR)/debian/uwsgi-python.$${type}.in \
 			> $(CURDIR)/debian/$@.$${type}; \
-		if [ "$${type}x" = "postinstx" ]; then \
+		if [ "x$${type}" = "xpostinst" ]; then \
 			sed -ie 's/@@uwsgi_alternative_priority@@/$(alternative_priority)/g' \
 				$(CURDIR)/debian/$@.$${type}; \
 		fi; \
@@ -116,7 +181,7 @@ $(patsubst %,build/uwsgi-plugin-%,$(plugins)):: build/uwsgi-plugin-% : debian/st
 # Build specific uWSGI plugin.
 $(patsubst %,debian/stamp-plugin-%,$(plugins)):
 	$(eval plugin_name = $(call last_pkgname_component,$(notdir $@)))
-	$(default_python) $(builder) --plugin $(plugins_dir)/$(plugin_name)
+	$(default_python) $(uwsgi_builder) --plugin $(plugins_dir)/$(plugin_name)
 	touch $@
 
 # Build libapache2-mod-% package
@@ -153,7 +218,7 @@ install/uwsgi-common::
 	chmod a-x $(common_docs_collection_dir)/examples/wsgi/ugreenchat.py
 
 # Install uwsgi-python% package
-$(patsubst %,install/uwsgi-python%,$(python_ver))::
+$(patsubst %,install/uwsgi-python%,$(available_python_versions))::
 	help2man \
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
 		--section 8 \
@@ -181,7 +246,7 @@ $(patsubst %,install/libapache2-mod-%,$(call ruwsgi_to_lc,$(libapache2_mods)))::
 	done
 
 # Binary-post-install uwsgi-python% package
-$(patsubst %,binary-post-install/uwsgi-python%,$(python_ver))::
+$(patsubst %,binary-post-install/uwsgi-python%,$(available_python_versions))::
 	$(eval package_name = $(notdir $@))
 	sed -e 's/@@uwsgi_binary@@/$(package_name)/g' \
 		< $(CURDIR)/debian/uwsgi-python.etc.README.in \

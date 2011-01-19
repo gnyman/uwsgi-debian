@@ -1,0 +1,1 @@
+uwsgi-python@@python_version@@ (>= ${binary:Version})

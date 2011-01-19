@@ -2,19 +2,18 @@ Building uwsgi-pythonX.Y package for new Python version
 =======================================================
 
 Rules for building uwsgi-pythonX.Y are created automatically based on
-contents of debian/control.
+contents of debian/available-python-versions.*
 
 For building uWSGI for new Python version one's only necessary to add new
-package (for example, 'uwsgi-python13.0') in debian/control.
+version (for example, '13.0') in debian/available-python-versions.X, where
+X is specific distribution (Debian/Ubuntu).
 
 Algorithmically speaking (see it in debian/rules):
-  1. Function list_pkgname_suffixes greps debian/control for substring
-     'Package: uwsgi-python', then removes this substring from each found line.
-     Remaining lines' suffixes are needing Python versions (2.5 or 2.6 or ...).
-  2. List of found suffixes is assigned to variable 'python_ver'.
-  3. Bunch of rules (each for building specific uwsgi-pythonX.Y) is generated
-     from 'python_ver' variable.
-  4. In each of these rules specific Python intepreter (python2.5 or python2.6
+  1. List of Python versions from file available-python-versions.X is assigned
+     to variable 'available_python_versions'.
+  2. Bunch of rules (each for building specific uwsgi-pythonX.Y) is generated
+     from 'available_python_versions' variable.
+  3. In each of these rules specific Python intepreter (python2.5 or python2.6
      or ...) is called for executing 'uwsgiconfig.py --build'.
 
 Building new uwsgi-plugin-X package
