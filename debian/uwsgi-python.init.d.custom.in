@@ -16,23 +16,23 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 NAME="custom_instance_name_here"     # Introduce the short server's name here
 SCRIPTNAME=/etc/init.d/$NAME
 
-DESC="custom configured WSGI server" # Introduce a short description here
-DAEMON=/usr/bin/@@uwsgi_binary@@      # Introduce the server's location here
+DESC="custom configured app server"  # Introduce a short description here
+DAEMON=/usr/bin/@@uwsgi_binary@@    # Introduce the server's location here
 
 UWSGI_UID=www-data                   # Introduce uWSGI uid here
 UWSGI_GID=www-data                   # Introduve uWSGI gid here
 
-RUNDIR_BASE=/var/run/uwsgi/@@uwsgi_binary@@
-RUNDIR=$RUNDIR_BASE/$NAME
+UWSGI_RUNDIR=/var/run/@@uwsgi_binary@@
+UWSGI_SPECIFIC_RUNDIR="$UWSGI_RUNDIR/$NAME"
 
-PIDFILE=$RUNDIR/pid
+PIDFILE=$UWSGI_SPECIFIC_RUNDIR/pid
 
 DAEMON_ARGS=" \
-  --daemonize /var/log/uwsgi/@@uwsgi_binary@@/${NAME}.@@uwsgi_binary@@.log \
+  --daemonize /var/log/@@uwsgi_binary@@/${NAME}.log \
   --pidfile $PIDFILE \
   --uid $UWSGI_UID \
   --gid $UWSGI_GID \
-  --xmlconfig /etc/uwsgi/@@uwsgi_binary@@/custom/${NAME}.xml \
+  --xmlconfig /etc/@@uwsgi_binary@@/custom/${NAME}.xml \
 "
 
 # Exit if the package is not installed
@@ -51,8 +51,8 @@ DAEMON_ARGS=" \
 #  2 if daemon could not be started
 do_start()
 {
-  install -d $RUNDIR_BASE
-  install -o $UWSGI_UID -g $UWSGI_GID -d $RUNDIR
+  install -d $UWSGI_RUNDIR
+  install -o $UWSGI_UID -g $UWSGI_GID -d $UWSGI_SPECIFIC_RUNDIR
 
   start-stop-daemon --start --quiet \
     --pidfile $PIDFILE \

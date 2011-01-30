@@ -20,7 +20,7 @@ VERBOSE=yes
 # Note: options '--socket', '--daemonize' and '--pidfile' are always added
 #       automatically by init.d script
 #
-# Default socket location: /var/run/uwsgi/@@uwsgi_binary@@/<confname>/socket
+# Default socket location: /var/run/@@uwsgi_binary@@/<confname>/socket
 # Tip: you could override '--socket' in configuration file.
 DAEMON_OPTS=" \
   --master \

@@ -19,12 +19,18 @@ set -e
 
 case "$1" in
     configure)
-      update-alternatives --quiet \
-        --install \
-          /usr/bin/uwsgi uwsgi \
-          /usr/bin/@@uwsgi_binary@@ @@uwsgi_alternative_priority@@ \
-        --slave /usr/share/man/man8/uwsgi.8.gz uwsgi.8.gz \
-          /usr/share/man/man8/@@uwsgi_binary@@.8.gz
+      PYVER_DEFAULT=@@default_python_version@@
+      for PYVER in @@available_python_versions@@; do
+        if [ "x$PYVER" = "x$PYVER_DEFAULT" ]; then
+          ALTERNATIVE_PRIORITY=75
+        else
+          ALTERNATIVE_PRIORITY=35
+        fi
+        update-alternatives --quiet \
+          --install \
+            /usr/bin/@@uwsgi_binary@@ @@uwsgi_binary@@ \
+            /usr/bin/uwsgi-python$PYVER $ALTERNATIVE_PRIORITY
+      done
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

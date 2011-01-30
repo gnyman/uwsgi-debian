@@ -1,4 +1,4 @@
-"/var/log/uwsgi/@@uwsgi_binary@@/*.log" {
+"/var/log/@@uwsgi_binary@@/*.log" {
   copytruncate
   daily
   rotate 5

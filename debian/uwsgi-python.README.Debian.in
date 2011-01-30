@@ -10,7 +10,7 @@ Automatic starting of instances of uWSGI
 ========================================
 
 On boot init.d script automatically starts one instance of @@uwsgi_binary@@ for
-each INI/XML/YAML configuration file found in /etc/uwsgi/@@uwsgi_binary@@/.
+each INI/XML/YAML configuration file found in /etc/@@uwsgi_binary@@/.
 
 INI file has higher precedence than XML. If INI file was found, then XML file
 with the same name will be ignored.
@@ -54,8 +54,8 @@ For list of options passed by default to each started instance see
 
 Service files of started uWSGI instance are located in directory named after
 configuration file (without '.ini'/'.xml'/'.yaml'/'.yml' extension):
-  * UNIX socket | /var/run/uwsgi/@@uwsgi_binary@@/<confname>/socket
-  * pidfile     | /var/run/uwsgi/@@uwsgi_binary@@/<confname>/pid
+  * UNIX socket | /var/run/@@uwsgi_binary@@/<confname>/socket
+  * pidfile     | /var/run/@@uwsgi_binary@@/<confname>/pid
 
 Owner, group and permissions of UNIX socket and pidfile
 =======================================================

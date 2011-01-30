@@ -22,7 +22,6 @@ do_start_specific_daemon()
   local PIDFILE=$(find_specific_pidfile $CONFNAME)
   local SOCKET=$(find_specific_socket $CONFNAME)
 
-  install_dir $RUNDIR
   install_dir $UWSGI_RUNDIR
   install_dir $SPECIFIC_RUNDIR $UWSGI_UID $UWSGI_GID
 
@@ -44,7 +43,7 @@ do_start_specific_daemon()
 
   local DAEMON_ARGS=" \
     $DAEMON_OPTS \
-    --daemonize $UWSGI_LOGDIR/${CONFNAME}.${LOG_FILENAME_SUFFIX}.log \
+    --daemonize $UWSGI_LOGDIR/${CONFNAME}.log \
     --pidfile $PIDFILE \
     --socket $SOCKET \
     --${CONFFILE_OPTION_NAME} $CONFFILE \

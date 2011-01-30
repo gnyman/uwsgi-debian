@@ -17,7 +17,7 @@ do_command()
 
   # List of unique names of user-defined configuration files.
   local ALL_CONFNAMES=$(
-    ls -1 "$CONFDIR" 2>/dev/null \
+    ls -1 "$UWSGI_CONFDIR" 2>/dev/null \
     | grep "\.\(ini\|xml\|yaml\|yml\)$" \
     | sed 's/^\(.\+\)\.\(ini\|xml\|yaml\|yml\)$/\1/g' \
     | sort \

@@ -22,7 +22,7 @@ install_dir()
 path_to_conffile_with_name()
 {
   local CONFNAME="$1"
-  local CONFFILE="$CONFDIR/$CONFNAME"
+  local CONFFILE="$UWSGI_CONFDIR/$CONFNAME"
   local PATH
 
   if [ -e "$CONFFILE.ini" ]; then

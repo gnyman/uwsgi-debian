@@ -12,18 +12,14 @@
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
-DESC="WSGI server(s)"             # Introduce a short description here
-NAME="@@uwsgi_binary@@"           # Introduce the short server's name here
-DAEMON=/usr/bin/@@uwsgi_binary@@  # Introduce the server's location here
+DESC="app server(s)"
+NAME="@@uwsgi_binary@@"
+DAEMON=/usr/bin/@@uwsgi_binary@@
 SCRIPTNAME=/etc/init.d/$NAME
-CONFDIR=/etc/uwsgi/@@uwsgi_binary@@
 
-RUNDIR=/var/run/uwsgi
-UWSGI_RUNDIR=$RUNDIR/@@uwsgi_binary@@
-
-LOGDIR=/var/log/uwsgi
-UWSGI_LOGDIR=$LOGDIR/@@uwsgi_binary@@
-LOG_FILENAME_SUFFIX=@@uwsgi_binary@@
+UWSGI_CONFDIR=/etc/@@uwsgi_binary@@
+UWSGI_RUNDIR=/var/run/@@uwsgi_binary@@
+UWSGI_LOGDIR=/var/log/@@uwsgi_binary@@
 
 # Exit if the package is not installed
 [ -x $DAEMON ] || exit 0

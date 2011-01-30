@@ -19,7 +19,10 @@ set -e
 
 case "$1" in
     remove)
-      update-alternatives --quiet --remove uwsgi /usr/bin/@@uwsgi_binary@@
+      for PYVER in @@available_python_versions@@; do
+        update-alternatives --quiet \
+          --remove @@uwsgi_binary@@ /usr/bin/uwsgi-python$PYVER
+      done
     ;;
 
     upgrade|deconfigure|failed-upgrade)
