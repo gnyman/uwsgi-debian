@@ -29,7 +29,10 @@ case "$1" in
         update-alternatives --quiet \
           --install \
             /usr/bin/@@uwsgi_binary@@ @@uwsgi_binary@@ \
-            /usr/bin/uwsgi-python$PYVER $ALTERNATIVE_PRIORITY
+            /usr/bin/uwsgi-python$PYVER $ALTERNATIVE_PRIORITY \
+          --slave \
+            /usr/share/man/man8/@@uwsgi_binary@@.8.gz @@uwsgi_binary@@.8.gz \
+            /usr/share/man/man8/uwsgi-python$PYVER.8.gz
       done
     ;;
 
