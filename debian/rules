@@ -16,9 +16,9 @@ PYTHON3_VERS=$(shell py3versions -vs)
 PYTHON3_DEFAULT=$(shell py3versions -dv)
 
 # List of templates to instantiate for each uwsgi-pythonX package
-# There is special-case template, not listed here: install
-UWSGI_PYTHON_PKG_TEMPLATES = dirs default init.d logrotate docs manpages \
-                             README.Debian init.d.custom postinst prerm
+# There are special-case template, not listed here: dirs install manpages
+UWSGI_PYTHON_PKG_TEMPLATES = default docs init.d init.d.custom logrotate \
+                             postinst prerm README.Debian
 
 # Search in debian/control for packages with name $(1)% and extract % in list.
 list_pkgname_suffixes = $(strip \
@@ -77,14 +77,11 @@ clean::
 	# collected common docs
 	$(RM) -r $(COMMON_DOCS_COLLECTION_DIR)
 	# instantiated uwsgi-pythonX templates
-	for TEMPLATE_TYPE in $(UWSGI_PYTHON_PKG_TEMPLATES); do \
+	for TEMPLATE_TYPE in $(UWSGI_PYTHON_PKG_TEMPLATES) dirs install manpages; do\
 		$(RM) $(addprefix $(CURDIR)/debian/uwsgi-, \
 			$(addsuffix .$${TEMPLATE_TYPE}, $(UWSGI_PYTHON_PKG_KINDS)) \
 		); \
 	done
-	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-, \
-		$(addsuffix .install, $(UWSGI_PYTHON_PKG_KINDS)) \
-	)
 	# instantiated libapache2-mod-X templates
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
 		$(RM) $(addprefix $(CURDIR)/debian/libapache2-mod-, \
@@ -95,8 +92,11 @@ clean::
 		$(addsuffix .load, $(LIBAPACHE2_MODS_NAMES)) \
 	)
 	# uwsgi-pythonX manpages
-	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-, \
-		$(addsuffix .8, $(UWSGI_PYTHON_PKG_KINDS)) \
+	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python, \
+		$(addsuffix .8, $(PYTHON_VERS)) \
+	)
+	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python, \
+		$(addsuffix .8, $(PYTHON3_VERS)) \
 	)
 	# instantiated uwsgi-plugin-N.install files
 	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-plugin-, \
@@ -113,22 +113,13 @@ $(patsubst %,debian/stamp-uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS)):
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(eval UWSGI_PYTHON = uwsgi-$(PYTHON_KIND))
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
-	$(eval PYDEFAULT = $($(subst python,PYTHON,$(PYTHON_KIND))_DEFAULT))
 	for PYTHON_VERSION in $(PYVERS); do \
 		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) --build; \
 		mv $(CURDIR)/uwsgi $(CURDIR)/uwsgi-python$${PYTHON_VERSION}; \
-		sed -e "s/@@uwsgi_binary@@/uwsgi-python$${PYTHON_VERSION}/g" \
-			< $(CURDIR)/debian/uwsgi-python.install.in \
-			>> $(CURDIR)/debian/$(UWSGI_PYTHON).install; \
 	done
-	for TEMPLATE_TYPE in $(UWSGI_PYTHON_PKG_TEMPLATES); do \
-		sed \
-			-e 's/@@uwsgi_binary@@/$(UWSGI_PYTHON)/g' \
-			-e 's/@@available_python_versions@@/$(PYVERS)/g' \
-			-e 's/@@default_python_version@@/$(PYDEFAULT)/g' \
-				< $(CURDIR)/debian/uwsgi-python.$${TEMPLATE_TYPE}.in \
-				> $(CURDIR)/debian/$(UWSGI_PYTHON).$${TEMPLATE_TYPE}; \
-	done
+	sed -e 's/@@uwsgi_binary@@/$(UWSGI_PYTHON)/g' \
+		< $(CURDIR)/debian/uwsgi-python.dirs.in \
+		> $(CURDIR)/debian/$(UWSGI_PYTHON).dirs
 	touch $@
 
 # Build uwsgi-plugin-% package
@@ -176,14 +167,29 @@ install/uwsgi-common::
 # Install uwsgi-python% package
 $(patsubst %,install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
+	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
 	$(eval PYDEFAULT = $($(subst python,PYTHON,$(PYTHON_KIND))_DEFAULT))
-	help2man \
-		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
-		--section 8 \
-		--no-info \
-		$(CURDIR)/uwsgi-python$(PYDEFAULT) \
-		| sed -e 's/^.B uwsgi-python$(PYDEFAULT)$$/.B $(cdbs_curpkg)/g' \
-		> $(CURDIR)/debian/$(cdbs_curpkg).8
+	for PYTHON_VERSION in $(PYVERS); do \
+		for TEMPLATE_TYPE in install manpages; do \
+			sed -e "s/@@uwsgi_binary@@/uwsgi-python$${PYTHON_VERSION}/g" \
+				< $(CURDIR)/debian/uwsgi-python.$${TEMPLATE_TYPE}.in \
+				>> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
+		done; \
+		help2man \
+			--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
+			--section 8 \
+			--no-info \
+			$(CURDIR)/uwsgi-python$${PYTHON_VERSION} \
+			> $(CURDIR)/debian/uwsgi-python$${PYTHON_VERSION}.8; \
+	done
+	for TEMPLATE_TYPE in $(UWSGI_PYTHON_PKG_TEMPLATES); do \
+		sed \
+			-e 's/@@uwsgi_binary@@/$(cdbs_curpkg)/g' \
+			-e 's/@@available_python_versions@@/$(PYVERS)/g' \
+			-e 's/@@default_python_version@@/$(PYDEFAULT)/g' \
+				< $(CURDIR)/debian/uwsgi-python.$${TEMPLATE_TYPE}.in \
+				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
+	done
 
 # Install uwsgi-plugin-% package
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES))::
