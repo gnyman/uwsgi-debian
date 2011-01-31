@@ -83,8 +83,9 @@ clean::
 		); \
 	done
 	$(RM) $(addprefix $(CURDIR)/debian/, \
-		$(addsuffix .load, $(LIBAPACHE2_MODS_NAMES)) \
-	)
+		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
+			$(addsuffix .load,  $(call ruwsgi_to_orig, $(module_name))) \
+	))
 	# uwsgi-pythonX manpages
 	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python, \
 		$(addsuffix .8, $(PYTHON_VERS)) \
