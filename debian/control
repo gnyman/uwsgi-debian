@@ -145,6 +145,6 @@ Description: fast, self-healing, developer-friendly WSGI server (extra files)
  languages or platform.
  .
  This package provides extra files from uWSGI distribution:
-   * nginx module source
+   * nginx 0.7.x module source
    * lighttpd module source
    * contribs
