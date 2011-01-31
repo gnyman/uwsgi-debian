@@ -74,7 +74,11 @@ int uwsgi_request_eval(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 		PyErr_Print();
 		return -1;
 	}
+#ifdef PYTHREETWO
+	PyEval_EvalCode(code, py_dict, py_dict );
+#else
 	PyEval_EvalCode((PyCodeObject *)code, py_dict, py_dict );
+#endif
 	Py_DECREF(code);
 	if (PyErr_Occurred()) {
 		PyErr_Print();

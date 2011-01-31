@@ -79,6 +79,7 @@ static struct option long_options[] = {
 
 		{"pidfile", required_argument, 0, LONG_ARGS_PIDFILE},
 		{"chroot", required_argument, 0, LONG_ARGS_CHROOT},
+		{"chroot-reload", no_argument, &uwsgi.chroot_reload, 1},
 		{"gid", required_argument, 0, LONG_ARGS_GID},
 		{"uid", required_argument, 0, LONG_ARGS_UID},
 		{"pythonpath", required_argument, 0, LONG_ARGS_PYTHONPATH},
@@ -153,7 +154,7 @@ static struct option long_options[] = {
 		UWSGI_PLUGIN_LONGOPT_LUA
 		UWSGI_PLUGIN_LONGOPT_RACK
 		{"logto", required_argument, 0, LONG_ARGS_LOGTO},
-		{"logdate", no_argument, &uwsgi.logdate, 1},
+		{"logdate", optional_argument, 0, LONG_ARGS_LOGDATE},
 		{"log-zero", no_argument, 0, LONG_ARGS_LOG_ZERO},
                 {"log-slow", required_argument, 0, LONG_ARGS_LOG_SLOW},
                 {"log-4xx", no_argument, 0, LONG_ARGS_LOG_4xx},
@@ -475,6 +476,8 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	int uwsgi_will_starts = 0;
 
+	char *pyversion = NULL;
+
 #ifdef UWSGI_ASYNC
 	int current_async_timeout = 0;
 #endif
@@ -498,7 +501,6 @@ int main(int argc, char *argv[], char *envp[]) {
 	int ready_to_die = 0;
 
 	char *env_reloads;
-	unsigned int reloads = 0;
 	char env_reload_buf[11];
 
 	int option_index = 0;
@@ -593,7 +595,7 @@ int main(int argc, char *argv[], char *envp[]) {
 	uwsgi.numproc = 1;
 
 	uwsgi.async = 1;
-	uwsgi.listen_queue = 64;
+	uwsgi.listen_queue = 100;
 
 	uwsgi.max_vars = MAX_VARS;
 	uwsgi.vec_size = 4 + 1 + (4 * MAX_VARS);
@@ -615,10 +617,10 @@ int main(int argc, char *argv[], char *envp[]) {
 	env_reloads = getenv("UWSGI_RELOADS");
 	if (env_reloads) {
 		// convert env value to int
-		reloads = atoi(env_reloads);
-		reloads++;
+		uwsgi.reloads = atoi(env_reloads);
+		uwsgi.reloads++;
 		// convert reloads to string
-		rlen = snprintf(env_reload_buf, 10, "%u", reloads);
+		rlen = snprintf(env_reload_buf, 10, "%u", uwsgi.reloads);
 		if (rlen > 0) {
 			env_reload_buf[rlen] = 0;
 			if (setenv("UWSGI_RELOADS", env_reload_buf, 1)) {
@@ -634,7 +636,7 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	socket_type_len = sizeof(int);
 	if (!getsockopt(3, SOL_SOCKET, SO_TYPE, &socket_type, &socket_type_len)) {
-		if (socket_type == SOCK_STREAM && reloads > 0) {
+		if (socket_type == SOCK_STREAM && uwsgi.reloads > 0) {
 			uwsgi_log("...fd 3 is a socket, i suppose this is a graceful reload of uWSGI, i will try to do my best...\n");
 			uwsgi.is_a_reload = 1;
 #ifdef UNBIT
@@ -704,7 +706,12 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	if (uwsgi.shared->options[UWSGI_OPTION_CGI_MODE] == 0) {
 		if (uwsgi.test_module == NULL) {
-			uwsgi_log("*** Starting uWSGI %s (%dbit) on [%.*s] ***\n", UWSGI_VERSION, (int) (sizeof(void *)) * 8, 24, ctime((const time_t *) &uwsgi.start_tv.tv_sec));
+			if (uwsgi.logdate) {
+				uwsgi_log("*** Starting uWSGI %s (%dbit) ***\n", UWSGI_VERSION, (int) (sizeof(void *)) * 8);
+			}
+			else {
+				uwsgi_log("*** Starting uWSGI %s (%dbit) on [%.*s] ***\n", UWSGI_VERSION, (int) (sizeof(void *)) * 8, 24, ctime((const time_t *) &uwsgi.start_tv.tv_sec));
+			}
 		}
 	}
 	else {
@@ -721,11 +728,8 @@ int main(int argc, char *argv[], char *envp[]) {
 	uwsgi_log("*** big endian arch detected ***\n");
 #endif
 
-#ifdef PYTHREE
-	uwsgi_log("*** Warning Python3.x support is experimental, do not use it in production environment ***\n");
-#endif
-
-	uwsgi_log("Python version: %s\n", Py_GetVersion());
+	pyversion = strchr(Py_GetVersion(), '\n');
+	uwsgi_log("Python version: %.*s %s\n", pyversion-Py_GetVersion(), Py_GetVersion(), Py_GetCompiler()+1);
 
 	if (uwsgi.pidfile && !uwsgi.is_a_reload) {
 		uwsgi_log( "writing pidfile to %s\n", uwsgi.pidfile);
@@ -741,7 +745,7 @@ int main(int argc, char *argv[], char *envp[]) {
 	}
 
 
-	uwsgi_as_root();
+	uwsgi_as_root(argv);
 
 	if (!uwsgi.master_process) {
 		uwsgi_log(" *** WARNING: you are running uWSGI without its master process manager ***\n");
@@ -867,6 +871,7 @@ int main(int argc, char *argv[], char *envp[]) {
 	
 	if (uwsgi.async > 1) {
 		if (!getrlimit(RLIMIT_NOFILE, &uwsgi.rl)) {
+			// no need to check for RLIM_INFINITY as lowring the fd max size is always allowed
 			if ( (unsigned long) uwsgi.rl.rlim_cur < (unsigned long) uwsgi.async) {
 				uwsgi_log("- your current max open files limit is %lu, this is lower than requested async cores !!! -\n", (unsigned long) uwsgi.rl.rlim_cur);
 				if (uwsgi.rl.rlim_cur < uwsgi.rl.rlim_max && (unsigned long) uwsgi.rl.rlim_max > (unsigned long) uwsgi.async) {
@@ -899,6 +904,14 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	uwsgi.async_buf = malloc( sizeof(char *) * uwsgi.async);
 	if (!uwsgi.async_buf) {
+		uwsgi_error("malloc()");
+		exit(1);
+	}
+
+	// uwsgi.rl.rlim_cur contains the maxium number of file descriptor
+	if (uwsgi.rl.rlim_cur == RLIM_INFINITY) uwsgi.rl.rlim_cur = uwsgi.async;
+	uwsgi.async_waiting_fd_table = malloc( sizeof(int) * uwsgi.rl.rlim_cur);
+	if (!uwsgi.async_waiting_fd_table) {
 		uwsgi_error("malloc()");
 		exit(1);
 	}
@@ -1466,8 +1479,8 @@ int main(int argc, char *argv[], char *envp[]) {
 				uwsgi_log( "running %s\n", uwsgi.binary_path);
 				argv[0] = uwsgi.binary_path;
 				//strcpy (argv[0], uwsgi.binary_path);
-				execve(uwsgi.binary_path, argv, environ);
-				uwsgi_error("execve()");
+				execvp(uwsgi.binary_path, argv);
+				uwsgi_error("execvp()");
 				// never here
 				exit(1);
 			}
@@ -1905,6 +1918,8 @@ int main(int argc, char *argv[], char *envp[]) {
 	
 	if (uwsgi.async > 1) {
 
+		if (!uwsgi.async_current_max) uwsgi.async_current_max = 1;
+
 		current_async_timeout = async_get_timeout(&uwsgi) ;
 		uwsgi.async_nevents = async_wait(uwsgi.async_queue, uwsgi.async_events, uwsgi.async, uwsgi.async_running, current_async_timeout);
 		async_expire_timeouts(&uwsgi);
@@ -1912,7 +1927,7 @@ int main(int argc, char *argv[], char *envp[]) {
 		if (uwsgi.async_nevents < 0) {
 			continue;
 		}
-	
+
 		for(i=0; i<uwsgi.async_nevents;i++) {
 
 			if ( (int) uwsgi.async_events[i].ASYNC_FD == uwsgi.serverfd) {
@@ -1923,7 +1938,7 @@ int main(int argc, char *argv[], char *envp[]) {
 					goto cycle;
 				}
 
-				wsgi_req_setup(uwsgi.wsgi_req, ( (uint8_t *)uwsgi.wsgi_req - (uint8_t *)uwsgi.wsgi_requests)/sizeof(struct wsgi_request) );
+				wsgi_req_setup(uwsgi.wsgi_req, uwsgi.wsgi_req->async_id );
 
 				if (wsgi_req_accept(uwsgi.serverfd, uwsgi.wsgi_req)) {
 					continue;
@@ -1953,6 +1968,7 @@ int main(int argc, char *argv[], char *envp[]) {
 				uwsgi.wsgi_req = find_wsgi_req_by_fd(&uwsgi, uwsgi.async_events[i].ASYNC_FD, uwsgi.async_events[i].ASYNC_EV);
 				if (uwsgi.wsgi_req) {
 					uwsgi.wsgi_req->async_status = UWSGI_AGAIN ;
+					uwsgi.async_waiting_fd_table[uwsgi.async_events[i].ASYNC_FD] = -1;
 					uwsgi.wsgi_req->async_waiting_fd = -1 ;
 					uwsgi.wsgi_req->async_waiting_fd_monitored = 0 ;
 					uwsgi.wsgi_req->async_timeout = 0;
@@ -3486,6 +3502,12 @@ void manage_opt(int i, char *optarg) {
 	case 'L':
 		uwsgi.shared->options[UWSGI_OPTION_LOGGING] = 0;
 		break;
+	case LONG_ARGS_LOGDATE:
+		uwsgi.logdate = 1;
+                if (optarg) {
+                	uwsgi.log_strftime = optarg;
+                }
+                break;
 	case LONG_ARGS_LOG_ZERO:
                 uwsgi.shared->options[UWSGI_OPTION_LOG_ZERO] = 1;
                 break;
@@ -3641,6 +3663,7 @@ void manage_opt(int i, char *optarg) {
 \t--callable <callable>\t\tset the callable (default 'application')\n\
 \t--pidfile <file>\t\twrite the masterpid to <file>\n\
 \t--chroot <dir>\t\t\tchroot to directory <dir> (only root)\n\
+\t--chroot-reload\t\t\tbinary reload after a chroot\n\
 \t--gid <id/groupname>\t\tsetgid to <id/groupname> (only root)\n\
 \t--uid <id/username>\t\tsetuid to <id/username> (only root)\n\
 \t--chdir <dir>\t\t\tchdir to <dir> before app loading\n\
@@ -3676,7 +3699,7 @@ void manage_opt(int i, char *optarg) {
 \t--eval <code>\t\t\tevaluate code for app configuration\n\
 \t--async <n>\t\t\tenable async mode with n core\n\
 \t--logto <logfile|addr>\t\tlog to file/udp\n\
-\t--logdate\t\t\tadd timestamp to loglines\n\
+\t--logdate[=fmt]\t\t\tadd timestamp to loglines (it takes an optional strftime-like format)\n\
 \t--log-zero\t\t\tlog requests with 0 response size\n\
 \t--log-slow <t>\t\t\tlog requests slower than <t> milliseconds\n\
 \t--log-4xx\t\t\tlog requests with status code 4xx\n\

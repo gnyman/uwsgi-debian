@@ -42,7 +42,7 @@ PyObject *py_eventfd_read(PyObject * self, PyObject * args) {
         }
 
         if (fd >= 0) {
-                wsgi_req->async_waiting_fd = fd ;
+		wsgi_req->async_waiting_fd = fd;
                 wsgi_req->async_waiting_fd_type = ASYNC_IN ;
                 wsgi_req->async_waiting_fd_monitored = 0 ;
 		if (timeout) {
@@ -64,7 +64,7 @@ PyObject *py_eventfd_write(PyObject * self, PyObject * args) {
         }
 
         if (fd >= 0) {
-                wsgi_req->async_waiting_fd = fd ;
+		wsgi_req->async_waiting_fd = fd;
                 wsgi_req->async_waiting_fd_type = ASYNC_OUT ;
                 wsgi_req->async_waiting_fd_monitored = 0 ;
 		if (timeout) {
@@ -80,7 +80,7 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 	int i;
 	
-	size_t post_remains = wsgi_req->post_cl;
+	size_t post_remains;
 	ssize_t post_chunk;
 
 	PyObject *zero, *wsgi_socket;
@@ -281,6 +281,7 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 			goto clear;
 		}
 		
+		post_remains = wsgi_req->post_cl;
 
 		while(post_remains > 0) {
 			if (uwsgi->shared->options[UWSGI_OPTION_HARAKIRI] > 0) {
@@ -361,6 +362,9 @@ int uwsgi_request_wsgi(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 	PyDict_SetItemString(wsgi_req->async_environ, "wsgi.url_scheme", zero);
 	Py_DECREF(zero);
 
+	if (uwsgi->async > 1) {
+                PyDict_SetItemString(wsgi_req->async_environ, "uwsgi.core", PyInt_FromLong(wsgi_req->async_id));
+        }
 
 	wsgi_req->async_app = wi->wsgi_callable ;
 

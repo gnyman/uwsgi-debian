@@ -17,8 +17,6 @@ extern struct uwsgi_server uwsgi;
 #define UWSGI_UNLOCK if (flock(uwsgi.serverfd, LOCK_UN)) { uwsgi_error("flock()"); }
 #endif
 
-#define UWSGI_LOGBASE "[- uWSGI -"
-
 PyObject *py_uwsgi_send(PyObject * self, PyObject * args) {
 	
 	char *data;
@@ -152,19 +150,12 @@ PyObject *py_uwsgi_warning(PyObject * self, PyObject * args) {
 
 PyObject *py_uwsgi_log(PyObject * self, PyObject * args) {
 	char *logline;
-	time_t tt;
 
 	if (!PyArg_ParseTuple(args, "s:log", &logline)) {
 		return NULL;
 	}
 
-	tt = time(NULL);
-	if (logline[strlen(logline)] != '\n') {
-		uwsgi_log( UWSGI_LOGBASE " %.*s] %s\n", 24, ctime(&tt), logline);
-	}
-	else {
-		uwsgi_log( UWSGI_LOGBASE " %.*s] %s", 24, ctime(&tt), logline);
-	}
+	uwsgi_log( "%s\n", logline);
 
 	Py_INCREF(Py_True);
 	return Py_True;
@@ -974,7 +965,9 @@ PyObject *py_uwsgi_disconnect(PyObject * self, PyObject * args) {
 	
 	struct wsgi_request *wsgi_req = current_wsgi_req(&uwsgi);
 	
+#ifdef UWSGI_DEBUG
 	uwsgi_log( "disconnecting worker %d (pid :%d) from session...\n", uwsgi.mywid, uwsgi.mypid);
+#endif
 
 	fclose(wsgi_req->async_post);
 	wsgi_req->fd_closed = 1 ;

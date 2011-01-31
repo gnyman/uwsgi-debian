@@ -216,11 +216,11 @@ void internal_server_error(int fd, char *message) {
         uwsgi.wsgi_req->response_size += write(fd, message, strlen(message));
 }
 
-void uwsgi_as_root() {
+void uwsgi_as_root(char **argv) {
 
 	if (!getuid()) {
                 uwsgi_log("uWSGI running as root, you can use --uid/--gid/--chroot options\n");
-                if (uwsgi.chroot) {
+                if (uwsgi.chroot && !uwsgi.reloads) {
                         uwsgi_log("chroot() to %s\n", uwsgi.chroot);
                         if (chroot(uwsgi.chroot)) {
                                 uwsgi_error("chroot()");
@@ -231,6 +231,13 @@ void uwsgi_as_root() {
                                 uwsgi_log("*** Warning, on linux system you have to bind-mount the /proc fs in your chroot to get memory debug/report.\n");
                         }
 #endif
+			if (uwsgi.chroot_reload) {
+				argv[0] = uwsgi.binary_path;
+                                execvp(uwsgi.binary_path, argv);
+                                uwsgi_error("execvp()");
+                                // never here
+                                exit(1);
+			}
                 }
                 if (uwsgi.gid) {
                         uwsgi_log("setgid() to %d\n", uwsgi.gid);
@@ -521,21 +528,33 @@ void parse_sys_envs(char **envs, struct option *long_options) {
 
 //use this instead of fprintf to avoid buffering mess with udp logging
 void uwsgi_log(const char *fmt, ...) {
+
 	va_list ap;
-	char logpkt[4096];
-	int rlen = 0;
+        char logpkt[4096];
+        int rlen = 0;
 
-	struct timeval tv;
+        struct timeval tv;
+        char sftime[64];
+        time_t now;
 
-	if (uwsgi.logdate) {
-		gettimeofday(&tv, NULL);
+        if (uwsgi.logdate) {
+                if (uwsgi.log_strftime) {
+                        now = time(NULL);
+                        rlen = strftime( sftime, 64, uwsgi.log_strftime, localtime(&now));
+                        memcpy( logpkt, sftime, rlen);
+                        memcpy( logpkt + rlen, " - ", 3);
+                        rlen += 3;
+                }
+                else {
+                        gettimeofday(&tv, NULL);
 
-		memcpy( logpkt, ctime( (const time_t *) &tv.tv_sec), 24);
-		memcpy( logpkt + 24, " - ", 3);
+                        memcpy( logpkt, ctime( (const time_t *) &tv.tv_sec), 24);
+                        memcpy( logpkt + 24, " - ", 3);
 
-		rlen = 24 + 3 ;
+                        rlen = 24 + 3;
+                }
+        }
 
-	}
 
 	va_start (ap, fmt);
 	rlen += vsnprintf(logpkt + rlen, 4096 - rlen, fmt, ap );

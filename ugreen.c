@@ -10,11 +10,12 @@ extern struct uwsgi_server uwsgi;
 
 void u_green_write_all(struct uwsgi_server *uwsgi, char *data, size_t len) {
 
-        struct wsgi_request *wsgi_req = uwsgi->wsgi_requests ;
+        struct wsgi_request *wsgi_req ;
         int i;
         ssize_t rlen ;
 
         for(i=0;i<uwsgi->async;i++) {
+		wsgi_req = &uwsgi->wsgi_requests[i];
                 if (wsgi_req->async_status == UWSGI_PAUSED) {
                         rlen = write(wsgi_req->poll.fd, data, len);
                         if (rlen < 0) {
@@ -26,34 +27,35 @@ void u_green_write_all(struct uwsgi_server *uwsgi, char *data, size_t len) {
                                 wsgi_req->response_size += rlen ;
                         }
                 }
-                wsgi_req = next_wsgi_req(uwsgi, wsgi_req) ;
         }
 }
 
 void u_green_unpause_all(struct uwsgi_server *uwsgi) {
 
-        struct wsgi_request *wsgi_req = uwsgi->wsgi_requests ;
+        struct wsgi_request *wsgi_req ;
         int i;
 
         for(i=0;i<uwsgi->async;i++) {
+                wsgi_req = &uwsgi->wsgi_requests[i] ;
                 if (wsgi_req->async_status == UWSGI_PAUSED) {
                         wsgi_req->async_status = UWSGI_AGAIN;
                         wsgi_req->async_timeout = 0;
                 }
-                wsgi_req = next_wsgi_req(uwsgi, wsgi_req) ;
         }
 }
 
 
 static int u_green_blocking(struct uwsgi_server *uwsgi) {
-        struct wsgi_request* wsgi_req = uwsgi->wsgi_requests ;
+
+        struct wsgi_request* wsgi_req;
+
         int i ;
 
         for(i=0;i<uwsgi->async;i++) {
+                wsgi_req = &uwsgi->wsgi_requests[i] ;
                 if (wsgi_req->async_status != UWSGI_ACCEPTING && wsgi_req->async_status != UWSGI_PAUSED && wsgi_req->async_waiting_fd == -1 && !wsgi_req->async_timeout) {
                         return 0 ;
                 }
-                wsgi_req = next_wsgi_req(uwsgi, wsgi_req) ;
         }
 
         return -1 ;
@@ -233,14 +235,16 @@ PyMethodDef uwsgi_green_methods[] = {
 
 static struct wsgi_request *find_first_accepting_wsgi_req(struct uwsgi_server *uwsgi) {
 
-        struct wsgi_request* wsgi_req = uwsgi->wsgi_requests ;
+        struct wsgi_request* wsgi_req ;
         int i ;
 
         for(i=0;i<uwsgi->async;i++) {
+
+                wsgi_req = &uwsgi->wsgi_requests[i] ;
+
                 if (wsgi_req->async_status == UWSGI_ACCEPTING) {
                         return wsgi_req ;
                 }
-                wsgi_req = next_wsgi_req(uwsgi, wsgi_req) ;
         }
 
         return NULL ;
@@ -305,9 +309,11 @@ void u_green_init(struct uwsgi_server *uwsgi) {
 		exit(1);
 	}
 
-        wsgi_req = uwsgi->wsgi_requests ;
 
 	for(i=0;i<uwsgi->async;i++) {
+
+        	wsgi_req = &uwsgi->wsgi_requests[i] ;
+		
 		uwsgi->ugreen_contexts[i] = malloc( sizeof(ucontext_t) );
 		if (!uwsgi->ugreen_contexts[i]) {
 			uwsgi_error("malloc()");
@@ -335,7 +341,6 @@ void u_green_init(struct uwsgi_server *uwsgi) {
 		makecontext(uwsgi->ugreen_contexts[i], (void (*) (void)) &u_green_request, 3, uwsgi, wsgi_req, i);
 		wsgi_req->async_status = UWSGI_ACCEPTING;
 		wsgi_req->async_id = i;
-		wsgi_req = next_wsgi_req(uwsgi, wsgi_req) ;
 	}
 
 	for (uwsgi_function = uwsgi_green_methods; uwsgi_function->ml_name != NULL; uwsgi_function++) {
@@ -347,26 +352,28 @@ void u_green_init(struct uwsgi_server *uwsgi) {
 
 void u_green_expire_timeouts(struct uwsgi_server *uwsgi) {
 
-        struct wsgi_request* wsgi_req = uwsgi->wsgi_requests ;
+        struct wsgi_request* wsgi_req ;
         int i ;
         time_t deadline = time(NULL);
 
 
         for(i=0;i<uwsgi->async;i++) {
+
+                wsgi_req = &uwsgi->wsgi_requests[i] ;
+
                 if (wsgi_req->async_timeout > 0) {
                         if (wsgi_req->async_timeout <= deadline) {
                                 wsgi_req->async_status = UWSGI_AGAIN ;
                                 wsgi_req->async_timeout = 0 ;
                         }
                 }
-                wsgi_req = next_wsgi_req(uwsgi, wsgi_req) ;
         }
 }
 
 static int u_green_get_timeout(struct uwsgi_server *uwsgi) {
 
 
-        struct wsgi_request* wsgi_req = uwsgi->wsgi_requests ;
+        struct wsgi_request* wsgi_req ;
         int i ;
         time_t curtime, tdelta = 0 ;
         int ret = 0 ;
@@ -374,12 +381,14 @@ static int u_green_get_timeout(struct uwsgi_server *uwsgi) {
         if (!uwsgi->async_running) return 0;
 
         for(i=0;i<uwsgi->async;i++) {
+
+                wsgi_req = &uwsgi->wsgi_requests[i] ;
+
                 if (wsgi_req->async_timeout > 0) {
                 	if (tdelta <= 0 || tdelta > wsgi_req->async_timeout) {
                         	tdelta = wsgi_req->async_timeout ;
                        }
                 }
-                wsgi_req = next_wsgi_req(uwsgi, wsgi_req) ;
         }
 
         curtime = time(NULL);
@@ -434,7 +443,7 @@ void u_green_loop(struct uwsgi_server *uwsgi) {
 
 cycle:
 
-		wsgi_req = find_wsgi_req_by_id(uwsgi, current) ;
+		wsgi_req = &uwsgi->wsgi_requests[current] ;
 		if (wsgi_req->async_status != UWSGI_ACCEPTING && wsgi_req->async_status != UWSGI_PAUSED && wsgi_req->async_waiting_fd == -1 && !wsgi_req->async_timeout) {
 			u_green_schedule_to_req(uwsgi, wsgi_req);
 		}
