@@ -3,11 +3,11 @@ Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: http://lists.unbit.it/pipermail/uwsgi/2010-September/000666.html
 Last-Update: 2010-09-14
 
-Index: uwsgi-0.9.6.1/uwsgiconfig.py
+Index: uwsgi/uwsgiconfig.py
 ===================================================================
---- uwsgi-0.9.6.1.orig/uwsgiconfig.py	2010-09-14 21:16:00.000000000 +0300
-+++ uwsgi-0.9.6.1/uwsgiconfig.py	2010-09-14 21:23:43.000000000 +0300
-@@ -94,10 +94,6 @@
+--- uwsgi.orig/uwsgiconfig.py	2011-01-31 21:35:23.000000000 +0200
++++ uwsgi/uwsgiconfig.py	2011-01-31 21:35:37.000000000 +0200
+@@ -95,10 +95,6 @@
  
  cflags = ['-O2', '-Wall', '-Werror', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64'] + os.environ.get("CFLAGS", "").split()
  
@@ -18,7 +18,7 @@ Index: uwsgi-0.9.6.1/uwsgiconfig.py
  if gcc_major >= 4:
  	cflags = cflags + [ '-Wextra', '-Wno-unused-parameter', '-Wno-missing-field-initializers' ]
  
-@@ -130,11 +126,16 @@
+@@ -131,11 +127,16 @@
  
  def build_uwsgi(bin_name):
  	print("*** uWSGI compiling ***")

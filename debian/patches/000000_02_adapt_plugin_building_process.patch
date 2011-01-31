@@ -9,11 +9,11 @@ Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: not-needed
 Last-Update: 2011-01-18
 
-Index: uwsgi-0.9.6.4/uwsgiconfig.py
+Index: uwsgi/uwsgiconfig.py
 ===================================================================
---- uwsgi-0.9.6.4.orig/uwsgiconfig.py	2010-09-26 11:50:11.000000000 +0300
-+++ uwsgi-0.9.6.4/uwsgiconfig.py	2010-09-26 11:50:43.000000000 +0300
-@@ -140,12 +140,6 @@
+--- uwsgi.orig/uwsgiconfig.py	2011-01-31 21:35:15.000000000 +0200
++++ uwsgi/uwsgiconfig.py	2011-01-31 21:35:23.000000000 +0200
+@@ -141,12 +141,6 @@
  		if ret != 0:
  			sys.exit(1)
  
@@ -26,7 +26,7 @@ Index: uwsgi-0.9.6.4/uwsgiconfig.py
  	print("*** uWSGI linking ***")
  	ldline = "%s -o %s %s %s %s" % (GCC, bin_name, ' '.join(ldflags), ' '.join(map(add_o, gcc_list)), ' '.join(libs))
  	print(ldline)
-@@ -459,7 +453,7 @@
+@@ -467,7 +461,7 @@
  	p_cflags.insert(0, '-I.')
  
  	plugin_base = path + '/' + up.NAME + '_plugin'

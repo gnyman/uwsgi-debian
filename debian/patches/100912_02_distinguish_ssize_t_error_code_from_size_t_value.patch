@@ -9,10 +9,10 @@ Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: http://lists.unbit.it/pipermail/uwsgi/2010-September/000666.html
 Last-Update: 2010-09-26
 
-Index: uwsgi-0.9.6.4/plugins/rack/rack_plugin.c
+Index: uwsgi/plugins/rack/rack_plugin.c
 ===================================================================
---- uwsgi-0.9.6.4.orig/plugins/rack/rack_plugin.c	2010-09-26 07:09:00.000000000 +0300
-+++ uwsgi-0.9.6.4/plugins/rack/rack_plugin.c	2010-09-26 09:16:53.000000000 +0300
+--- uwsgi.orig/plugins/rack/rack_plugin.c	2011-01-31 21:15:14.000000000 +0200
++++ uwsgi/plugins/rack/rack_plugin.c	2011-01-31 21:35:36.000000000 +0200
 @@ -331,7 +331,7 @@
          	wsgi_req->hvec[4].iov_base = "\r\n";
          	wsgi_req->hvec[4].iov_len = 2 ;
