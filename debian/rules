@@ -210,6 +210,12 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 			> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE} ; \
 	done
 
+binary-install/python-django-uwsgi-admin::
+	dh_install -p $(cdbs_curpkg) \
+		django/uwsgi_admin \
+		usr/lib/python$(PYTHON_DEFAULT)/dist-packages
+	dh_pysupport -p $(cdbs_curpkg)
+
 # Binary-post-install uwsgi-python% package
 $(patsubst %,binary-post-install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
 	$(eval SHAREDOCDIR = $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/doc)
