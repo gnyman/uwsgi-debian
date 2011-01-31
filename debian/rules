@@ -47,12 +47,6 @@ COMMON_DOCS_COLLECTION_DIR = $(CURDIR)/debian/uwsgi-common-files/docs
 # character
 target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
 
-# As for uWSGI 0.9.6.6 there are some *.orig files in upstream tarball.
-#
-# dh_clean deletes all *.orig files by default, but upstream files shouldn't
-# be deleted, so we exclude them explicitly.
-DEB_CLEAN_EXCLUDE = ugreen.c.orig utils.c.orig uwsgi.c.orig uwsgi.h.orig
-
 DEB_COMPRESS_EXCLUDE_uwsgi-common = .py .pl .xml .psgi .png
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
