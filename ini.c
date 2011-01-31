@@ -101,7 +101,7 @@ void uwsgi_ini_config(char *file, struct option *long_options) {
 		}
 	}
 
-	uwsgi_log("[uWSGI] getting YAML configuration from %s\n", file);
+	uwsgi_log("[uWSGI] getting INI configuration from %s\n", file);
 
 	fd = open(file, O_RDONLY);
 	if (fd < 0) {

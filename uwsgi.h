@@ -2,7 +2,7 @@
 
 /* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs -npsl -di1 */
 
-#define UWSGI_VERSION	"0.9.6.6"
+#define UWSGI_VERSION	"0.9.6.7"
 
 #define uwsgi_error(x)  uwsgi_log("%s: %s [%s line %d]\n", x, strerror(errno), __FILE__, __LINE__);
 #define uwsgi_debug(x, ...) uwsgi_log("[uWSGI DEBUG] " x, __VA_ARGS__);
@@ -134,6 +134,9 @@
 
 #if PY_MAJOR_VERSION > 2
 #define PYTHREE
+#if PY_MINOR_VERSION > 1
+#define PYTHREETWO
+#endif
 #endif
 
 /* this value are taken from nginx */
@@ -203,6 +206,7 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define LONG_ARGS_LOG_BIG               17052
 #define LONG_ARGS_YAML			17053
 #define LONG_ARGS_PYMODULE_ALIAS	17054
+#define LONG_ARGS_LOGDATE		17055
 
 
 
@@ -477,12 +481,15 @@ struct uwsgi_server {
 	int default_app;
 	int enable_profiler;
 
+	unsigned int reloads;
+
 	// base for all the requests (even on async mode)
 	struct wsgi_request *wsgi_requests ;
 	struct wsgi_request *wsgi_req ;
 
 	PyThreadState *_save;
 	char *chroot;
+	int chroot_reload;
 	gid_t gid;
 	uid_t uid;
 
@@ -501,6 +508,7 @@ struct uwsgi_server {
 	int ignore_script_name;
 	int no_default_app;
 	int logdate;
+	char *log_strftime;
 
 	int serverfd;
 #ifdef UWSGI_PROXY
@@ -515,6 +523,9 @@ struct uwsgi_server {
 	struct iovec *async_hvec;
 	char **async_buf;
 	char **async_post_buf;
+
+	int *async_waiting_fd_table;
+	int async_current_max;
 
 #ifdef UWSGI_ROUTING
 	int **async_ovector;
@@ -959,13 +970,6 @@ struct http_status_codes {
 struct wsgi_request *async_loop(struct uwsgi_server *);
 struct wsgi_request *find_first_available_wsgi_req(struct uwsgi_server *); 
 struct wsgi_request *find_wsgi_req_by_fd(struct uwsgi_server *, int, int); 
-struct wsgi_request *find_wsgi_req_by_id(struct uwsgi_server *, int); 
-
-#ifdef __clang__
-struct wsgi_request *next_wsgi_req(struct uwsgi_server *, struct wsgi_request *);
-#else
-inline struct wsgi_request *next_wsgi_req(struct uwsgi_server *, struct wsgi_request *);
-#endif
 
 
 int async_add(int, int , int) ;
@@ -1026,7 +1030,7 @@ ssize_t uwsgi_do_sendfile(int, int, size_t, size_t, off_t*, int);
 PyObject *py_uwsgi_write(PyObject *, PyObject *) ;
 PyObject *py_uwsgi_spit(PyObject *, PyObject *) ;
 
-void uwsgi_as_root(void);
+void uwsgi_as_root(char **);
 
 #ifdef UWSGI_NAGIOS
 void nagios(struct uwsgi_server *);
