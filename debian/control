@@ -151,8 +151,11 @@ Section: python
 Depends: ${python:Depends}, ${misc:Depends}, uwsgi-python, python-django
 Description: Django application for administering uWSGI server
  uwsgi_admin is a small Django application that:
+ .
    * shows some information about current uWSGI state
    * allows to reload uWSGI from web-interface
+ .
+ This application must be served with uWSGI.
 
 Package: uwsgi-extra
 Architecture: any
