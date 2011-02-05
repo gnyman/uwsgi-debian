@@ -214,8 +214,10 @@ binary-install/python-django-uwsgi-admin::
 # Binary-post-install uwsgi-python% package
 $(patsubst %,binary-post-install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
 	$(eval SHAREDOCDIR = $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/doc)
-	sed -e 's/@@uwsgi_binary@@/$(cdbs_curpkg)/g' \
-		< $(CURDIR)/debian/uwsgi-python.etc.README.in \
-		> $(CURDIR)/debian/$(cdbs_curpkg)/etc/$(cdbs_curpkg)/README
+	for SUBDIR in apps-available apps-enabled; do \
+		sed -e 's/@@uwsgi_binary@@/$(cdbs_curpkg)/g' \
+			< $(CURDIR)/debian/uwsgi-python.etc.$${SUBDIR}.README.in \
+			> $(CURDIR)/debian/$(cdbs_curpkg)/etc/$(cdbs_curpkg)/$${SUBDIR}/README; \
+	done
 	ln -s ../uwsgi-common/tests $(SHAREDOCDIR)/$(cdbs_curpkg)/tests
 	ln -s ../uwsgi-common/examples $(SHAREDOCDIR)/$(cdbs_curpkg)/examples

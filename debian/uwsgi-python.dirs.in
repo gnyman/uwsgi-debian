@@ -1,2 +1,3 @@
-etc/@@uwsgi_binary@@
+etc/@@uwsgi_binary@@/apps-available
+etc/@@uwsgi_binary@@/apps-enabled
 var/log/@@uwsgi_binary@@

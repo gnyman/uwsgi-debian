@@ -1,4 +1,4 @@
-Files with '.ini'/'.xml'/'.yaml'/'.yml' extension found in this directory are
+Files with '.ini'/'.xml'/'.yaml'/'.yml' extensions found in this directory are
 processed by @@uwsgi_binary@@ init.d script as uWSGI configuration files.
 
 On system boot for each configuration file new uWSGI daemon instance is started

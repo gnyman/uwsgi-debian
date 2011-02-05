@@ -10,7 +10,8 @@ Automatic starting of instances of uWSGI
 ========================================
 
 On boot init.d script automatically starts one instance of @@uwsgi_binary@@ for
-each INI/XML/YAML configuration file found in /etc/@@uwsgi_binary@@/.
+each INI/XML/YAML configuration file found in
+/etc/@@uwsgi_binary@@/apps-enabled.
 
 INI file has higher precedence than XML. If INI file was found, then XML file
 with the same name will be ignored.

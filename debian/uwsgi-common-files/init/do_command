@@ -32,7 +32,7 @@ do_command()
   fi
 
   if [ -z "$ALL_CONFNAMES" ]; then
-    log_progress_msg "(omitted; missing conffile(s) in /etc/uwsgi/${NAME})"
+    log_progress_msg "(omitted; missing conffile(s) in /etc/${NAME}/apps-enabled)"
   else
     # Command actions.
     do_with_given_specific_daemons $COMMAND $ALL_CONFNAMES

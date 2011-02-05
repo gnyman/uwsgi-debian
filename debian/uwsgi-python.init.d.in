@@ -17,7 +17,7 @@ NAME="@@uwsgi_binary@@"
 DAEMON=/usr/bin/@@uwsgi_binary@@
 SCRIPTNAME=/etc/init.d/$NAME
 
-UWSGI_CONFDIR=/etc/@@uwsgi_binary@@
+UWSGI_CONFDIR=/etc/@@uwsgi_binary@@/apps-enabled
 UWSGI_RUNDIR=/var/run/@@uwsgi_binary@@
 UWSGI_LOGDIR=/var/log/@@uwsgi_binary@@
 
