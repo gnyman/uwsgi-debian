@@ -41,6 +41,21 @@ Description: fast, self-healing, developer-friendly WSGI server (Python 2)
  .
  This package provides uWSGI for serving on Python 2.X.
 
+Package: uwsgi-python-dbg
+Architecture: any
+Section: debug
+Depends: ${misc:Depends}, uwsgi-python (= ${binary:Version})
+Description: debugging symbols for uWSGI server (Python 2)
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package contains the debug symbols for uWSGI compiled with Python 2.X
+ support. Install this package if you need to debug such a program or if you
+ need a useful backtrace of a crash.
+
 Package: uwsgi-python3
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-common (= ${binary:Version})
@@ -55,6 +70,21 @@ Description: fast, self-healing, developer-friendly WSGI server (Python 3)
  languages or platform.
  .
  This package provides uWSGI for serving on Python 3.X.
+
+Package: uwsgi-python3-dbg
+Architecture: any
+Section: debug
+Depends: ${misc:Depends}, uwsgi-python3 (= ${binary:Version})
+Description: debugging symbols for uWSGI server (Python 3)
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package contains the debug symbols for uWSGI compiled with Python 3.X
+ support. Install this package if you need to debug such a program or if you
+ need a useful backtrace of a crash.
 
 Package: uwsgi-plugins-all
 Architecture: any
