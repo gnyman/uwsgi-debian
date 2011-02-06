@@ -136,7 +136,24 @@ Entirely custom configured uWSGI instance
 =========================================
 
 There is an example of simple custom init.d script in
-/usr/share/doc/@@uwsgi_binary@@/@@uwsgi_binary@@.init.d.custom
+/usr/share/doc/@@uwsgi_binary@@/@@uwsgi_binary@@.init.d.custom.gz
 
 It could be useful for starting entirely custom configured uWSGI server
 instance.
+
+Gunzip it to (something like) /etc/init.d/@@uwsgi_binary@@-custom-instance, then
+edit copied file and change:
+  * '# Provides:' comment and NAME variable with value of
+    '@@uwsgi_binary@@-custom-instance' (or whatever you've named copied file)
+  * UWSGI_UID, UWSGI_GID and DAEMON_ARGS variables with values suitable to your
+    needs
+
+Then execute:
+
+    chmod a+x /etc/init.d/@@uwsgi_binary@@-custom-instance
+    update-rc.d @@uwsgi_binary@@-custom-instance defaults
+
+And for removing your custom init.d script execute:
+
+    update-rc.d @@uwsgi_binary@@-custom-instance remove
+    rm /etc/init.d/@@uwsgi_binary@@-custom-instance

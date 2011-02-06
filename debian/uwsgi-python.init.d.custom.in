@@ -65,8 +65,16 @@ do_start()
     --exec $DAEMON -- $DAEMON_ARGS \
       || return 2
 
+  local INTERVAL_START=$(date +%s)
+  local INTERVAL_END=$(date +%s)
+  local WAITING=2 # seconds
+
   # Wait until daemon getting to create pidfile.
   while [ ! -e "$PIDFILE" ]; do
+    INTERVAL_END=$(date +%s)
+    if [ $(expr $INTERVAL_END - $INTERVAL_START) -gt $WAITING ]; then
+      return
+    fi
     sleep 0.05
   done
 
