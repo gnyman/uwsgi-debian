@@ -112,9 +112,11 @@ $(patsubst %,debian/stamp-uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS)):
 		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) --build; \
 		mv $(CURDIR)/uwsgi $(CURDIR)/uwsgi-python$${PYTHON_VERSION}; \
 	done
-	sed -e 's/@@uwsgi_binary@@/$(UWSGI_PYTHON)/g' \
-		< $(CURDIR)/debian/uwsgi-python.dirs.in \
-		> $(CURDIR)/debian/$(UWSGI_PYTHON).dirs
+	sed \
+		-e 's/@@uwsgi_binary@@/$(UWSGI_PYTHON)/g' \
+		-e 's/@@python_runtime_name@@/$(PYTHON_KIND)/g' \
+			< $(CURDIR)/debian/uwsgi-python.dirs.in \
+			> $(CURDIR)/debian/$(UWSGI_PYTHON).dirs
 	touch $@
 
 # Build uwsgi-plugin-% package
@@ -213,7 +215,19 @@ binary-install/python-django-uwsgi-admin::
 
 # Binary-post-install uwsgi-python% package
 $(patsubst %,binary-post-install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
+	$(eval PYTHON_KIND = $(call target_name_tail, $@))
+	$(eval UWSGI_PYTHON = uwsgi-$(PYTHON_KIND))
+	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
+	$(eval PYTHON_RTUPDATE_SCRIPT = \
+		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(PYTHON_KIND)/runtime.d/$(UWSGI_PYTHON).rtupdate \
+	)
 	$(eval SHAREDOCDIR = $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/doc)
+	sed \
+		-e 's/@@available_python_versions@@/$(PYVERS)/g' \
+		-e 's/@@uwsgi_binary@@/$(UWSGI_PYTHON)/g' \
+			< $(CURDIR)/debian/uwsgi-python.rtupdate.in \
+			> $(PYTHON_RTUPDATE_SCRIPT)
+	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
 	for SUBDIR in apps-available apps-enabled; do \
 		sed -e 's/@@uwsgi_binary@@/$(cdbs_curpkg)/g' \
 			< $(CURDIR)/debian/uwsgi-python.etc.$${SUBDIR}.README.in \
