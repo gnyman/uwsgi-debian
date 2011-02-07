@@ -1,5 +1,5 @@
-uwsgi (0.9.6.7-1) unstable; urgency=low
+uwsgi (0.9.6.8-1) unstable; urgency=low
 
   * Initial release. (Closes: #582864)
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Mon, 31 Jan 2011 14:44:36 +0200
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Mon, 07 Feb 2011 17:11:23 +0200
