@@ -612,6 +612,8 @@ void erlang_loop(struct wsgi_request *wsgi_req) {
 		uwsgi_log( "- error preparing arg tuple for uwsgi.erlang_func callable, Erlang message manager will be disabled -\n");
 	}
 
+	wsgi_req_setup(wsgi_req, 0);
+
 	while (uwsgi.workers[uwsgi.mywid].manage_next_request) {
 
 

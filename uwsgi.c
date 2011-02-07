@@ -160,6 +160,8 @@ static struct option long_options[] = {
                 {"log-4xx", no_argument, 0, LONG_ARGS_LOG_4xx},
                 {"log-5xx", no_argument, 0, LONG_ARGS_LOG_5xx},
                 {"log-big", required_argument, 0, LONG_ARGS_LOG_BIG},
+		{"ignore-sigpipe", no_argument, &uwsgi.ignore_sigpipe, 1},
+		{"master-as-root", no_argument, &uwsgi.master_as_root, 1},
 		{"chdir", required_argument, 0, LONG_ARGS_CHDIR},
 		{"chdir2", required_argument, 0, LONG_ARGS_CHDIR2},
 		{"grunt", no_argument, &uwsgi.grunt, 1},
@@ -745,7 +747,9 @@ int main(int argc, char *argv[], char *envp[]) {
 	}
 
 
-	uwsgi_as_root(argv);
+	if (!uwsgi.master_as_root) {
+		uwsgi_as_root(argv);
+	}
 
 	if (!uwsgi.master_process) {
 		uwsgi_log(" *** WARNING: you are running uWSGI without its master process manager ***\n");
@@ -909,11 +913,13 @@ int main(int argc, char *argv[], char *envp[]) {
 	}
 
 	// uwsgi.rl.rlim_cur contains the maxium number of file descriptor
-	if (uwsgi.rl.rlim_cur == RLIM_INFINITY) uwsgi.rl.rlim_cur = uwsgi.async;
-	uwsgi.async_waiting_fd_table = malloc( sizeof(int) * uwsgi.rl.rlim_cur);
-	if (!uwsgi.async_waiting_fd_table) {
-		uwsgi_error("malloc()");
-		exit(1);
+	if (uwsgi.async > 1) {
+		if (uwsgi.rl.rlim_cur == RLIM_INFINITY) uwsgi.rl.rlim_cur = uwsgi.async;
+		uwsgi.async_waiting_fd_table = malloc( sizeof(int) * uwsgi.rl.rlim_cur);
+		if (!uwsgi.async_waiting_fd_table) {
+			uwsgi_error("malloc()");
+			exit(1);
+		}
 	}
 
 	if (uwsgi.post_buffering > 0) {
@@ -1765,6 +1771,10 @@ int main(int argc, char *argv[], char *envp[]) {
 		}
 	}
 
+	if (uwsgi.master_as_root) {
+		uwsgi_as_root(argv);
+	}
+
 	// reinitialize the random seed (thanks Jonas Borgström)
 	random_module = PyImport_ImportModule("random");
 	if (random_module) {
@@ -1832,7 +1842,12 @@ int main(int argc, char *argv[], char *envp[]) {
 	signal(SIGUSR2, (void *) &what_i_am_doing);
 
 
-	signal(SIGPIPE, (void *) &warn_pipe);
+	if (uwsgi.ignore_sigpipe) {
+		signal(SIGPIPE, SIG_IGN);
+	}
+	else {
+		signal(SIGPIPE, (void *) &warn_pipe);
+	}
 
 // initialization done
 
@@ -1863,9 +1878,9 @@ int main(int argc, char *argv[], char *envp[]) {
 			// NEVER HERE
 			exit(1);
 		}
+		// close the erlang server fd for python workers
+		close(uwsgi.erlangfd);
 	}
-	// close the erlang server fd for python workers
-	close(uwsgi.erlangfd);
 #endif
 
 #ifdef UWSGI_THREADING
@@ -3668,6 +3683,7 @@ void manage_opt(int i, char *optarg) {
 \t--uid <id/username>\t\tsetuid to <id/username> (only root)\n\
 \t--chdir <dir>\t\t\tchdir to <dir> before app loading\n\
 \t--chdir2 <dir>\t\t\tchdir to <dir> after module loading\n\
+\t--master-as-root\t\tpostpone setuid/setgid/chroot and leave the master in root-mode\n\
 \t--no-server\t\t\tinitialize the uWSGI server then exit. Useful for testing and using uwsgi embedded module\n\
 \t--no-defer-accept\t\tdisable the no-standard way to defer the accept() call (TCP_DEFER_ACCEPT, SO_ACCEPTFILTER...)\n\
 \t--paste <config:/egg:>\t\tload applications using paste.deploy.loadapp()\n\
@@ -3705,6 +3721,7 @@ void manage_opt(int i, char *optarg) {
 \t--log-4xx\t\t\tlog requests with status code 4xx\n\
 \t--log-5xx\t\t\tlog requests with status code 5xx\n\
 \t--log-big <n>\t\t\tlog requests bigger than <n> bytes\n\
+\t--ignore-sigpipe\t\tignore SIGPIPE\n\
 \t--ignore-script-name\t\tdisable uWSGI management of SCRIPT_NAME\n\
 \t--no-default-app\t\tdo not fallback unknown SCRIPT_NAME requests\n\
 \t--ini <inifile>\t\t\tpath of ini config file\n\

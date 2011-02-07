@@ -2,7 +2,7 @@
 
 /* indent -i8 -br -brs -brf -l0 -npsl -nip -npcs -npsl -di1 */
 
-#define UWSGI_VERSION	"0.9.6.7"
+#define UWSGI_VERSION	"0.9.6.8"
 
 #define uwsgi_error(x)  uwsgi_log("%s: %s [%s line %d]\n", x, strerror(errno), __FILE__, __LINE__);
 #define uwsgi_debug(x, ...) uwsgi_log("[uWSGI DEBUG] " x, __VA_ARGS__);
@@ -482,6 +482,8 @@ struct uwsgi_server {
 	int enable_profiler;
 
 	unsigned int reloads;
+	int ignore_sigpipe;
+	int master_as_root;
 
 	// base for all the requests (even on async mode)
 	struct wsgi_request *wsgi_requests ;
