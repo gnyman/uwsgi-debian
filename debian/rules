@@ -239,5 +239,5 @@ $(patsubst %,binary-post-install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
 			< $(CURDIR)/debian/uwsgi-python.etc.$${SUBDIR}.README.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg)/etc/$(cdbs_curpkg)/$${SUBDIR}/README; \
 	done
-	ln -s ../uwsgi-common/tests $(SHAREDOCDIR)/$(cdbs_curpkg)/tests
-	ln -s ../uwsgi-common/examples $(SHAREDOCDIR)/$(cdbs_curpkg)/examples
+	ln -sf ../uwsgi-common/tests $(SHAREDOCDIR)/$(cdbs_curpkg)/tests
+	ln -sf ../uwsgi-common/examples $(SHAREDOCDIR)/$(cdbs_curpkg)/examples
