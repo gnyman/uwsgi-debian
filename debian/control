@@ -14,6 +14,7 @@ Vcs-Browser: http://git.debian.org/?p=collab-maint/uwsgi.git
 
 Package: uwsgi-common
 Architecture: any
+Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: fast, self-healing, developer-friendly WSGI server (common files)
  uWSGI is aimed for professional Python webapps deployment and development.
@@ -29,6 +30,7 @@ Description: fast, self-healing, developer-friendly WSGI server (common files)
 
 Package: uwsgi-python
 Architecture: any
+Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-common (= ${binary:Version})
 Provides: httpd-wsgi
 Suggests: nginx-full | libapache2-mod-uwsgi | libapache2-mod-ruwsgi,
@@ -59,6 +61,7 @@ Description: debugging symbols for uWSGI server (Python 2)
 
 Package: uwsgi-python3
 Architecture: any
+Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-common (= ${binary:Version})
 Provides: httpd-wsgi
 Suggests: nginx-full | libapache2-mod-uwsgi | libapache2-mod-ruwsgi,
