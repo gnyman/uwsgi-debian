@@ -2,6 +2,9 @@
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 
+# Common variables
+# ================
+
 PYTHON=/usr/bin/python
 APXS2=/usr/bin/apxs2
 APR_CONFIG=/usr/bin/apr-config
@@ -55,8 +58,14 @@ files_instantiated_in_debian_dir = $(addprefix \
 	$(CURDIR)/debian/$(strip $(1)), $(addsuffix $(strip $(3)), $(strip $(2))) \
 )
 
+# CDBS-specific variables
+# =======================
+
 DEB_COMPRESS_EXCLUDE_uwsgi-common = .py .pl .xml .psgi .png
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
+
+# Rules
+# =====
 
 clean::
 	# uWSGI executables
@@ -106,6 +115,9 @@ clean::
 	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
 
+# uwsgi-python/uwsgi-python3 packages
+# -----------------------------------
+
 # Build uwsgi-python% package
 $(patsubst %,build/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS)):: build/uwsgi-% : debian/stamp-uwsgi-%
 
@@ -124,48 +136,6 @@ $(patsubst %,debian/stamp-uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS)):
 			< $(CURDIR)/debian/uwsgi-python.dirs.in \
 			> $(CURDIR)/debian/$(UWSGI_PYTHON).dirs
 	touch $@
-
-# Build uwsgi-plugin-% package
-$(patsubst %,build/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES)):: build/uwsgi-plugin-% : debian/stamp-plugin-%
-
-# Build specific uWSGI plugin
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_NAMES)):
-	$(eval PLUGIN_NAME = $(call target_name_tail, $@))
-	$(PYTHON) $(UWSGI_BUILDER) --plugin $(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME)
-	touch $@
-
-# Build libapache2-mod-% package
-$(patsubst %,build/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):: build/% : debian/stamp-%
-
-# Build specific Apache2 module
-$(patsubst %,debian/stamp-libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):
-	$(eval MODULE_NAME = $(call ruwsgi_to_orig, $(call target_name_tail, $@)))
-	$(APXS2) -c \
-		`$(APR_CONFIG) --link-ld` `$(APU_CONFIG) --link-ld` \
-		$(CURDIR)/apache2/mod_$(MODULE_NAME).c
-	touch $@
-
-install/uwsgi-common::
-	mkdir $(COMMON_DOCS_COLLECTION_DIR)
-	cp -r $(CURDIR)/tests $(COMMON_DOCS_COLLECTION_DIR)
-	for subdir in conffile psgi wsgi; do \
-		mkdir -p $(COMMON_DOCS_COLLECTION_DIR)/examples/$$subdir; \
-	done
-	for file in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py; do\
-		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples; \
-	done
-	for file in mega.xml uwsgi.xml; do \
-		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/conffile; \
-	done
-	for file in mojoapp.pl psgi.py test.psgi; do \
-		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/psgi; \
-	done
-	for file in hello_world_rrdtool.py mjpeg_stream.py simple_app.py \
-	            simple_app_wsgi2.py testapp.py ugreenchat.py uploadtest.py \
-	            ; do \
-		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi; \
-	done
-	chmod a-x $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi/ugreenchat.py
 
 # Install uwsgi-python% package
 $(patsubst %,install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
@@ -194,31 +164,6 @@ $(patsubst %,install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
 
-# Install uwsgi-plugin-% package
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES))::
-	$(eval PLUGIN_NAME = $(call target_name_tail, $@))
-	sed -e 's/@@plugin_name@@/$(PLUGIN_NAME)/g' \
-		< $(CURDIR)/debian/uwsgi-plugin.install.in \
-		> $(CURDIR)/debian/$(cdbs_curpkg).install
-
-# Install libapache2-mod-% package
-$(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
-	$(eval MODULE_NAME = $(call ruwsgi_to_orig, $(call target_name_tail, $@)))
-	sed -e 's/@@module_name@@/$(MODULE_NAME)/g' \
-		< $(CURDIR)/debian/uwsgi.load.in \
-		> $(CURDIR)/debian/$(MODULE_NAME).load
-	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
-		sed -e 's/@@module_name@@/$(MODULE_NAME)/g' \
-			< $(CURDIR)/debian/libapache2-mod.$${TEMPLATE_TYPE}.in \
-			> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE} ; \
-	done
-
-binary-install/python-django-uwsgi-admin::
-	dh_install -p $(cdbs_curpkg) \
-		django/uwsgi_admin \
-		usr/lib/python$(PYTHON_DEFAULT)/dist-packages
-	dh_pysupport -p $(cdbs_curpkg)
-
 # Binary-post-install uwsgi-python% package
 $(patsubst %,binary-post-install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
@@ -241,3 +186,80 @@ $(patsubst %,binary-post-install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
 	done
 	ln -sf ../uwsgi-common/tests $(SHAREDOCDIR)/$(cdbs_curpkg)/tests
 	ln -sf ../uwsgi-common/examples $(SHAREDOCDIR)/$(cdbs_curpkg)/examples
+
+# uwsgi-plugin-% packages
+# -----------------------
+
+# Build uwsgi-plugin-% package
+$(patsubst %,build/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES)):: build/uwsgi-plugin-% : debian/stamp-plugin-%
+
+# Build specific uWSGI plugin
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_NAMES)):
+	$(eval PLUGIN_NAME = $(call target_name_tail, $@))
+	$(PYTHON) $(UWSGI_BUILDER) --plugin $(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME)
+	touch $@
+
+# Install uwsgi-plugin-% package
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES))::
+	$(eval PLUGIN_NAME = $(call target_name_tail, $@))
+	sed -e 's/@@plugin_name@@/$(PLUGIN_NAME)/g' \
+		< $(CURDIR)/debian/uwsgi-plugin.install.in \
+		> $(CURDIR)/debian/$(cdbs_curpkg).install
+
+# libapache2-mod-% packages
+# -------------------------
+
+# Build libapache2-mod-% package
+$(patsubst %,build/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):: build/% : debian/stamp-%
+
+# Build specific Apache2 module
+$(patsubst %,debian/stamp-libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):
+	$(eval MODULE_NAME = $(call ruwsgi_to_orig, $(call target_name_tail, $@)))
+	$(APXS2) -c \
+		`$(APR_CONFIG) --link-ld` `$(APU_CONFIG) --link-ld` \
+		$(CURDIR)/apache2/mod_$(MODULE_NAME).c
+	touch $@
+
+# Install libapache2-mod-% package
+$(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
+	$(eval MODULE_NAME = $(call ruwsgi_to_orig, $(call target_name_tail, $@)))
+	sed -e 's/@@module_name@@/$(MODULE_NAME)/g' \
+		< $(CURDIR)/debian/uwsgi.load.in \
+		> $(CURDIR)/debian/$(MODULE_NAME).load
+	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
+		sed -e 's/@@module_name@@/$(MODULE_NAME)/g' \
+			< $(CURDIR)/debian/libapache2-mod.$${TEMPLATE_TYPE}.in \
+			> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE} ; \
+	done
+
+# Some other packages
+# -------------------
+
+install/uwsgi-common::
+	mkdir $(COMMON_DOCS_COLLECTION_DIR)
+	cp -r $(CURDIR)/tests $(COMMON_DOCS_COLLECTION_DIR)
+	for subdir in conffile psgi wsgi; do \
+		mkdir -p $(COMMON_DOCS_COLLECTION_DIR)/examples/$$subdir; \
+	done
+	for file in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py; do\
+		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples; \
+	done
+	for file in mega.xml uwsgi.xml; do \
+		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/conffile; \
+	done
+	for file in mojoapp.pl psgi.py test.psgi; do \
+		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/psgi; \
+	done
+	for file in hello_world_rrdtool.py mjpeg_stream.py simple_app.py \
+	            simple_app_wsgi2.py testapp.py ugreenchat.py uploadtest.py \
+	            ; do \
+		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi; \
+	done
+	chmod a-x $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi/ugreenchat.py
+
+binary-install/python-django-uwsgi-admin::
+	dh_install -p $(cdbs_curpkg) \
+		django/uwsgi_admin \
+		usr/lib/python$(PYTHON_DEFAULT)/dist-packages
+	dh_pysupport -p $(cdbs_curpkg)
+
