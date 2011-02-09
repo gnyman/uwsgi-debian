@@ -261,5 +261,5 @@ binary-install/python-django-uwsgi-admin::
 	dh_install -p $(cdbs_curpkg) \
 		django/uwsgi_admin \
 		usr/lib/python$(PYTHON_DEFAULT)/dist-packages
-	dh_pysupport -p $(cdbs_curpkg)
+	dh_python2 -p $(cdbs_curpkg)
 

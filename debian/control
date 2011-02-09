@@ -4,9 +4,9 @@ Priority: extra
 Maintainer: Leonid Borisenko <leo.borisenko@gmail.com>
 Uploaders: Stephen Crosby <stevecrozz@gmail.com>
 Build-Depends: cdbs, debhelper (>= 8), python-all-dev, python3-all-dev,
- python-support, libxml2-dev, libsctp-dev, erlang-dev, libpcre3-dev,
- libldap2-dev, liblua5.1-0-dev, libperl-dev, ruby, ruby-dev,
- apache2-threaded-dev, libapr1-dev, libaprutil1-dev, help2man
+ libxml2-dev, libsctp-dev, erlang-dev, libpcre3-dev, libldap2-dev,
+ liblua5.1-0-dev, libperl-dev, ruby, ruby-dev, apache2-threaded-dev,
+ libapr1-dev, libaprutil1-dev, help2man
 Standards-Version: 3.9.1
 Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://git.debian.org/collab-maint/uwsgi.git
@@ -183,6 +183,7 @@ Package: python-django-uwsgi-admin
 Architecture: all
 Section: python
 Depends: ${python:Depends}, ${misc:Depends}, uwsgi-python, python-django
+Breaks: ${python:Breaks}
 Description: Django application for administering uWSGI server
  uwsgi_admin is a small Django application that:
  .
