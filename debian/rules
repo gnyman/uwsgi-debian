@@ -47,14 +47,23 @@ COMMON_DOCS_COLLECTION_DIR = $(CURDIR)/debian/uwsgi-common-files/docs
 # character
 target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
 
+# From something like:
+#   $(call <...>, uwsgi-, $(UWSGI_PYTHON_PKG_KINDS), .dirs)
+# makes list:
+#   $(CURDIR)/debian/uwsgi-python.dirs $(CURDIR)/debian/uwsgi-python3.dirs
+files_instantiated_in_debian_dir = $(addprefix \
+	$(CURDIR)/debian/$(strip $(1)), $(addsuffix $(strip $(3)), $(strip $(2))) \
+)
+
 DEB_COMPRESS_EXCLUDE_uwsgi-common = .py .pl .xml .psgi .png
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
 clean::
 	# uWSGI executables
 	$(RM) $(CURDIR)/uwsgi
-	$(RM) $(addprefix $(CURDIR)/uwsgi-python, $(PYTHON_VERS))
-	$(RM) $(addprefix $(CURDIR)/uwsgi-python, $(PYTHON3_VERS))
+	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
+		$(RM) $(CURDIR)/uwsgi-python$${PYVER}; \
+	done
 	# intermediate compiled files
 	$(RM) $(CURDIR)/*.o $(CURDIR)/uwsgiconfig.pyc
 	# plugins
@@ -72,14 +81,14 @@ clean::
 	$(RM) -r $(COMMON_DOCS_COLLECTION_DIR)
 	# instantiated uwsgi-pythonX templates
 	for TEMPLATE_TYPE in $(UWSGI_PYTHON_PKG_TEMPLATES) dirs install manpages; do\
-		$(RM) $(addprefix $(CURDIR)/debian/uwsgi-, \
-			$(addsuffix .$${TEMPLATE_TYPE}, $(UWSGI_PYTHON_PKG_KINDS)) \
+		$(RM) $(call files_instantiated_in_debian_dir, \
+			uwsgi-, $(UWSGI_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE} \
 		); \
 	done
 	# instantiated libapache2-mod-X templates
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
-		$(RM) $(addprefix $(CURDIR)/debian/libapache2-mod-, \
-			$(addsuffix .$${TEMPLATE_TYPE}, $(LIBAPACHE2_MODS_NAMES)) \
+		$(RM) $(call files_instantiated_in_debian_dir, \
+			libapache2-mod-, $(LIBAPACHE2_MODS_NAMES), .$${TEMPLATE_TYPE} \
 		); \
 	done
 	$(RM) $(addprefix $(CURDIR)/debian/, \
@@ -87,15 +96,12 @@ clean::
 			$(addsuffix .load,  $(call ruwsgi_to_orig, $(module_name))) \
 	))
 	# uwsgi-pythonX manpages
-	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python, \
-		$(addsuffix .8, $(PYTHON_VERS)) \
-	)
-	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-python, \
-		$(addsuffix .8, $(PYTHON3_VERS)) \
-	)
+	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
+		$(RM) $(CURDIR)/debian/uwsgi-python$${PYVER}.8; \
+	done
 	# instantiated uwsgi-plugin-N.install files
-	$(RM) $(addprefix $(CURDIR)/debian/uwsgi-plugin-, \
-		$(addsuffix .install, $(UWSGI_PLUGINS_NAMES)) \
+	$(RM) $(call files_instantiated_in_debian_dir, \
+		uwsgi-plugin-, $(UWSGI_PLUGINS_NAMES), .install \
 	)
 	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
