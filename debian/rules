@@ -238,22 +238,22 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 install/uwsgi-common::
 	test -e $(COMMON_DOCS_COLLECTION_DIR) || mkdir $(COMMON_DOCS_COLLECTION_DIR)
 	cp -r $(CURDIR)/tests $(COMMON_DOCS_COLLECTION_DIR)
-	for subdir in conffile psgi wsgi; do \
-		mkdir -p $(COMMON_DOCS_COLLECTION_DIR)/examples/$$subdir; \
+	for SUBDIR in conffile psgi wsgi; do \
+		mkdir -p $(COMMON_DOCS_COLLECTION_DIR)/examples/$${SUBDIR}; \
 	done
-	for file in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py; do\
-		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples; \
+	for FILE in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py; do\
+		cp $(CURDIR)/$${FILE} $(COMMON_DOCS_COLLECTION_DIR)/examples; \
 	done
-	for file in mega.xml uwsgi.xml; do \
-		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/conffile; \
+	for FILE in mega.xml uwsgi.xml; do \
+		cp $(CURDIR)/$${FILE} $(COMMON_DOCS_COLLECTION_DIR)/examples/conffile; \
 	done
-	for file in mojoapp.pl psgi.py test.psgi; do \
-		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/psgi; \
+	for FILE in mojoapp.pl psgi.py test.psgi; do \
+		cp $(CURDIR)/$${FILE} $(COMMON_DOCS_COLLECTION_DIR)/examples/psgi; \
 	done
-	for file in hello_world_rrdtool.py mjpeg_stream.py simple_app.py \
+	for FILE in hello_world_rrdtool.py mjpeg_stream.py simple_app.py \
 	            simple_app_wsgi2.py testapp.py ugreenchat.py uploadtest.py \
 	            ; do \
-		cp $(CURDIR)/$$file $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi; \
+		cp $(CURDIR)/$${FILE} $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi; \
 	done
 	chmod a-x $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi/ugreenchat.py
 
