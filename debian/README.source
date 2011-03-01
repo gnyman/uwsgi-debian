@@ -40,3 +40,12 @@ You could manage 'ubuntu.series' with command:
 For example:
 
     QUILT_SERIES=ubuntu.series quilt series
+
+Why #!/bin/bash in uwsgi-pythonX init.d script?
+===============================================
+
+For supporting configuration file names with spaces and/or control characters
+Bash-specific features are used (namely, '-d' option of 'read' command and
+process substitution).
+
+See their's usage in debian/uwsgi-common-files/init/do_command.
