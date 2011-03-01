@@ -8,31 +8,31 @@
 #  2 if daemon could not be started
 do_start_specific_daemon()
 {
-  local CONFNAME=$1
+  local CONFNAME="$@"
 
-  local CONFFILE=$(path_to_conffile_with_name "$CONFNAME")
+  local CONFFILE="$(path_to_conffile_with_name "$CONFNAME")"
   if [ -z "$CONFFILE" ]; then
     return 2
   fi
 
-  local UWSGI_UID=$(extract_id uid "$CONFNAME")
-  local UWSGI_GID=$(extract_id gid "$CONFNAME")
+  local UWSGI_UID="$(extract_id uid "$CONFNAME")"
+  local UWSGI_GID="$(extract_id gid "$CONFNAME")"
 
-  local SPECIFIC_RUNDIR=$(find_specific_rundir $CONFNAME)
-  local PIDFILE=$(find_specific_pidfile $CONFNAME)
-  local SOCKET=$(find_specific_socket $CONFNAME)
+  local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
+  local PIDFILE="$(find_specific_pidfile "$CONFNAME")"
+  local SOCKET="$(find_specific_socket "$CONFNAME")"
 
-  install_dir $UWSGI_RUNDIR
-  install_dir $SPECIFIC_RUNDIR $UWSGI_UID $UWSGI_GID
+  install -d -o root -g root -m 755 "$UWSGI_RUNDIR"
+  install -d -o "$UWSGI_UID" -g "$UWSGI_GID" -m 755 "$SPECIFIC_RUNDIR"
 
   start-stop-daemon --start --quiet \
-    --pidfile $PIDFILE \
-    --exec $DAEMON \
+    --pidfile "$PIDFILE" \
+    --exec "$DAEMON" \
     --test > /dev/null \
       || return 1
 
   local CONFFILE_OPTION_NAME
-  local CONFTYPE=$(type_of_conffile "$CONFFILE")
+  local CONFTYPE="$(type_of_conffile "$CONFFILE")"
   if [ "$CONFTYPE" = "ini" ]; then
     CONFFILE_OPTION_NAME=ini
   elif [ "$CONFTYPE" = "xml" ]; then
@@ -41,19 +41,24 @@ do_start_specific_daemon()
     CONFFILE_OPTION_NAME=yaml
   fi
 
-  local DAEMON_ARGS=" \
-    $DAEMON_OPTS \
-    --daemonize $UWSGI_LOGDIR/${CONFNAME}.log \
-    --pidfile $PIDFILE \
-    --socket $SOCKET \
-    --${CONFFILE_OPTION_NAME} $CONFFILE \
-  "
   start-stop-daemon --start --quiet \
-    --pidfile $PIDFILE \
-    --exec $DAEMON -- $DAEMON_ARGS \
+    --pidfile "$PIDFILE" \
+    --exec "$DAEMON" \
+      -- $DAEMON_OPTS \
+         --daemonize "${UWSGI_LOGDIR}/${CONFNAME}.log" \
+         --pidfile "$PIDFILE" \
+         --socket "$SOCKET" \
+         --"${CONFFILE_OPTION_NAME}" "${CONFFILE}" \
+    > /dev/null \
       || return 2
 
-  chown_and_chmod_pidfile $PIDFILE
+  chown_and_chmod_pidfile "$PIDFILE"
+
+  start-stop-daemon --start --quiet \
+    --pidfile "$PIDFILE" \
+    --exec "$DAEMON" \
+    --test > /dev/null \
+      && return 2
 
   return 0
 }
@@ -65,19 +70,19 @@ do_start_specific_daemon()
 #  other if a failure occurred
 do_stop_specific_daemon()
 {
-  local CONFNAME=$1
-  local SPECIFIC_RUNDIR=$(find_specific_rundir $CONFNAME)
-  local PIDFILE=$(find_specific_pidfile $CONFNAME)
+  local CONFNAME="$@"
+  local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
+  local PIDFILE="$(find_specific_pidfile "$CONFNAME")"
 
   start-stop-daemon --stop --quiet \
     --retry=QUIT/30/KILL/5 \
-    --pidfile $PIDFILE \
-    --name $NAME
+    --pidfile "$PIDFILE" \
+    --name "$NAME"
 
   RETVAL="$?"
   [ "$RETVAL" = 2 ] && return 2
 
-  rm -rf $SPECIFIC_RUNDIR
+  rm -rf "$SPECIFIC_RUNDIR"
 
   return "$RETVAL"
 }
@@ -87,13 +92,13 @@ do_stop_specific_daemon()
 #  3 if daemon could not be reloaded
 do_reload_specific_daemon()
 {
-  local CONFNAME=$1
-  local PIDFILE=$(find_specific_pidfile $CONFNAME)
+  local CONFNAME="$@"
+  local PIDFILE="$(find_specific_pidfile "$CONFNAME")"
 
   start-stop-daemon --stop --quiet \
     --signal=HUP \
-    --pidfile $PIDFILE \
-    --name $NAME
+    --pidfile "$PIDFILE" \
+    --name "$NAME"
 
   RETVAL="$?"
 
@@ -108,13 +113,13 @@ do_reload_specific_daemon()
 #  3 if daemon could not be reloaded
 do_force_reload_specific_daemon()
 {
-  local CONFNAME=$1
-  local PIDFILE=$(find_specific_pidfile $CONFNAME)
+  local CONFNAME="$@"
+  local PIDFILE="$(find_specific_pidfile "$CONFNAME")"
 
   start-stop-daemon --stop --quiet \
     --signal=TERM \
-    --pidfile $PIDFILE \
-    --name $NAME
+    --pidfile "$PIDFILE" \
+    --name "$NAME"
 
   RETVAL="$?"
 

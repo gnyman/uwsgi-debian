@@ -1,47 +1,32 @@
 # This is shell script, (indirectly) sourced by uWSGI init.d script
 
-install_dir()
-{
-  local DIR=$1
-  local DIR_UID=$2
-  local DIR_GID=$3
-  local DIR_MODE=$4
-
-  if [ -z "$DIR_UID" ]; then DIR_UID=root; fi
-  if [ -z "$DIR_GID" ]; then DIR_GID=root; fi
-  if [ -z "$DIR_MODE" ]; then DIR_MODE=755; fi
-
-  if [ ! -e "$DIR" ]; then
-    # Suppose I don't know about /usr/bin/install
-    mkdir -p "$DIR"
-    chown "$DIR_UID":"$DIR_GID" "$DIR"
-    chmod "$DIR_MODE" "$DIR"
-  fi
-}
-
 path_to_conffile_with_name()
 {
-  local CONFNAME="$1"
-  local CONFFILE="$UWSGI_CONFDIR/$CONFNAME"
-  local PATH
+  local CONFNAME="$@"
+  local CONFFILE="${UWSGI_CONFDIR}/${CONFNAME}"
+  local PATH=""
 
-  if [ -e "$CONFFILE.ini" ]; then
-    PATH=$CONFFILE.ini
-  elif [ -e "$CONFFILE.xml" ]; then
-    PATH=$CONFFILE.xml
-  elif [ -e "$CONFFILE.yaml" ]; then
-    PATH=$CONFFILE.yaml
-  elif [ -e "$CONFFILE.yml" ]; then
-    PATH=$CONFFILE.yml
+  if [ -e "${CONFFILE}.ini" ]; then
+    PATH="${CONFFILE}.ini"
+  elif [ -e "${CONFFILE}.xml" ]; then
+    PATH="${CONFFILE}.xml"
+  elif [ -e "${CONFFILE}.yaml" ]; then
+    PATH="${CONFFILE}.yaml"
+  elif [ -e "${CONFFILE}.yml" ]; then
+    PATH="${CONFFILE}.yml"
   fi
 
-  echo $PATH
+  echo "$PATH"
 }
 
 # Extract extension of configuration file from it's path/name.
 type_of_conffile()
 {
-  echo "$1" | sed 's/^.*\(ini\|xml\|yaml\|yml\)$/\1/g'
+  # Configuration file name can contain newline character.
+  #
+  # So one's needed to process and return only last line from configuration
+  # file name.
+  echo "$@" | sed '$s/^.*\(ini\|xml\|yaml\|yml\)$/\1/g' | tail -1
 }
 
 # Get value of user-defined id (specifically, 'uid' or 'gid') for uWSGI
@@ -59,82 +44,82 @@ type_of_conffile()
 # Echo found value or empty string if not found.
 extract_id()
 {
-  local KIND=$1
-  local CONFNAME=$2
+  local KIND="$1"
+  local CONFNAME="$@"
 
-  local CONFFILE=$(path_to_conffile_with_name $CONFNAME)
-  local CONFTYPE=$(type_of_conffile $CONFFILE)
+  local CONFFILE="$(path_to_conffile_with_name "$CONFNAME")"
+  local CONFTYPE="$(type_of_conffile "$CONFFILE")"
 
   local ID
 
   if [ "$CONFTYPE" = "ini" ]; then
-    ID=$(
+    ID="$(
       grep --max-count=1 "^\s*${KIND}\s*=" "$CONFFILE" \
       | sed -e "s/^\s*${KIND}\s*=\s*\(.*\)\s*/\1/g"
-    )
+    )"
   elif [ "$CONFTYPE" = "xml" ]; then
-    ID=$(
+    ID="$(
       grep --max-count=1 "<${KIND}>.\+</${KIND}>" "$CONFFILE" \
       | sed -e "s/.*<${KIND}>\s*\(.*\)\s*<\/${KIND}>.*/\1/g"
-    )
+    )"
   elif [ "$CONFTYPE" = "yaml" -o "$CONFTYPE" = "yml" ]; then
-    ID=$(
+    ID="$(
       grep --max-count=1 "^\s\+${KIND}\s*:" "$CONFFILE" \
       | sed -e "s/^\s\+${KIND}\s*:\s*\(.*\)\s*/\1/g"
-    )
+    )"
   fi
 
   if [ -z "$ID" ]; then
-    ID=$(
+    ID="$(
       echo "$DAEMON_OPTS" \
       | sed -e "s/.*--${KIND}\s*\([^[:space:]]\+\).*/\1/g"
-    )
-    if [ "$ID" = "$DAEMON_OPTS" ]; then ID=''; fi
+    )"
+    if [ "$ID" = "$DAEMON_OPTS" ]; then ID=""; fi
   fi
 
-  echo $ID
+  echo "$ID"
 }
 
 # Location of /var/run subdirectory for specific uWSGI process.
 find_specific_rundir()
 {
-  local $CONFNAME=$1
-  echo "$UWSGI_RUNDIR/$CONFNAME"
+  local CONFNAME="$@"
+  echo "${UWSGI_RUNDIR}/${CONFNAME}"
 }
 
 # Location of pidfile for specific uWSGI process.
 find_specific_pidfile()
 {
-  local CONFNAME=$1
-  local SPECIFIC_RUNDIR=$(find_specific_rundir $CONFNAME)
-  echo "$SPECIFIC_RUNDIR/pid"
+  local CONFNAME="$@"
+  local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
+  echo "${SPECIFIC_RUNDIR}/pid"
 }
 
 # Location of UNIX socket for specific uWSGI process.
 find_specific_socket()
 {
-  local CONFNAME=$1
-  local SPECIFIC_RUNDIR=$(find_specific_rundir $CONFNAME)
-  echo "$SPECIFIC_RUNDIR/socket"
+  local CONFNAME="$@"
+  local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
+  echo "${SPECIFIC_RUNDIR}/socket"
 }
 
 # Assigns owner, group and permissions to pidfile of uWSGI process.
 chown_and_chmod_pidfile()
 {
-  local PIDFILE=$1
-  local INTERVAL_START=$(date +%s)
-  local INTERVAL_END=$(date +%s)
+  local PIDFILE="$@"
+  local INTERVAL_START="$(date +%s)"
+  local INTERVAL_END="$(date +%s)"
   local WAITING=2 # seconds
 
   # Wait until daemon getting to create pidfile.
   while [ ! -e "$PIDFILE" ]; do
-    INTERVAL_END=$(date +%s)
-    if [ $(expr $INTERVAL_END - $INTERVAL_START) -gt $WAITING ]; then
+    INTERVAL_END="$(date +%s)"
+    if [ "$(expr "$INTERVAL_END" - "$INTERVAL_START")" -gt "$WAITING" ]; then
       return
     fi
     sleep 0.05
   done
 
-  chown root:root $PIDFILE
-  chmod 644 $PIDFILE
+  chown root:root "$PIDFILE"
+  chmod 644 "$PIDFILE"
 }

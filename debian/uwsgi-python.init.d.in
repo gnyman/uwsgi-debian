@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ### BEGIN INIT INFO
 # Provides:          @@uwsgi_binary@@
 # Required-Start:    $local_fs $remote_fs $network
@@ -14,21 +14,21 @@
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="app server(s)"
 NAME="@@uwsgi_binary@@"
-DAEMON=/usr/bin/@@uwsgi_binary@@
-SCRIPTNAME=/etc/init.d/$NAME
+DAEMON="/usr/bin/@@uwsgi_binary@@"
+SCRIPTNAME="/etc/init.d/${NAME}"
 
-UWSGI_CONFDIR=/etc/@@uwsgi_binary@@/apps-enabled
-UWSGI_RUNDIR=/var/run/@@uwsgi_binary@@
-UWSGI_LOGDIR=/var/log/@@uwsgi_binary@@
+UWSGI_CONFDIR="/etc/@@uwsgi_binary@@/apps-enabled"
+UWSGI_RUNDIR="/var/run/@@uwsgi_binary@@"
+UWSGI_LOGDIR="/var/log/@@uwsgi_binary@@"
 
 # Exit if the package is not installed
-[ -x $DAEMON ] || exit 0
+[ -x "$DAEMON" ] || exit 0
 
 # Load the VERBOSE setting and other rcS variables
 . /lib/init/vars.sh
 
 # Read configuration variable file if it is present
-[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+[ -r "/etc/default/${NAME}" ] && . "/etc/default/${NAME}"
 
 # Define LSB log_* functions.
 # Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
@@ -59,7 +59,7 @@ case "$WHAT" in
     if [ -z "$1" ]; then
       [ "$VERBOSE" != no ] && log_failure_msg "which one?"
     else
-      status_of_proc -p $(find_specific_pidfile $1) "$DAEMON" "$NAME" \
+      status_of_proc -p "$(find_specific_pidfile "$1")" "$DAEMON" "$NAME" \
         && exit 0 \
         || exit $?
     fi
