@@ -86,7 +86,7 @@ You can issue to init.d script following commands:
   * reload       | sends to daemon SIGHUP signal
   * force-reload | sends to daemon SIGTERM signal
   * restart      | issues 'stop', then 'start' commands
-  * status       | shows status of daemon instance (runned/not runned)
+  * status       | shows status of daemon instance (running/not running)
 
 'status' command must be issued with exactly one argument: '<confname>'.
 
@@ -125,7 +125,7 @@ Output:
     <...> -> (ario) wrogn? googl moogl!
 
 It means that:
-  * 'ario' instance was already runned before executing 'start' command
+  * 'ario' instance was already ran before executing 'start' command
   * configuration file for 'wrogn' (i.e. file 'wrogn.xml') wasn't found
   * 'googl' is started without problems
   * starting 'moogl' is failed
