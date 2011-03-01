@@ -236,7 +236,7 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 # -------------------
 
 install/uwsgi-common::
-	mkdir $(COMMON_DOCS_COLLECTION_DIR)
+	test -e $(COMMON_DOCS_COLLECTION_DIR) || mkdir $(COMMON_DOCS_COLLECTION_DIR)
 	cp -r $(CURDIR)/tests $(COMMON_DOCS_COLLECTION_DIR)
 	for subdir in conffile psgi wsgi; do \
 		mkdir -p $(COMMON_DOCS_COLLECTION_DIR)/examples/$$subdir; \
