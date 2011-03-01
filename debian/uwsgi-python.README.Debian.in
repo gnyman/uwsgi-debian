@@ -93,7 +93,7 @@ You can issue to init.d script following commands:
 Controling specific instances of uWSGI
 ======================================
 
-You could control specific instance(s) by issueing:
+You could control specific instance(s) by issuing:
 
     /etc/init.d/@@uwsgi_binary@@ <command> <confname> <confname> ...
 

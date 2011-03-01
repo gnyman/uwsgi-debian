@@ -4,7 +4,7 @@ set -e
 
 if [ "x$1" = "xrtupdate" ]; then
   # Versions of Python interpreter which was available at packaging moment
-  # (and for which appropriate uwsgi-pythonX.Y binaries was builded).
+  # (and for which appropriate uwsgi-pythonX.Y binaries was built).
   KNOWN_PYVERS="@@available_python_versions@@"
 
   DEFAULT_UWSGI_ALTERNATIVE_PRIORITY=75
@@ -16,7 +16,7 @@ if [ "x$1" = "xrtupdate" ]; then
     # version) was available at packaging moment.
     #
     # If it wasn't available, there is no point in changing default alternative
-    # (as appropriate uwsgi-pythonX.Y binary wasn't builded and packaged).
+    # (as appropriate uwsgi-pythonX.Y binary wasn't built and packaged).
     if [ "x$3" = "xpython$MAYBE_NEW_DEFAULT_PYVER" ]; then
 
       # Reset prorities of all packaged alternatives of @@uwsgi_binary@@ to
