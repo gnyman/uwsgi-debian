@@ -1,5 +1,63 @@
-uwsgi (0.9.6.8-1) unstable; urgency=low
+uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1) UNRELEASED; urgency=low
 
-  * Initial release. (Closes: #582864)
+  * New upstream release.
+  * Remove uwsgi binary package.
+  * Transform uwsgi-python2.6 and uwsgi-python3.1 binary packages into
+    transitional dummy packages. Note, that now they can be safely removed from
+    system.
+  * Provide functionality of uwsgi-python2.6 and uwsgi-python3.1 packages with
+    (respectively) uwsgi-python and uwsgi-python3:
+    - each of uwsgi-pythonX packages contains executables named uwsgi-pythonX.Y
+      for all packaged pythonX.Y versions
+    - uwsgi-python and uwsgi-python3 executables are provided by alternatives
+      system. By default, they are symlinked to uwsgi-pythonX.Y executables,
+      where X.Y is default pythonX version
+    - move directory for configuration files from /etc/uwsgi/uwsgi-pythonX.Y to
+      /etc/uwsgi-pythonX/{apps-available,apps-enabled}. See README in new
+      configuration subdirectories for description of their's purposes
+    - move defaults file from /etc/default/pythonX.Y to
+      /etc/default/uwsgi-pythonX
+    - move runtime directory from /var/run/uwsgi/uwsgi-pythonX.Y to
+      /var/run/uwsgi-pythonX
+    - move log directory from /var/log/uwsgi/uwsgi-pythonX.Y to
+      /var/log/uwsgi-pythonX
+  * Add .rtupdate script to uwsgi-pythonX packages for updating of alternative
+    system symlink of uwsgi-pythonX executable on default pythonX version
+    changing (but only if alternative group is in automatic mode).
+  * Add python-django-uwsgi-admin package with uwsgi_admin Django application
+    from uWSGI distribution.
+  * Add uwsgi-plugins-all dependency package for installing all packaged
+    uWSGI plugins at once.
+  * Add uwsgi-python-dbg and uwsgi-python3-dbg packages with debug symbols for
+    uwsgi-pythonX.Y executables.
+  * Extend starting/controlling of uWSGI instances in init.d script with
+    support for YAML configuration files (.yaml/.yml extensions are
+    recognized).
+  * Fix error in handling of configuration files by init.d script. Now, all
+    configuration files are processed (not only the first found).
+    Closes LP: #713479
+  * Handle weird configuration file names (those with spaces and/or control
+    characters).
+  * Print one-character symbols instead of configuration file names in init.d
+    script output. Old behavior could be enabled by setting in
+    /etc/default/uwsgi-pythonX file.
+  * Update README.Debian of uwsgi-pythonX packages.
+  * Bump debhelper compatibility level (from 7 to 8) with no changes.
+  * Update debian/copyright to most current DEP-5 version.
+  * Add python to Build-Depends for getting dh_python2 helper (as Lintian
+    suggests).
+  * Add Stephen Crosby to Uploaders.
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Mon, 07 Feb 2011 17:11:23 +0200
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Thu, 03 Mar 2011 14:17:56 +0200
+
+uwsgi (0.9.6.6-0uwsgi1) maverick; urgency=low
+
+  * New upstream release.
+
+ -- Stephen Crosby <stevecrozz@gmail.com>  Fri, 14 Jan 2011 09:00:06 -0800
+
+uwsgi (0.9.6.5-0ubuntu1) maverick; urgency=low
+
+  * Initial release.
+
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Wed, 15 Dec 2010 23:43:28 +0200
