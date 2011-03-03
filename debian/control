@@ -12,10 +12,29 @@ Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://git.debian.org/collab-maint/uwsgi.git
 Vcs-Browser: http://git.debian.org/?p=collab-maint/uwsgi.git
 
+Package: uwsgi-python2.6
+Architecture: all
+Depends: ${misc:Depends}, uwsgi-python
+Description: dummy package to ease transition to uwsgi-python
+ This is dummy package to ease transition from uwsgi-python2.6 to uwsgi-python.
+ .
+ It may be safely removed from your system.
+
+Package: uwsgi-python3.1
+Architecture: all
+Depends: ${misc:Depends}, uwsgi-python3
+Description: dummy package to ease transition to uwsgi-python3
+ This is dummy package to ease transition from uwsgi-python3.1 to
+ uwsgi-python3.
+ .
+ It may be safely removed from your system.
+
 Package: uwsgi-common
 Architecture: any
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Breaks: uwsgi-python2.6 (<< 0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1),
+ uwsgi-python3.1 (<< 0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1)
 Description: fast, self-healing, developer-friendly WSGI server (common files)
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -32,9 +51,11 @@ Package: uwsgi-python
 Architecture: any
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-common (= ${binary:Version})
-Provides: httpd-wsgi
+Provides: httpd-wsgi, uwsgi-python2.6
 Suggests: nginx-full | libapache2-mod-uwsgi | libapache2-mod-ruwsgi,
  uwsgi-plugins-all, uwsgi-extra
+Breaks: uwsgi-python2.6 (<< 0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1)
+Conflicts: uwsgi (<< 0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1)
 Description: fast, self-healing, developer-friendly WSGI server (Python 2)
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -63,9 +84,11 @@ Package: uwsgi-python3
 Architecture: any
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-common (= ${binary:Version})
-Provides: httpd-wsgi
+Provides: httpd-wsgi, uwsgi-python3.1
 Suggests: nginx-full | libapache2-mod-uwsgi | libapache2-mod-ruwsgi,
  uwsgi-plugins-all, uwsgi-extra
+Breaks: uwsgi-python3.1 (<< 0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1)
+Conflicts: uwsgi (<< 0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1)
 Description: fast, self-healing, developer-friendly WSGI server (Python 3)
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
