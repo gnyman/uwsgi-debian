@@ -1,0 +1,55 @@
+#!/bin/sh
+# config script for @@uwsgi_pythonX.Y_binary@@
+#
+# see: dh_installdebconf(1)
+
+set -e
+
+# man 3 confmodule
+. /usr/share/debconf/confmodule
+
+any_conffiles_to_migrate_are_exists() {
+  [ -d /etc/uwsgi/@@uwsgi_pythonX.Y_binary@@ ] \
+  && [ "x$(find /etc/uwsgi/@@uwsgi_pythonX.Y_binary@@ \
+                -maxdepth 1 \
+                -type f \
+                -regextype posix-basic \
+                -iregex '.*\.\(xml\|ini\|yaml\|yml\)$')" \
+       != "x" ]
+}
+
+configure_migration_of_conffiles() {
+  db_input high \
+           "@@uwsgi_pythonX.Y_binary@@/migrate-conffiles-to-@@uwsgi_python_binary@@" \
+    || true
+  db_go || true
+}
+
+# summary of how this script can be called:
+#        * <config> `configure' <most-recently-configured-version>
+#        * <config> `reconfigure' <most-recently-configured-version>
+# for details, see:
+# - http://www.fifi.org/doc/debconf-doc/tutorial.html
+# - http://www.debian.org/doc/debian-policy/ch-binary.html#s-maintscriptprompt
+# - http://www.debian.org/doc/packaging-manuals/debconf_specification.html
+
+case "$1" in
+  configure|reconfigure)
+    # First version of uwsgi source package which introduced
+    # @@uwsgi_python_binary@@ binary package.
+    UWSGI_PYTHON_FIRST_VER="@@uwsgi_python_first_ver@@"
+
+    if dpkg --compare-versions "$2" lt "$UWSGI_PYTHON_FIRST_VER" \
+         && any_conffiles_to_migrate_are_exists ; then
+
+      configure_migration_of_conffiles
+    fi
+  ;;
+
+  *)
+    echo "config called with unknown argument \`$1'" >&2
+    exit 1
+  ;;
+esac
+
+exit 0

@@ -112,6 +112,12 @@ clean::
 	$(RM) $(call files_instantiated_in_debian_dir, \
 		uwsgi-plugin-, $(UWSGI_PLUGINS_NAMES), .install \
 	)
+	# instantiated uwsgi_pythonX.Y templates
+	for UWSGI_PYTHON_XY_VER in 2.6 3.1; do \
+		for TEMPLATE_TYPE in config postinst postrm preinst templates; do \
+			$(RM) $(CURDIR)/debian/uwsgi-python$${UWSGI_PYTHON_XY_VER}.$${TEMPLATE_TYPE} ; \
+		done; \
+	done
 	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
 
@@ -234,6 +240,26 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 
 # Some other packages
 # -------------------
+
+install/uwsgi-python2.6::
+	for TEMPLATE_TYPE in config postinst postrm preinst templates; do \
+		sed \
+			-e 's/@@uwsgi_pythonX.Y_binary@@/uwsgi-python2.6/g' \
+			-e 's/@@uwsgi_python_binary@@/uwsgi-python/g' \
+			-e 's/@@uwsgi_python_first_ver@@/0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1/g' \
+				< $(CURDIR)/debian/uwsgi-pythonX.Y.$${TEMPLATE_TYPE}.in \
+				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
+	done
+
+install/uwsgi-python3.1::
+	for TEMPLATE_TYPE in config postinst postrm preinst templates; do \
+		sed \
+			-e 's/@@uwsgi_pythonX.Y_binary@@/uwsgi-python3.1/g' \
+			-e 's/@@uwsgi_python_binary@@/uwsgi-python3/g' \
+			-e 's/@@uwsgi_python_first_ver@@/0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1/g' \
+				< $(CURDIR)/debian/uwsgi-pythonX.Y.$${TEMPLATE_TYPE}.in \
+				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
+	done
 
 install/uwsgi-common::
 	test -e $(COMMON_DOCS_COLLECTION_DIR) || mkdir $(COMMON_DOCS_COLLECTION_DIR)

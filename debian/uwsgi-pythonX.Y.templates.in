@@ -1,0 +1,24 @@
+Template: @@uwsgi_pythonX.Y_binary@@/migrate-conffiles-to-@@uwsgi_python_binary@@
+Type: boolean
+Default: true
+Description: Migrate configuration files to @@uwsgi_python_binary@@?
+ Package @@uwsgi_pythonX.Y_binary@@ has been replaced with @@uwsgi_python_binary@@. This
+ transition has been made to the advantage of building Debian and Ubuntu
+ packages from one unified source and easing job of Debian Python Team.
+ @@uwsgi_python_binary@@ package provides the same functionality as @@uwsgi_pythonX.Y_binary@@,
+ but there is one notable important difference between them: placement of
+ directories with service files (including configurations, pidfiles, sockets,
+ logs) has been changed to mirror naming scheme of new package.
+ .
+ Configuration files now should be placed in configuration directory
+ '/etc/@@uwsgi_python_binary@@/apps-enabled'. @@uwsgi_python_binary@@ package also
+ introducing staging directory '/etc/@@uwsgi_python_binary@@/apps-available' which
+ could be (and should be) used for placing real configuration files (with
+ creating symlinks to them in apps-enabled directory).
+ .
+ If you answer positively to this question, configuration files of
+ @@uwsgi_pythonX.Y_binary@@ (those with xml/ini/yaml/yml extensions) will be copied
+ from '/etc/uwsgi/@@uwsgi_pythonX.Y_binary@@' to '/etc/@@uwsgi_python_binary@@/apps-available'
+ and symlinks to them will be created in '/etc/@@uwsgi_python_binary@@/apps-enabled'.
+ .
+ If you answer negatively, then you should copy these files manually.
