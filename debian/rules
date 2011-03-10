@@ -15,8 +15,8 @@ UWSGI_PYTHON_PKG_KINDS = python python3
 
 PYTHON_VERS=$(shell pyversions -vs)
 PYTHON_DEFAULT=$(shell pyversions -dv)
-PYTHON3_VERS=$(shell py3versions -vs)
-PYTHON3_DEFAULT=$(shell py3versions -dv)
+PYTHON3_VERS=3.1
+PYTHON3_DEFAULT=3.1
 
 # List of templates to instantiate for each uwsgi-pythonX package
 # There are special-case template, not listed here: dirs install manpages
