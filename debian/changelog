@@ -1,12 +1,12 @@
-uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~lucid1) UNRELEASED; urgency=low
+uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~lucid1) lucid; urgency=low
 
-  * Backport from Ubuntu 10.10 (Maverick Meerkat) package of version
-    0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1.
-  * Lower Debhelper compatibility level from 8 to 7 with no changes.
-  * Move from dh_python to dh_pysupport.
-  * Hardcode packaged python3 versions in debian/rules
+  * Backport from Ubuntu 10.10 (Maverick Meerkat) package
+    of version 0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1:
+    - lower Debhelper compatibility level from 8 to 7 with no changes
+    - move from dh_python to dh_pysupport
+    - hardcode packaged Python 3 versions in debian/rules
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Thu, 10 Mar 2011 04:32:21 +0200
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Thu, 10 Mar 2011 04:56:13 +0200
 
 uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1) maverick; urgency=low
 
