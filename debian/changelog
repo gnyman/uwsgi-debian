@@ -1,3 +1,11 @@
+uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~lucid1) UNRELEASED; urgency=low
+
+  * Backport from Ubuntu 10.10 (Maverick Meerkat) package of version
+    0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1
+  * lower Debhelper compatibility level from 8 to 7 with no changes
+
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Thu, 10 Mar 2011 04:32:21 +0200
+
 uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1) maverick; urgency=low
 
   * New upstream release.
