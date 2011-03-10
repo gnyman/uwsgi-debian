@@ -1,4 +1,4 @@
-uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1) UNRELEASED; urgency=low
+uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1) maverick; urgency=low
 
   * New upstream release.
   * Remove uwsgi binary package.
@@ -48,7 +48,7 @@ uwsgi (0.9.6.8-0ubuntu1~uwsgimaintppa1~maverick1) UNRELEASED; urgency=low
     suggests).
   * Add Stephen Crosby to Uploaders.
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Thu, 03 Mar 2011 14:17:56 +0200
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Thu, 10 Mar 2011 02:58:28 +0200
 
 uwsgi (0.9.6.6-0uwsgi1) maverick; urgency=low
 
