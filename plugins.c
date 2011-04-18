@@ -1,46 +1,74 @@
 #include "uwsgi.h"
 
-void embed_plugins(struct uwsgi_server *uwsgi) {
+extern struct uwsgi_server uwsgi;
 
-#ifdef UWSGI_EMBED_PLUGIN_PSGI
-	if (uwsgi->plugin_arg_psgi)
-		ret = uwsgi_load_plugin(uwsgi, 5, "psgi_plugin.so", uwsgi->plugin_arg_psgi, 0);
-#endif
-
-#ifdef UWSGI_EMBED_PLUGIN_LUA
-	if (uwsgi->plugin_arg_lua)
-		ret = uwsgi_load_plugin(uwsgi, 6, "lua_plugin.so", uwsgi->plugin_arg_lua, 0);
-#endif
-
-#ifdef UWSGI_EMBED_PLUGIN_RACK
-	if (uwsgi->plugin_arg_rack)
-		ret = uwsgi_load_plugin(uwsgi, 7, "rack_plugin.so", uwsgi->plugin_arg_rack, 0);
-#endif
-
-}
-
-int uwsgi_load_plugin(struct uwsgi_server *uwsgi, int modifier, char *plugin, char *pargs, int absolute) {
-
-	char *plugin_name ;
+int uwsgi_load_plugin(int modifier, char *plugin, char *pargs, int absolute) {
 
 	void *plugin_handle;
-        int (*plugin_init) (struct uwsgi_server *, char *);
-        int (*plugin_request) (struct uwsgi_server *, struct wsgi_request *);
-        void (*plugin_after_request) (struct uwsgi_server *, struct wsgi_request *);
-	
+
+	char *plugin_name;
+	char *plugin_entry_symbol;
+	struct uwsgi_plugin *up;
+	int i;
+
+	char *colon = strchr(plugin, ':');
+	if (colon) {
+		colon[0] = 0;
+	}
+
+check:
+	for (i = 0; i < 0xFF; i++) {
+		if (uwsgi.p[i]->name) {
+			if (!strcmp(plugin, uwsgi.p[i]->name)) {
+#ifdef UWSGI_DEBUG
+				uwsgi_log("%s plugin already available\n", plugin);
+#endif
+				return 0;
+			}	
+		}
+		if (uwsgi.p[i]->alias) {
+			if (!strcmp(plugin, uwsgi.p[i]->alias)) {
+#ifdef UWSGI_DEBUG
+				uwsgi_log("%s plugin already available\n", plugin);
+#endif
+				return 0;
+			}	
+		}
+	}
+
+	for(i=0;i<uwsgi.gp_cnt;i++) {
+
+		if (uwsgi.gp[i]->name) {
+                        if (!strcmp(plugin, uwsgi.gp[i]->name)) {
+#ifdef UWSGI_DEBUG
+                                uwsgi_log("%s plugin already available\n", plugin);
+#endif
+                                return 0;
+                        }       
+                }
+                if (uwsgi.gp[i]->alias) {
+                        if (!strcmp(plugin, uwsgi.gp[i]->alias)) {
+#ifdef UWSGI_DEBUG
+                                uwsgi_log("%s plugin already available\n", plugin);
+#endif
+                                return 0;
+                        }
+                }
+        }
+
+	if (colon) {
+		plugin = colon+1;
+		colon[0] = ':';
+		colon = NULL;
+		goto check;
+	}
+
 	if (absolute) {
 		plugin_name = malloc(strlen(plugin) + 1);
 		memcpy(plugin_name, plugin, strlen(plugin) + 1);
 	}	
 	else {
-		plugin_name = malloc(strlen(UWSGI_PLUGIN_DIR) + 1 + strlen(plugin) + 1);
-		if (!plugin_name) {
-			uwsgi_error("malloc()");
-			return -1 ;
-		}
-		memcpy(plugin_name, UWSGI_PLUGIN_DIR, strlen(UWSGI_PLUGIN_DIR));
-		memcpy(plugin_name + strlen(UWSGI_PLUGIN_DIR) , "/", 1);
-		memcpy(plugin_name + strlen(UWSGI_PLUGIN_DIR) + 1, plugin, strlen(plugin) + 1);
+		plugin_name = uwsgi_concat4(UWSGI_PLUGIN_DIR, "/", plugin, "_plugin.so");
 	}
 	plugin_handle = dlopen(plugin_name, RTLD_NOW | RTLD_GLOBAL);
 	free(plugin_name);
@@ -49,33 +77,19 @@ int uwsgi_load_plugin(struct uwsgi_server *uwsgi, int modifier, char *plugin, ch
                 uwsgi_log( "%s\n", dlerror());
         }
         else {
-                plugin_init = dlsym(plugin_handle, "uwsgi_init");
-                if (plugin_init) {
-                        if ((*plugin_init) (uwsgi, pargs)) {
-                                uwsgi_log( "plugin initialization returned error\n");
-                                if (dlclose(plugin_handle)) {
-                                        uwsgi_log( "unable to unload plugin\n");
-                                }
-
-				return -1;
-                        }
+		plugin_entry_symbol = uwsgi_concat2(plugin, "_plugin");
+                up = dlsym(plugin_handle, plugin_entry_symbol);
+                if (up) {
+			if (modifier != -1) {
+				fill_plugin_table(modifier, up);			
+			}
+			else {
+				fill_plugin_table(up->modifier1, up);			
+			}
+			return 1;
                 }
-
-                plugin_request = dlsym(plugin_handle, "uwsgi_request");
-                if (plugin_request) {
-                        uwsgi->shared->hooks[modifier] = plugin_request;
-                        plugin_after_request = dlsym(plugin_handle, "uwsgi_after_request");
-                        if (plugin_after_request) {
-                                uwsgi->shared->after_hooks[modifier] = plugin_after_request;
-                        }
-			return 0;
-
-                }
-                else {
-                        uwsgi_log( "%s\n", dlerror());
-                }
+                uwsgi_log( "%s\n", dlerror());
         }
 
-
-	return -1;
+	return 0;
 }

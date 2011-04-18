@@ -13,7 +13,7 @@ void yaml_rstrip(char *line) {
 
 	off_t i;
 
-	for (i = strlen(line) - 1; i >= 0; i--) {
+	for(i = strlen(line)-1;i>=0; i--) {
 		if (line[i] == ' ' || line[i] == '\t') {
 			line[i] = 0;
 			continue;
@@ -24,18 +24,18 @@ void yaml_rstrip(char *line) {
 
 char *yaml_lstrip(char *line) {
 
-	off_t i;
-	char *ptr = line;
+        off_t i;
+        char *ptr = line;
 
-	for (i = 0; i < (int) strlen(line); i++) {
-		if (line[i] == ' ' || line[i] == '\t') {
-			ptr++;
-			continue;
-		}
-		break;
-	}
+        for(i=0;i< (int) strlen(line);i++) {
+                if (line[i] == ' ' || line[i] == '\t') {
+                        ptr++;
+                        continue;
+                }
+                break;
+        }
 
-	return ptr;
+        return ptr;
 }
 
 
@@ -44,13 +44,13 @@ int yaml_get_depth(char *line) {
 	off_t i;
 	int depth = 0;
 
-	for (i = 0; i < (int) strlen(line); i++) {
+	for(i=0;i< (int) strlen(line);i++) {
 		if (line[i] == ' ') {
 			depth++;
 			continue;
 		}
 		else if (line[i] == '\t') {
-			depth += 8;
+			depth+=8;
 			continue;
 		}
 		break;
@@ -65,11 +65,11 @@ char *yaml_get_line(char *yaml, off_t size) {
 	char *ptr = yaml;
 	int comment = 0;
 
-	for (i = 0; i < size; i++) {
+	for(i=0;i<size;i++) {
 		ptr++;
 		if (yaml[i] == '#') {
 			yaml[i] = 0;
-			comment = 1;
+			comment = 1;	
 		}
 		else if (yaml[i] == '\n') {
 			yaml[i] = 0;
@@ -84,12 +84,10 @@ char *yaml_get_line(char *yaml, off_t size) {
 
 }
 
-void uwsgi_yaml_config(char *file, struct option *long_options) {
+void uwsgi_yaml_config(char *file, char *magic_table[]) {
 
-	int fd;
-	ssize_t len;
+	int len = 0;
 	char *yaml;
-	struct stat sb;
 
 	int depth;
 	int current_depth = 0;
@@ -103,64 +101,35 @@ void uwsgi_yaml_config(char *file, struct option *long_options) {
 
 	int lines = 1;
 
-	struct option *lopt, *aopt;
 	char *section_asked = "uwsgi";
 	char *colon;
 
-	colon = strchr(file, ':');
+	colon = uwsgi_get_last_char(file, ':');
 	if (colon) {
 		colon[0] = 0;
 		if (colon[1] != 0) {
-			section_asked = colon + 1;
+			section_asked = colon+1;
 		}
 	}
 
 	uwsgi_log("[uWSGI] getting YAML configuration from %s\n", file);
 
-	fd = open(file, O_RDONLY);
-	if (fd < 0) {
-		uwsgi_error("open()");
-		exit(1);
-	}
+	yaml = uwsgi_open_and_read(file, &len, 1, magic_table);
 
-	if (fstat(fd, &sb)) {
-		uwsgi_error("fstat()");
-		exit(1);
-	}
-
-
-	yaml = malloc(sb.st_size + 1);
-
-	if (!yaml) {
-		uwsgi_error("malloc()");
-		exit(1);
-	}
-
-
-	len = read(fd, yaml, sb.st_size);
-	if (len != sb.st_size) {
-		uwsgi_error("read()");
-		exit(1);
-	}
-
-	yaml[sb.st_size] = 0;
-
-	while (sb.st_size) {
-		yaml_line = yaml_get_line(yaml, sb.st_size);
+	while(len) {
+		yaml_line = yaml_get_line(yaml, len);
 		if (yaml_line == NULL) {
 			break;
 		}
 		lines++;
 
 		// skip empty line
-		if (yaml[0] == 0)
-			goto next;
+		if (yaml[0] == 0) goto next;
 		depth = yaml_get_depth(yaml);
 		if (depth <= current_depth) {
 			current_depth = depth;
 			// end the parsing cycle
-			if (in_uwsgi_section)
-				goto end;
+			if (in_uwsgi_section) return;
 		}
 		else if (depth > current_depth && !in_uwsgi_section) {
 			goto next;
@@ -168,67 +137,47 @@ void uwsgi_yaml_config(char *file, struct option *long_options) {
 
 		key = yaml_lstrip(yaml);
 		// skip empty line
-		if (key[0] == 0)
-			goto next;
+		if (key[0] == 0) goto next;
 
 		// skip list and {} defined dict
 		if (key[0] == '-' || key[0] == '[' || key[0] == '{') {
-			if (in_uwsgi_section)
-				goto end;
+			if (in_uwsgi_section) return;
 			goto next;
 		}
-
+		
 		if (!in_uwsgi_section) {
-			section = strchr(key, ':');
-			if (!section)
-				goto next;
+			section = strchr(key,':');
+			if (!section) goto next;		
 			section[0] = 0;
 			if (!strcmp(key, section_asked)) {
 				in_uwsgi_section = 1;
 			}
 		}
 		else {
-			// get dict value       
+			// get dict value	
 			val = strstr(key, ": ");
 			if (!val) {
 				val = strstr(key, ":\t");
 			}
-			if (!val)
-				goto end;
+			if (!val) return; 
 			// get the right key
 			val[0] = 0;
 			// yeah overengeneering....
 			yaml_rstrip(key);
 
-			val = yaml_lstrip(val + 2);
+			val = yaml_lstrip(val+2);
 			yaml_rstrip(val);
-
+			
 			//uwsgi_log("YAML: %s = %s\n", key, val);
 
-			lopt = long_options;
-			while ((aopt = lopt)) {
-				if (!aopt->name)
-					break;
-				if (!strcmp(key, aopt->name)) {
-					if (aopt->flag) {
-						*aopt->flag = aopt->val;
-					}
-					else {
-						manage_opt(aopt->val, val);
-					}
-				}
-				lopt++;
-			}
+			add_exported_option((char *)key, val, 0);
 		}
-	      next:
-		sb.st_size -= (yaml_line - yaml);
+next:
+		len -= (yaml_line - yaml);
 		yaml += (yaml_line - yaml);
 
 	}
 
-      end:
-
-	close(fd);
 
 }
 

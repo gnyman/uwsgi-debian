@@ -1,3 +1,121 @@
+*** april 2011 ***
+
+ * 0.9.7.2 [20110406]
+
+- new option --touch-reload <file> to reload the stack on <file> modification
+--static-map <mountpoint=documentroot> allows to serve static files
+- fixed --post-limit management
+- disallow empty socket names
+- implemented exception_info WSGI support
+- new options --reload-on-as <n> and --reload-on-rss <n> allows
+to recycle workers when their memory usage is higher than <n> MB
+- fixed syslog support (use --log-syslog[=facility] to enable it)
+- improved plugin loading system
+- added support for RabbitMQ as event dispatcher for the Emperor
+- fixed FreeBSD memory report
+- PSGI plugin can be compiled without ithreads
+- various Emperor fixes
+- fixed a regression with setgroups()
+- support for shared sockets (used in jails within network namespaces)
+
+*** march 2011 ***
+
+ * 0.9.7.1 [20110326]
+
+- fixed python stackless support
+- added persistence for queue
+- forbid daemonizing in vassal mode
+- modifier1 30 is available again
+- allow python modules to be mapped/aliased via http
+- added --pidfile2 and --logfile-chown
+- added UWSGI_CACHE_GET dynamic variable
+- 304/If-Modified-Since support for --check-static
+- option --check-cache for integrated caching
+- option --map-socket to assign specific workers to socket
+- fixed unix fd passing on older OSX versions
+- fixed post-buffering without pep3333-input
+- fixed python threading without uwsgi cores
+- support for Linux network namespace
+- build with sys.abiflags if necessary
+
+
+ * 0.9.7 [20110317]
+
+- fixed psgi compilation on GNU systems
+- improved --pep3333-input
+- better error reporting on failed open/fopen
+- fixed uGreen
+- added greenlet support
+- various solaris fixes
+- new help system
+- updated async support
+- fixed uwsgi.cache_get in python
+
+ * 0.9.7-rc3 [20110312]
+
+- added support for persistent cache (--cache-store <filename>)
+- less verbose file monitoring
+- fixed a race condition in emperor startup
+- fixed erlang empty list encoding
+- improved snmp support
+- fixed cache modifier 111 for 3 and 4
+- preliminary cpu-affinity support (Linux only)
+- fixed ldap support
+- auto-configure ldap compilation
+- added --allowed-modifiers (allow only a subset of modifiers)
+- fixed a bug with getopt_long
+
+ * 0.9.7-rc2 [20110309]
+
+- added cron-like interface to signal framework
+- improved Linux namespaces support
+- fixed multithreading + --max-requests
+- added support for reference in configuration files
+
+ * 0.9.7-rc1 [20110307]
+
+- export %v in emperor mode
+- fixed signal race condition in server reload
+- fixed http router post handling bug
+- added uwsgi.erlang_register_process in pyerl plugin
+- fixed unix socket inherit
+- fixed linux namespace support in recent kernel/gcc
+- ported threading to python 3.2
+- add build date to uWSGI startup info
+- do not allow clustering without defining a socket
+- kill all the gateways/daemons on startup errors
+- fixed vacuum after chdir()
+- fixed gateways reload
+- re-added support for OpenBSD and NetBSD
+- fixed post-buffering in python
+- use erlang binary for python string
+- fixed memory leak in pyerl plugin
+- removed broken log rotation (post-poned)
+- fixed no_argument options in ini and yaml parsing
+
+ * 0.9.7-beta1 [20110301]
+
+- fully modular re-design
+- advanced build system with presets
+- threading support
+- emperor mode for massive auto-hosting
+- caching subsystem
+- message queue (even stacked) support
+- improved server reloading system
+- support for Linux Cgroups and Namespaces
+- integrated upload progress
+- Clustering infrastructure via multicast, broadcast or subscriptions
+- support for attaching/monitoring external apps to the master process
+- improved virtualhosting mode
+- extremely improved Python support with better usage of multiple interpreters
+- improved multiple apps support
+- Production ready, evented HTTP router/proxy/load-balancer
+- Production ready, evented uwsgi router/proxy/load-balancer
+- new Erlang stack
+- Internal signal subsystem
+- support for RubyOnRails and Rack apps
+- A huge series of fixes and optimizations
+
 *** february 2011 ***
 
  * 0.9.6.8 [20110207]
@@ -42,6 +160,7 @@
 - use HTTP_HOST var (and fallback to SERVER_NAME) in virtual hosting mode
 - fixed a buffer overflow in automatic socket_name allocation (spotted by Riccardo Magliocchetti)
 - Official support for Nexenta
+
 
 *** september 2010 ***
 
