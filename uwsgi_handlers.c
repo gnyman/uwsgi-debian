@@ -1,65 +1,12 @@
 #include "uwsgi.h"
 
-/* uwsgi PING|100 */
-int uwsgi_request_ping(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) {
-	char len;
+extern struct uwsgi_server uwsgi;
 
-	uwsgi_log( "PING\n");
-	wsgi_req->uh.modifier2 = 1;
-	wsgi_req->uh.pktsize = 0;
-
-	len = strlen(uwsgi->shared->warning_message);
-	if (len > 0) {
-		// TODO: check endianess ?
-		wsgi_req->uh.pktsize = len;
-	}
-	if (write(wsgi_req->poll.fd, wsgi_req, 4) != 4) {
-		uwsgi_error("write()");
-	}
-
-	if (len > 0) {
-		if (write(wsgi_req->poll.fd, uwsgi->shared->warning_message, len)
-		    != len) {
-			uwsgi_error("write()");
-		}
-	}
-
-	return UWSGI_OK;
-}
-
-/* uwsgi ADMIN|10 */
-int uwsgi_request_admin(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) {
-	uint32_t opt_value = 0;
-	int i;
-
-	if (wsgi_req->uh.pktsize >= 4) {
-		memcpy(&opt_value, wsgi_req->buffer, 4);
-		// TODO: check endianess ?
-	}
-
-	uwsgi_log( "setting internal option %d to %d\n", wsgi_req->uh.modifier2, opt_value);
-	uwsgi->shared->options[wsgi_req->uh.modifier2] = opt_value;
-
-	// ACK
-	wsgi_req->uh.modifier1 = 255;
-	wsgi_req->uh.pktsize = 0;
-	wsgi_req->uh.modifier2 = 1;
-
-	i = write(wsgi_req->poll.fd, wsgi_req, 4);
-	if (i != 4) {
-		uwsgi_error("write()");
-	}
-
-
-
-	return UWSGI_OK;
-}
-
-int uwsgi_request_eval(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) {
-
+int uwsgi_request_eval(struct wsgi_request *wsgi_req) {
 	PyObject *code, *py_dict;
 
-	PyObject *m = PyImport_AddModule("__main__");
+	UWSGI_GET_GIL
+		PyObject *m = PyImport_AddModule("__main__");
 	if (m == NULL) {
 		PyErr_Print();
 		return -1;
@@ -67,59 +14,60 @@ int uwsgi_request_eval(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req
 
 	py_dict = PyModule_GetDict(m);
 	// make it a valid c string
-	wsgi_req->buffer[wsgi_req->uh.pktsize] = 0 ;
+	wsgi_req->buffer[wsgi_req->uh.pktsize] = 0;
 	// need to find a way to cache compilations...
 	code = Py_CompileString(wsgi_req->buffer, "uWSGI", Py_file_input);
 	if (code == NULL) {
 		PyErr_Print();
-		return -1;
+		UWSGI_RELEASE_GIL
+			return -1;
 	}
-#ifdef PYTHREETWO
-	PyEval_EvalCode(code, py_dict, py_dict );
-#else
 	PyEval_EvalCode((PyCodeObject *)code, py_dict, py_dict );
-#endif
 	Py_DECREF(code);
 	if (PyErr_Occurred()) {
 		PyErr_Print();
-		return -1;
+		UWSGI_RELEASE_GIL
+			return -1;
 	}
-	return UWSGI_OK;
+
+	UWSGI_RELEASE_GIL
+		return UWSGI_OK;
 }
 
 /* uwsgi FASTFUNC|26 */
-int uwsgi_request_fastfunc(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) {
+int uwsgi_request_fastfunc(struct wsgi_request *wsgi_req) {
 
 	PyObject *ffunc;
+	int ret = UWSGI_OK;
 
-#ifdef UWSGI_ASYNC
-        if (wsgi_req->async_status == UWSGI_AGAIN) {
-                return manage_python_response(uwsgi, wsgi_req);
-        }
-#endif
+	UWSGI_GET_GIL
 
-	ffunc = PyList_GetItem(uwsgi->fastfuncslist, wsgi_req->uh.modifier2);
+		// CHECK HERE
+		ffunc = PyList_GetItem(uwsgi.fastfuncslist, wsgi_req->uh.modifier2);
 	if (ffunc) {
 		uwsgi_log( "managing fastfunc %d\n", wsgi_req->uh.modifier2);
-		return uwsgi_python_call(uwsgi, wsgi_req, ffunc, NULL);
+		ret = uwsgi_python_call(wsgi_req, ffunc, NULL);
 	}
 
-	return UWSGI_OK;
+	UWSGI_RELEASE_GIL
+		return ret;
 }
 
 /* uwsgi MARSHAL|33 */
-int uwsgi_request_marshal(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_req) {
+int uwsgi_request_marshal(struct wsgi_request *wsgi_req) {
 	PyObject *func_result;
 
-	PyObject *umm = PyDict_GetItemString(uwsgi->embedded_dict,
-					     "message_manager_marshal");
+	UWSGI_GET_GIL
+
+		PyObject *umm = PyDict_GetItemString(uwsgi.embedded_dict,
+				"message_manager_marshal");
 	if (umm) {
 		PyObject *ummo = PyMarshal_ReadObjectFromString(wsgi_req->buffer,
-								wsgi_req->uh.pktsize);
+				wsgi_req->uh.pktsize);
 		if (ummo) {
-			if (!PyTuple_SetItem(uwsgi->embedded_args, 0, ummo)) {
-				if (!PyTuple_SetItem(uwsgi->embedded_args, 1, PyInt_FromLong(wsgi_req->uh.modifier2))) {
-					func_result = PyEval_CallObject(umm, uwsgi->embedded_args);
+			if (!PyTuple_SetItem(uwsgi.embedded_args, 0, ummo)) {
+				if (!PyTuple_SetItem(uwsgi.embedded_args, 1, PyInt_FromLong(wsgi_req->uh.modifier2))) {
+					func_result = PyEval_CallObject(umm, uwsgi.embedded_args);
 					if (PyErr_Occurred()) {
 						PyErr_Print();
 					}
@@ -155,5 +103,6 @@ int uwsgi_request_marshal(struct uwsgi_server *uwsgi, struct wsgi_request *wsgi_
 	}
 	PyErr_Clear();
 
-	return 0;
+	UWSGI_RELEASE_GIL
+		return 0;
 }

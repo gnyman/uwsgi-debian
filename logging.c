@@ -1,3 +1,4 @@
+#define _NO_UWSGI_RB
 #include "uwsgi.h"
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || defined(__OpenBSD__)
@@ -31,21 +32,29 @@ void log_request(struct wsgi_request *wsgi_req) {
 	char mempkt[4096];
 	char logpkt[4096];
 
-	struct iovec logvec[4] ;
-	int logvecpos = 0 ;
+	struct iovec logvec[4];
+	int logvecpos = 0;
+
+	const char *msecs = "msecs";
+	const char *micros = "micros";
+
+	long int rt;
+	char *tsize = (char *) msecs;
 
 #ifdef UWSGI_SENDFILE
 	char *msg1 = " via sendfile() ";
+#endif
 
 	struct uwsgi_app *wi;
 
 	if (wsgi_req->app_id >= 0) {
-		wi = &uwsgi.wsgi_apps[wsgi_req->app_id];
+		wi = &uwsgi.apps[wsgi_req->app_id];
 		if (wi->requests > 0) {
 			app_req = wi->requests;
 		}
 	}
 
+#ifdef UWSGI_SENDFILE
 	if (wsgi_req->sendfile_fd > -1 && wsgi_req->sendfile_obj == wsgi_req->async_result) { //wsgi_req->sendfile_fd_size > 0 ) {
 		via = msg1;
 	}
@@ -55,61 +64,67 @@ void log_request(struct wsgi_request *wsgi_req) {
 	microseconds = wsgi_req->end_of_request.tv_sec * 1000000 + wsgi_req->end_of_request.tv_usec;
 	microseconds2 = wsgi_req->start_of_request.tv_sec * 1000000 + wsgi_req->start_of_request.tv_usec;
 
-	if (uwsgi.vhost) {
-		logvec[logvecpos].iov_base = wsgi_req->host ;
-                logvec[logvecpos].iov_len = wsgi_req->host_len ;
-                logvecpos++;
+	rt = (long int) (microseconds - microseconds2);
 
-		logvec[logvecpos].iov_base = " " ;
-                logvec[logvecpos].iov_len = 1 ;
-                logvecpos++;
+	if (uwsgi.log_micros) {
+		tsize = (char *) micros;
+	}
+	else {
+		rt /= 1000;
+	}
+
+	if (uwsgi.vhost) {
+		logvec[logvecpos].iov_base = wsgi_req->host;
+		logvec[logvecpos].iov_len = wsgi_req->host_len;
+		logvecpos++;
+
+		logvec[logvecpos].iov_base = " ";
+		logvec[logvecpos].iov_len = 1;
+		logvecpos++;
 	}
 
 	if (uwsgi.shared->options[UWSGI_OPTION_MEMORY_DEBUG] == 1) {
 #ifndef UNBIT
 		rlen = snprintf(mempkt, 4096, "{address space usage: %lld bytes/%lluMB} {rss usage: %llu bytes/%lluMB} ",
-			(unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size, (unsigned long long ) uwsgi.workers[uwsgi.mywid].vsz_size / 1024 / 1024,
-			(unsigned long long) uwsgi.workers[uwsgi.mywid].rss_size, (unsigned long long ) uwsgi.workers[uwsgi.mywid].rss_size / 1024 / 1024);
+				(unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size, (unsigned long long ) uwsgi.workers[uwsgi.mywid].vsz_size / 1024 / 1024,
+				(unsigned long long) uwsgi.workers[uwsgi.mywid].rss_size, (unsigned long long ) uwsgi.workers[uwsgi.mywid].rss_size / 1024 / 1024);
 #else
 		rlen = snprintf(mempkt, 4096, "{address space usage: %lld bytes/%lluMB} ",
-			(unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size, (unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size / 1024 / 1024);
+				(unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size, (unsigned long long) uwsgi.workers[uwsgi.mywid].vsz_size / 1024 / 1024);
 #endif
 
-	
-		logvec[logvecpos].iov_base = mempkt ;
-		logvec[logvecpos].iov_len = rlen ;
+		logvec[logvecpos].iov_base = mempkt;
+		logvec[logvecpos].iov_len = rlen;
 		logvecpos++;
-
 
 	}
 
-	rlen = snprintf(logpkt, 4096, "[pid: %d|app: %d|req: %d/%llu] %.*s (%.*s) {%d vars in %d bytes} [%.*s] %.*s %.*s => generated %llu bytes in %ld msecs%s(%.*s %d) %d headers in %d bytes (%d async switches on async core %d)\n",
-		(int) uwsgi.mypid,
-		wsgi_req->app_id,
-		app_req,
-		(unsigned long long ) uwsgi.workers[0].requests,
-		wsgi_req->remote_addr_len, wsgi_req->remote_addr,
-		wsgi_req->remote_user_len, wsgi_req->remote_user,
-		wsgi_req->var_cnt,
-		wsgi_req->uh.pktsize,
-		24, time_request,
-		wsgi_req->method_len, wsgi_req->method,
-		wsgi_req->uri_len, wsgi_req->uri,
-		(unsigned long long) wsgi_req->response_size,
-		(long int) (microseconds - microseconds2) / 1000,
-		via,
-		wsgi_req->protocol_len, wsgi_req->protocol,
-		wsgi_req->status,
-		wsgi_req->header_cnt,
-		wsgi_req->headers_size, 
-		wsgi_req->async_switches, wsgi_req->async_id);
+	rlen = snprintf(logpkt, 4096, "[pid: %d|app: %d|req: %d/%llu] %.*s (%.*s) {%d vars in %d bytes} [%.*s] %.*s %.*s => generated %llu bytes in %ld %s%s(%.*s %d) %d headers in %llu bytes (%d switches on core %d)\n",
+			(int) uwsgi.mypid,
+			wsgi_req->app_id,
+			app_req,
+			(unsigned long long ) uwsgi.workers[0].requests,
+			wsgi_req->remote_addr_len, wsgi_req->remote_addr,
+			wsgi_req->remote_user_len, wsgi_req->remote_user,
+			wsgi_req->var_cnt,
+			wsgi_req->uh.pktsize,
+			24, time_request,
+			wsgi_req->method_len, wsgi_req->method,
+			wsgi_req->uri_len, wsgi_req->uri,
+			(unsigned long long) wsgi_req->response_size,
+			rt, tsize,
+			via,
+			wsgi_req->protocol_len, wsgi_req->protocol,
+			wsgi_req->status,
+			wsgi_req->header_cnt,
+			(unsigned long long) wsgi_req->headers_size,
+			wsgi_req->switches, wsgi_req->async_id);
 
-	logvec[logvecpos].iov_base = logpkt ;
-	logvec[logvecpos].iov_len = rlen ;
+	logvec[logvecpos].iov_base = logpkt;
+	logvec[logvecpos].iov_len = rlen;
 
 	// do not check for errors
 	rlen = writev(2, logvec, logvecpos+1);
-
 }
 
 void get_memusage() {
@@ -130,18 +145,18 @@ void get_memusage() {
 	uwsgi.workers[uwsgi.mywid].rss_size = uwsgi.workers[uwsgi.mywid].rss_size * uwsgi.page_size;
 #elif defined (__sun__)
 	psinfo_t info;
-	int procfd ;
+	int procfd;
 
 	procfd = open("/proc/self/psinfo", O_RDONLY);
 	if (procfd >= 0) {
 		if ( read(procfd, (char *) &info, sizeof(info)) > 0) {
-			uwsgi.workers[uwsgi.mywid].rss_size = (uint64_t) info.pr_rssize * 1024 ;
-			uwsgi.workers[uwsgi.mywid].vsz_size = (uint64_t) info.pr_size * 1024 ;
+			uwsgi.workers[uwsgi.mywid].rss_size = (uint64_t) info.pr_rssize * 1024;
+			uwsgi.workers[uwsgi.mywid].vsz_size = (uint64_t) info.pr_size * 1024;
 		}
 		close(procfd);
 	}
-	
-#elif defined( __APPLE__)
+
+#elif defined(__APPLE__)
 	/* darwin documentation says that the value are in pages, but they are bytes !!! */
 	struct task_basic_info t_info;
 	mach_msg_type_number_t t_size = sizeof(struct task_basic_info);
@@ -154,7 +169,11 @@ void get_memusage() {
 	kvm_t *kv;
 	int cnt;
 
+#if defined(__FreeBSD__)
+	kv = kvm_open(NULL, "/dev/null", NULL, O_RDONLY, NULL);
+#else
 	kv = kvm_open(NULL, NULL, NULL, O_RDONLY, NULL);
+#endif
 	if (kv) {
 #if defined(__FreeBSD__) || defined(__DragonFly__)
 
@@ -166,7 +185,7 @@ void get_memusage() {
 		}
 #elif defined(__NetBSD__) || defined(__OpenBSD__)
 		struct kinfo_proc2 *kproc2;
-		
+
 		kproc2 = kvm_getproc2(kv, KERN_PROC_PID, uwsgi.mypid, sizeof(struct kinfo_proc2), &cnt);
 		if (kproc2 && cnt > 0) {
 #ifdef __OpenBSD__
@@ -183,9 +202,9 @@ void get_memusage() {
 #elif defined(__HAIKU__)
 	area_info ai;
 	int32 cookie;
-	
-	uwsgi.workers[uwsgi.mywid].vsz_size = 0 ;
-	uwsgi.workers[uwsgi.mywid].rss_size = 0 ;
+
+	uwsgi.workers[uwsgi.mywid].vsz_size = 0;
+	uwsgi.workers[uwsgi.mywid].rss_size = 0;
 	while(get_next_area_info(0, &cookie, &ai) == B_OK) {
 		uwsgi.workers[uwsgi.mywid].vsz_size += ai.ram_size;
 		if ( (ai.protection & B_WRITE_AREA) != 0) {

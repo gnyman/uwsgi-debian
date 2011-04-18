@@ -1,53 +1,43 @@
-import socket
-import select
-import errno
+import uwsgi
 
 def send_request(env, client):
 
-	client.setblocking(1)
+	uwsgi.send(client, b"GET /intl/it_it/images/logo.gif HTTP/1.0\r\n")
 
-	client.send(b"GET /intl/it_it/images/logo.gif HTTP/1.0\r\n")
-	client.send(b"Host: www.google.it\r\n\r\n")
+	# test for suspend/resume
+	uwsgi.suspend()
+
+	uwsgi.send(client, b"Host: www.google.it\r\n\r\n")
+
 
 	while 1:
-		yield env['x-wsgiorg.fdevent.readable'](client.fileno(), 10)
-
+		yield uwsgi.wait_fd_read(client, 2)
 		if env['x-wsgiorg.fdevent.timeout']:
-			print("request timed out !!!")
 			return
 
-		buf = client.recv(4096)
-		if len(buf) == 0:
-			break
-		else:
+		buf = uwsgi.recv(client, 4096)
+		if buf:
 			yield buf
+		else:
+			break
 
 
 def application(env, start_response):
 
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	s.setblocking(0)
+	c = uwsgi.async_connect('74.125.232.115:80')
 
-	#env['x-wsgiorg.fdevent.readable'] = lambda fd,t: ""
-	#env['x-wsgiorg.fdevent.writable'] = lambda fd,t: ""
-
-	#yield ""
-
-	c = s.connect_ex(('www.google.it', 80))
-	if c == errno.EINPROGRESS:
-		yield env['x-wsgiorg.fdevent.writable'](s.fileno(), 10)
+	# wait for connection
+	yield uwsgi.wait_fd_write(c, 2)
 	
-		if env['x-wsgiorg.fdevent.timeout']:
-			print("request timed out !!!")
-			return
+	if env['x-wsgiorg.fdevent.timeout']:
+		uwsgi.close(c)
+		raise StopIteration
 
-		for r in send_request(env, s):
-			yield r
-	elif c == errno.EISCONN: 
-		for r in send_request(env, s):
+	if uwsgi.is_connected(c):
+		for r in send_request(env, c):
 			yield r
 	else:
 		start_response( '500 Internal Server Error', [ ('Content-Type', 'text/html')])
 		yield "Internal Server Error"
 
-	s.close()
+	uwsgi.close(c)
