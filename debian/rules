@@ -74,11 +74,12 @@ clean::
 		$(RM) $(CURDIR)/uwsgi-python$${PYVER}; \
 	done
 	# intermediate compiled files
-	$(RM) $(CURDIR)/*.o $(CURDIR)/uwsgiconfig.pyc
+	find $(CURDIR) \
+		\! -path '$(CURDIR)/debian/*' \( -name '*.o' -o -name '*.pyc' \) -type f \
+		-delete
 	# plugins
 	for PLUGIN_NAME in $(UWSGI_PLUGINS_NAMES); do \
 		$(RM) $(CURDIR)/$${PLUGIN_NAME}_plugin.so; \
-		$(RM) $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$${PLUGIN_NAME}/uwsgiplugin.pyc; \
 	done
 	# compiled Apache2 modules
 	$(RM) -r $(CURDIR)/apache2/.libs
@@ -86,6 +87,9 @@ clean::
 		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
 			$(addprefix $(call ruwsgi_to_orig, $(module_name)), .la .lo .slo) \
 	))
+	# instantiated build configurations
+	$(RM) $(CURDIR)/debian/buildconf/uwsgi-flavor.ini
+	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 	# collected common docs
 	$(RM) -r $(COMMON_DOCS_COLLECTION_DIR)
 	# instantiated uwsgi-pythonX templates
@@ -127,8 +131,14 @@ $(patsubst %,debian/stamp-uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS)):
 	$(eval UWSGI_PYTHON = uwsgi-$(PYTHON_KIND))
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
 	for PYTHON_VERSION in $(PYVERS); do \
-		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) --build; \
-		mv $(CURDIR)/uwsgi $(CURDIR)/uwsgi-python$${PYTHON_VERSION}; \
+		sed \
+			-e 's|@@curdir@@|$(CURDIR)|g' \
+			-e "s/@@bin_name_flavor@@/python$${PYTHON_VERSION}/g" \
+			-e "s/@@embedded_plugin@@/python$$(echo $${PYTHON_VERSION}|tr -d .)/g" \
+				< $(CURDIR)/debian/buildconf/uwsgi-flavor.ini.in \
+				> $(CURDIR)/debian/buildconf/uwsgi-flavor.ini; \
+		$(PYTHON) $(UWSGI_BUILDER) \
+			--build $(CURDIR)/debian/buildconf/uwsgi-flavor.ini; \
 	done
 	sed \
 		-e 's/@@uwsgi_binary@@/$(UWSGI_PYTHON)/g' \
@@ -196,7 +206,12 @@ $(patsubst %,build/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES)):: build/uwsgi-plugin-%
 # Build specific uWSGI plugin
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_NAMES)):
 	$(eval PLUGIN_NAME = $(call target_name_tail, $@))
-	$(PYTHON) $(UWSGI_BUILDER) --plugin $(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME)
+	sed -e 's|@@curdir@@|$(CURDIR)|g' \
+		< $(CURDIR)/debian/buildconf/uwsgi-plugin.ini.in \
+		> $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
+	$(PYTHON) $(UWSGI_BUILDER) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME) \
+		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 	touch $@
 
 # Install uwsgi-plugin-% package

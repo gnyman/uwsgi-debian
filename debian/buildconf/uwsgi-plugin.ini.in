@@ -1,0 +1,3 @@
+[uwsgi]
+inherit = @@curdir@@/debian/buildconf/uwsgi-core.ini
+plugin_dir = @@curdir@@
