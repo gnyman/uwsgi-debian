@@ -93,9 +93,18 @@ Description: debugging symbols for uWSGI server (Python 3)
 Package: uwsgi-plugins-all
 Architecture: any
 Depends: ${misc:Depends},
+ uwsgi-plugin-cgi (= ${binary:Version}),
+ uwsgi-plugin-echo (= ${binary:Version}),
+ uwsgi-plugin-erlang (= ${binary:Version}),
+ uwsgi-plugin-fastrouter (= ${binary:Version}),
+ uwsgi-plugin-http (= ${binary:Version}),
  uwsgi-plugin-lua (= ${binary:Version}),
+ uwsgi-plugin-nagios (= ${binary:Version}),
+ uwsgi-plugin-ping (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
- uwsgi-plugin-rack (= ${binary:Version})
+ uwsgi-plugin-rack (= ${binary:Version}),
+ uwsgi-plugin-rpc (= ${binary:Version}),
+ uwsgi-plugin-ugreen (= ${binary:Version})
 Description: all available plugins for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -105,9 +114,78 @@ Description: all available plugins for uWSGI
  .
  This dependency package provide all available plugins for uWSGI, namely:
  .
+   * CGI plugin
+   * echo plugin
+   * Erlang plugin
+   * fastrouter plugin
+   * HTTP plugin
    * Lua WSAPI plugin
+   * Nagios plugin
+   * ping plugin
    * Perl PSGI plugin
+   * RPC plugin
    * Ruby Rack plugin
+   * uGreen plugin
+
+Package: uwsgi-plugin-cgi
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: CGI plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide CGI plugin for uWSGI.
+
+Package: uwsgi-plugin-echo
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: echo plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide echo plugin for uWSGI.
+
+Package: uwsgi-plugin-erlang
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Erlang plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide Erlang plugin for uWSGI.
+
+Package: uwsgi-plugin-fastrouter
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: fastrouter plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide fastrouter plugin for uWSGI.
+
+Package: uwsgi-plugin-http
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: HTTP plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide HTTP plugin for uWSGI.
 
 Package: uwsgi-plugin-lua
 Architecture: any
@@ -120,6 +198,30 @@ Description: Lua WSAPI plugin for uWSGI
  languages or platform.
  .
  This package provide Lua WSAPI plugin for uWSGI.
+
+Package: uwsgi-plugin-nagios
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Nagios plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide Nagios plugin for uWSGI.
+
+Package: uwsgi-plugin-ping
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: ping plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide ping plugin for uWSGI.
 
 Package: uwsgi-plugin-psgi
 Architecture: any
@@ -144,6 +246,30 @@ Description: Ruby Rack plugin for uWSGI
  languages or platform.
  .
  This package provide Ruby Rack plugin for uWSGI.
+
+Package: uwsgi-plugin-rpc
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: RPC plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide RPC plugin for uWSGI.
+
+Package: uwsgi-plugin-ugreen
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: uGreen plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide uGreen plugin for uWSGI.
 
 Package: libapache2-mod-uwsgi
 Architecture: any
