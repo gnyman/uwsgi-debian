@@ -1,3 +1,12 @@
+Description: Remove value assignments to environment variable LD_RUN_PATH
+ Value assignment to environment variable LD_RUN_PATH leads to setted RPATH in
+ compiled binary/shared library.
+ .
+ And then Lintian reports about error (E: binary-or-shlib-defines-rpath).
+Author: Leonid Borisenko <leo.borisenko@gmail.com>
+Forwarded: no
+Last-Update: 2011-05-01
+
 Index: uwsgi/plugins/rack/uwsgiplugin.py
 ===================================================================
 --- uwsgi.orig/plugins/rack/uwsgiplugin.py	2011-05-01 13:45:40.000000000 +0300

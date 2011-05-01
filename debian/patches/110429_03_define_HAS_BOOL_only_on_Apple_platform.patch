@@ -1,3 +1,7 @@
+Description: Fix PSGI plugin building with defining HAS_BOOL only on Apple
+Origin: upstream, http://projects.unbit.it/hg/uwsgi/rev/5c86defc1864
+Last-Update: 2011-05-01
+
 Index: uwsgi/plugins/psgi/psgi.h
 ===================================================================
 --- uwsgi.orig/plugins/psgi/psgi.h	2011-04-29 04:26:50.000000000 +0300

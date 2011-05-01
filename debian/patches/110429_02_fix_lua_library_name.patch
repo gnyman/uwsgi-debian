@@ -1,3 +1,8 @@
+Description: Fix Lua library name
+Author: Leonid Borisenko <leo.borisenko@gmail.com>
+Forwarded: no
+Last-Update: 2011-05-01
+
 Index: uwsgi/plugins/lua/uwsgiplugin.py
 ===================================================================
 --- uwsgi.orig/plugins/lua/uwsgiplugin.py	2011-04-29 04:16:51.000000000 +0300
