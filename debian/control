@@ -183,7 +183,6 @@ Package: python-django-uwsgi-admin
 Architecture: all
 Section: python
 Depends: ${python:Depends}, ${misc:Depends}, uwsgi-python, python-django
-Breaks: ${python:Breaks}
 Description: Django application for administering uWSGI server
  uwsgi_admin is a small Django application that:
  .
