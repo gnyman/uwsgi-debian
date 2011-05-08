@@ -35,6 +35,10 @@ list_pkgname_suffixes = $(strip \
 UWSGI_PLUGINS_NAMES = $(call list_pkgname_suffixes,uwsgi-plugin-)
 UWSGI_PLUGINS_SRC_DIR = plugins
 
+PARTICULARLY_BUILT_UWSGI_PLUGINS = python python3
+ORDINARILY_BUILT_UWSGI_PLUGINS := $(filter-out \
+	$(PARTICULARLY_BUILT_UWSGI_PLUGINS), $(UWSGI_PLUGINS_NAMES))
+
 # List of packaged Apache2 modules' names
 LIBAPACHE2_MODS_NAMES = uwsgi ruwsgi
 
@@ -80,6 +84,9 @@ clean::
 	# plugins
 	for PLUGIN_NAME in $(UWSGI_PLUGINS_NAMES); do \
 		$(RM) $(CURDIR)/$${PLUGIN_NAME}_plugin.so; \
+	done
+	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
+		$(RM) $(CURDIR)/python$${PYVER}_plugin.so; \
 	done
 	# compiled Apache2 modules
 	$(RM) -r $(CURDIR)/apache2/.libs
@@ -201,25 +208,54 @@ $(patsubst %,binary-post-install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
 # -----------------------
 
 # Build uwsgi-plugin-% package
-$(patsubst %,build/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES)):: build/uwsgi-plugin-% : debian/stamp-plugin-%
+$(patsubst %,build/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES)) \
+	:: build/uwsgi-plugin-% \
+	:  debian/buildconf/uwsgi-plugin.ini debian/stamp-plugin-%
 
-# Build specific uWSGI plugin
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_NAMES)):
-	$(eval PLUGIN_NAME = $(call target_name_tail, $@))
+debian/buildconf/uwsgi-plugin.ini:
 	sed -e 's|@@curdir@@|$(CURDIR)|g' \
 		< $(CURDIR)/debian/buildconf/uwsgi-plugin.ini.in \
 		> $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
+
+# Ordinary building of uWSGI plugins
+$(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGINS)):
+	$(eval PLUGIN_NAME = $(subst stamp-plugin-,,$(notdir $@)))
 	$(PYTHON) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 	touch $@
 
-# Install uwsgi-plugin-% package
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_NAMES))::
-	$(eval PLUGIN_NAME = $(call target_name_tail, $@))
+# Build python2.x_plugin.so/python3.x_plugin.so
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PYTHON_PKG_KINDS)):
+	$(eval PYTHON_KIND = $(call target_name_tail, $@))
+	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
+	for PYTHON_VERSION in $(PYVERS); do \
+		PLUGIN_NAME=python$$(echo $${PYTHON_VERSION} | tr -d .); \
+		$(PYTHON) $(UWSGI_BUILDER) \
+			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$${PLUGIN_NAME} \
+			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini; \
+		mv \
+			$(CURDIR)/$${PLUGIN_NAME}_plugin.so \
+			$(CURDIR)/python$${PYTHON_VERSION}_plugin.so; \
+	done
+	touch $@
+
+# Install uwsgi-plugin-% package for ordinarily built uWSGI plugin
+$(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGINS))::
+	$(eval PLUGIN_NAME = $(subst -,_,$(subst uwsgi-plugin-,,$(notdir $@))))
 	sed -e 's/@@plugin_name@@/$(PLUGIN_NAME)/g' \
 		< $(CURDIR)/debian/uwsgi-plugin.install.in \
 		> $(CURDIR)/debian/$(cdbs_curpkg).install
+
+# Install uwsgi-plugin-python/uwsgi-plugin-python3
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PYTHON_PKG_KINDS))::
+	$(eval PYTHON_KIND = $(call target_name_tail, $@))
+	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
+	for PYTHON_VERSION in $(PYVERS); do \
+		sed -e "s/@@plugin_name@@/python$${PYTHON_VERSION}/g" \
+			< $(CURDIR)/debian/uwsgi-plugin.install.in \
+			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
+	done
 
 # libapache2-mod-% packages
 # -------------------------

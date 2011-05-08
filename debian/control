@@ -102,6 +102,8 @@ Depends: ${misc:Depends},
  uwsgi-plugin-nagios (= ${binary:Version}),
  uwsgi-plugin-ping (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
+ uwsgi-plugin-python (= ${binary:Version}),
+ uwsgi-plugin-python3 (= ${binary:Version}),
  uwsgi-plugin-rack (= ${binary:Version}),
  uwsgi-plugin-rpc (= ${binary:Version}),
  uwsgi-plugin-ugreen (= ${binary:Version})
@@ -234,6 +236,30 @@ Description: Perl PSGI plugin for uWSGI
  languages or platform.
  .
  This package provide Perl PSGI plugin for uWSGI.
+
+Package: uwsgi-plugin-python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Python plugins for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide Python 2.X plugins for uWSGI.
+
+Package: uwsgi-plugin-python3
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Python 3 plugins for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide Python 3.X plugins for uWSGI.
 
 Package: uwsgi-plugin-rack
 Architecture: any
