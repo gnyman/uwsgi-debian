@@ -30,7 +30,8 @@ UWSGI_PLUGINS_SRC_DIR = plugins
 
 UWSGI_PLUGIN_PYTHON_PKG_KINDS = python python3
 
-PARTICULARLY_BUILT_UWSGI_PLUGINS = $(UWSGI_PLUGIN_PYTHON_PKG_KINDS)
+PARTICULARLY_BUILT_UWSGI_PLUGINS = \
+	$(UWSGI_PLUGIN_PYTHON_PKG_KINDS) greenlet-python
 ORDINARILY_BUILT_UWSGI_PLUGINS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGINS), $(UWSGI_PLUGINS_NAMES))
 
@@ -80,6 +81,9 @@ clean::
 	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
 		$(RM) $(CURDIR)/python$${PYVER}_plugin.so; \
 	done
+	for PYVER in $(PYTHON_VERS); do \
+		$(RM) $(CURDIR)/greenlet_python$${PYVER}_plugin.so; \
+	done
 	# compiled Apache2 modules
 	$(RM) -r $(CURDIR)/apache2/.libs
 	$(RM) -r $(addprefix $(CURDIR)/apache2/mod_, \
@@ -90,11 +94,14 @@ clean::
 	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 	# staging directory of uwsgi-core documentation
 	$(RM) -r $(UWSGI_CORE_DOCS_STAGING_DIR)
-	# instantiated uwsgi-plugin-pythonX templates
+	# instantiated uwsgi-plugin-X templates
 	for TEMPLATE_TYPE in dirs install postinst prerm; do\
 		$(RM) $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, $(UWSGI_PLUGIN_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE} \
 		); \
+	done
+	for TEMPLATE_TYPE in install postinst prerm; do\
+		$(RM) $(CURDIR)/debian/uwsgi-plugin-greenlet-python.$${TEMPLATE_TYPE}; \
 	done
 	# instantiated libapache2-mod-X templates
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
@@ -202,6 +209,18 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 			> $(CURDIR)/debian/uwsgi-plugin-$(PYTHON_KIND).dirs
 	touch $@
 
+# Build greenlet plugin
+debian/stamp-plugin-greenlet-python:
+	for PYTHON_VERSION in $(PYTHON_VERS); do \
+		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) \
+			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/greenlet \
+			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini; \
+		mv \
+			$(CURDIR)/greenlet_plugin.so \
+			$(CURDIR)/greenlet_python$${PYTHON_VERSION}_plugin.so; \
+	done
+	touch $@
+
 # Install uwsgi-plugin-% package for ordinarily built uWSGI plugin
 $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGINS))::
 	$(eval PLUGIN_NAME = $(subst -,_,$(subst uwsgi-plugin-,,$(notdir $@))))
@@ -228,6 +247,20 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
 	done
 
+install/uwsgi-plugin-greenlet-python::
+	for TEMPLATE_TYPE in postinst prerm; do \
+		sed \
+			-e 's/@@available_python_versions@@/$(PYTHON_VERS)/g' \
+			-e 's/@@default_python_version@@/$(PYTHON_DEFAULT)/g' \
+				< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.$${TEMPLATE_TYPE}.in \
+				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
+	done
+	for PYTHON_VERSION in $(PYTHON_VERS); do \
+		sed -e "s/@@plugin_name@@/greenlet_python$${PYTHON_VERSION}/g" \
+			< $(CURDIR)/debian/uwsgi-plugin.install.in \
+			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
+	done
+
 # Binary-post-install uwsgi-plugin-python/uwsgi-plugin-python3 packages
 $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
@@ -239,6 +272,16 @@ $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)
 		-e 's/@@available_python_versions@@/$(PYVERS)/g' \
 		-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.rtupdate.in \
+			> $(PYTHON_RTUPDATE_SCRIPT)
+	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
+
+binary-post-install/uwsgi-plugin-greenlet-python::
+	$(eval PYTHON_RTUPDATE_SCRIPT = \
+		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/python/runtime.d/uwsgi-plugin-greenlet-python.rtupdate \
+	)
+	sed \
+		-e 's/@@available_python_versions@@/$(PYTHON_VERS)/g' \
+			< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)
 	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
 
