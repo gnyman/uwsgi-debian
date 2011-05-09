@@ -73,7 +73,7 @@ DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
 clean::
 	# uWSGI executables
-	$(RM) $(CURDIR)/uwsgi
+	$(RM) $(CURDIR)/uwsgi-core
 	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
 		$(RM) $(CURDIR)/uwsgi-python$${PYVER}; \
 	done
@@ -121,6 +121,8 @@ clean::
 		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
 			$(addsuffix .load,  $(call ruwsgi_to_orig, $(module_name))) \
 	))
+	# generated uwsgi-core manpage
+	$(RM) $(CURDIR)/debian/uwsgi-core.1
 	# uwsgi-pythonX manpages
 	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
 		$(RM) $(CURDIR)/debian/uwsgi-python$${PYVER}.8; \
@@ -131,6 +133,23 @@ clean::
 	)
 	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
+
+# uwsgi-core package
+# ------------------
+
+build/uwsgi-core:: uwsgi-core
+
+uwsgi-core:
+	$(PYTHON) $(UWSGI_BUILDER) \
+		--build $(CURDIR)/debian/buildconf/uwsgi-core.ini
+
+install/uwsgi-core::
+	help2man \
+		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
+		--section 1 \
+		--no-info \
+		$(CURDIR)/uwsgi-core \
+		> $(CURDIR)/debian/uwsgi-core.1; \
 
 # uwsgi-python/uwsgi-python3 packages
 # -----------------------------------
