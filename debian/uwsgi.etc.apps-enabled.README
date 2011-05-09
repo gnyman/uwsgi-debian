@@ -1,0 +1,12 @@
+Files with '.ini'/'.xml'/'.yaml'/'.yml' extensions found in this directory are
+processed by uWSGI init.d script as uWSGI configuration files.
+
+On system boot for each configuration file new uWSGI daemon instance is started
+with additional option:
+  * for INI: '--ini /etc/uwsgi/apps-enabled/<configuration file>'
+  * for XML: '--xmlconfig /etc/uwsgi/apps-enabled/<configuration file>'
+  * for YAML: '--yaml /etc/uwsgi/apps-enabled/<configuration file>'
+
+See more detailed information at:
+  * /usr/share/doc/uwsgi/README.Debian.gz
+  * /etc/default/uwsgi

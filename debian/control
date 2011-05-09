@@ -28,6 +28,22 @@ Description: fast, self-healing, developer-friendly WSGI server (common files)
    * uWSGI usage examples
    * uWSGI test suite
 
+Package: uwsgi
+Architecture: any
+Priority: optional
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: fast, self-healing, developer-friendly WSGI server
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package installs uWSGI core binary with additional infrastructure:
+   * 'uwsgi' executable binary (which is symbolic link to uwsgi-core)
+   * init.d script for running uWSGI daemon(s) with options defined in custom
+     user-created configuration files
+
 Package: uwsgi-core
 Architecture: any
 Priority: optional

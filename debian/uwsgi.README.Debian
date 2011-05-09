@@ -1,0 +1,158 @@
+Contents:
+  1. Automatic starting of instances of uWSGI
+  2. Owner, group and permissions of UNIX socket and pidfile
+  3. Commands recognized by init.d script
+  4. Controling specific instances of uWSGI
+  5. Status of executing init.d command for specific instance
+
+Automatic starting of instances of uWSGI
+========================================
+
+On boot init.d script automatically starts one instance of uWSGI for each
+INI/XML/YAML configuration file found in /etc/uwsgi/apps-enabled.
+
+INI file has higher precedence than XML and YAML. If INI file was found, then
+XML and YAML files with the same name will be ignored.
+
+XML file has higher precedence than YAML. If XML file was found, then YAML file
+with the same name will be ignored.
+
+INI file must have '.ini' extension and may be empty.
+
+Example of INI file:
+
+    [uwsgi]
+    uid = uwsgi_user
+    gid = uwsgi_group
+    socket = /tmp/uwsgi.sock
+
+XML file must have '.xml' extension and, at least, following content:
+
+    <uwsgi></uwsgi>
+
+Example of more realistic configuration file:
+
+    <uwsgi>
+      <uid>uwsgi_user</uid>
+      <gid>uwsgi_group</gid>
+      <socket>/tmp/uwsgi.sock</socket>
+    </uwsgi>
+
+YAML file must have one of two extensions '.yaml'/'.yml' (the first one has
+higher precedence) and may be empty.
+
+Example of YAML file:
+
+    uwsgi:
+        uid: uwsgi_uwser
+        gid: uwsgi_group
+        socket: /tmp/uwsgi.sock
+
+For list of options passed by default to each started instance see
+/etc/default/uwsgi.
+
+Service files of started uWSGI instance are located in directory named after
+configuration file (without '.ini'/'.xml'/'.yaml'/'.yml' extension):
+  * UNIX socket | /var/run/uwsgi/<confname>/socket
+  * pidfile     | /var/run/uwsgi/<confname>/pid
+
+Owner, group and permissions of UNIX socket and pidfile
+=======================================================
+
+After starting of uWSGI instance init.d script tries to chown and/or chmod:
+  * pidfile                    | chown root:root   | chmod 644
+  * UNIX socket                |                   | chmod 660
+  * directory with these files | chown <uid>:<gid> | chmod 755
+
+If mentioned directory doesn't exist it will be created. Note that this
+directory will be chowned/chmodded only if it was created by init.d script.
+
+init.d script tries to parse configuration file for values of uid/gid. If such
+the key/tag didn't found, init.d tries to parse DAEMON_OPTS for '--uid' or
+'--gid' option. If even this fails, then directory will be chowned to
+root:root.
+
+Chmodding of UNIX socket is made by using uWSGI option '--chmod-socket' in
+DAEMON_OPTS. For value of this variable see /etc/default/uwsgi.
+
+Commands recognized by init.d script
+====================================
+
+You can issue to init.d script following commands:
+  * start        | starts daemon
+  * stop         | stops daemon
+  * reload       | sends to daemon SIGHUP signal
+  * force-reload | sends to daemon SIGTERM signal
+  * restart      | issues 'stop', then 'start' commands
+  * status       | shows status of daemon instance (running/not running)
+
+'status' command must be issued with exactly one argument: '<confname>'.
+
+Controling specific instances of uWSGI
+======================================
+
+You could control specific instance(s) by issuing:
+
+    /etc/init.d/uwsgi <command> <confname> <confname> ...
+
+where:
+  * <command> is one of 'start', 'stop' etc.
+  * <confname> is the name of configuration file (without extension)
+
+For example, this is how instance for /etc/uwsgi/apps-enabled/hello.xml is
+started:
+
+    /etc/init.d/uwsgi start hello
+
+Status of executing init.d command for specific instance
+========================================================
+
+In init.d script output:
+  * . -- command was executed without problems or instance is already in needed
+         state
+  * ! -- command failed (or executed with some problems)
+  * ? -- configuration file for this instance isn't found
+         and this instance is ignored
+
+Let's see by example:
+
+    /etc/init.d/uwsgi start ario wrogn googl moogl
+
+Output:
+
+    <...> -> . ? . ! failed!
+
+It means that:
+  * 'ario' and 'googl' instances was started without problems (or was already
+    ran before executing 'start' command)
+  * configuration file for 'wrogn' wasn't found
+  * starting 'moogl' was failed
+
+In this example (as one of instances failed to start), init.d script output
+ends with 'failed!' message. But generally, output ends with 'done.' message:
+
+    <...> -> . . . done.
+
+With changing of appropriate setting in /etc/default/uwsgi, init.d script could
+print configuration file names instead of one-character symbols:
+  * <confname>   -- command was executed without problems
+  * <confname>!  -- command is failed (or executed with some problems)
+  * <confname>?  -- configuration file for this instance isn't found
+                    and this instance is ignored
+  * (<confname>) -- instance is already in needed state
+
+Let's see by example:
+
+    /etc/init.d/uwsgi start ario wrogn googl moogl
+
+Output:
+
+    <...> -> (ario) wrogn? googl moogl! failed!
+
+It means that:
+  * 'ario' instance was already ran before executing 'start' command
+  * configuration file for 'wrogn' wasn't found
+  * 'googl' is started without problems
+  * starting 'moogl' was failed
+
+Return value of init.d script is the number of instances with '!' mark.
