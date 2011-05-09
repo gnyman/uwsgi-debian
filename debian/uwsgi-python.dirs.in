@@ -1,4 +1,0 @@
-etc/@@uwsgi_binary@@/apps-available
-etc/@@uwsgi_binary@@/apps-enabled
-var/log/@@uwsgi_binary@@
-usr/share/@@python_runtime_name@@/runtime.d

@@ -11,17 +11,10 @@ APR_CONFIG=/usr/bin/apr-config
 APU_CONFIG=/usr/bin/apu-config
 UWSGI_BUILDER = $(CURDIR)/uwsgiconfig.py
 
-UWSGI_PYTHON_PKG_KINDS = python python3
-
 PYTHON_VERS=$(shell pyversions -vs)
 PYTHON_DEFAULT=$(shell pyversions -dv)
 PYTHON3_VERS=$(shell py3versions -vs)
 PYTHON3_DEFAULT=$(shell py3versions -dv)
-
-# List of templates to instantiate for each uwsgi-pythonX package
-# There are special-case template, not listed here: dirs install manpages
-UWSGI_PYTHON_PKG_TEMPLATES = default docs init.d init.d.custom logrotate \
-                             postinst prerm README.Debian
 
 # Search in debian/control for packages with name $(1)% and extract % in list.
 list_pkgname_suffixes = $(strip \
@@ -35,7 +28,9 @@ list_pkgname_suffixes = $(strip \
 UWSGI_PLUGINS_NAMES = $(call list_pkgname_suffixes,uwsgi-plugin-)
 UWSGI_PLUGINS_SRC_DIR = plugins
 
-PARTICULARLY_BUILT_UWSGI_PLUGINS = python python3
+UWSGI_PLUGIN_PYTHON_PKG_KINDS = python python3
+
+PARTICULARLY_BUILT_UWSGI_PLUGINS = $(UWSGI_PLUGIN_PYTHON_PKG_KINDS)
 ORDINARILY_BUILT_UWSGI_PLUGINS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGINS), $(UWSGI_PLUGINS_NAMES))
 
@@ -48,7 +43,6 @@ ruwsgi_to_orig = $(subst ruwsgi,Ruwsgi,$(1))
 # There is special-case template, not listed here: uwsgi.load
 LIBAPACHE2_MOD_PKG_TEMPLATES = install postinst prerm
 
-COMMON_DOCS_COLLECTION_DIR = $(CURDIR)/debian/uwsgi-common-files/docs
 UWSGI_CORE_DOCS_STAGING_DIR = $(CURDIR)/debian/uwsgi-core-docs-staging
 
 # Discards directory-part of target and returns substring after last '-'
@@ -56,7 +50,7 @@ UWSGI_CORE_DOCS_STAGING_DIR = $(CURDIR)/debian/uwsgi-core-docs-staging
 target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
 
 # From something like:
-#   $(call <...>, uwsgi-, $(UWSGI_PYTHON_PKG_KINDS), .dirs)
+#   $(call <...>, uwsgi-, $(UWSGI_PLUGIN_PYTHON_PKG_KINDS), .dirs)
 # makes list:
 #   $(CURDIR)/debian/uwsgi-python.dirs $(CURDIR)/debian/uwsgi-python3.dirs
 files_instantiated_in_debian_dir = $(addprefix \
@@ -66,7 +60,6 @@ files_instantiated_in_debian_dir = $(addprefix \
 # CDBS-specific variables
 # =======================
 
-DEB_COMPRESS_EXCLUDE_uwsgi-common = .py .pl .xml .psgi .png
 DEB_COMPRESS_EXCLUDE_uwsgi-core = .py .pl .xml .psgi .png
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
@@ -74,11 +67,8 @@ DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 # =====
 
 clean::
-	# uWSGI executables
+	# uWSGI executable binary
 	$(RM) $(CURDIR)/uwsgi-core
-	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
-		$(RM) $(CURDIR)/uwsgi-python$${PYVER}; \
-	done
 	# intermediate compiled files
 	find $(CURDIR) \
 		\! -path '$(CURDIR)/debian/*' \( -name '*.o' -o -name '*.pyc' \) -type f \
@@ -97,22 +87,13 @@ clean::
 			$(addprefix $(call ruwsgi_to_orig, $(module_name)), .la .lo .slo) \
 	))
 	# instantiated build configurations
-	$(RM) $(CURDIR)/debian/buildconf/uwsgi-flavor.ini
 	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
-	# collected common docs
-	$(RM) -r $(COMMON_DOCS_COLLECTION_DIR)
 	# staging directory of uwsgi-core documentation
 	$(RM) -r $(UWSGI_CORE_DOCS_STAGING_DIR)
-	# instantiated uwsgi-pythonX templates
-	for TEMPLATE_TYPE in $(UWSGI_PYTHON_PKG_TEMPLATES) dirs install manpages; do\
-		$(RM) $(call files_instantiated_in_debian_dir, \
-			uwsgi-, $(UWSGI_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE} \
-		); \
-	done
 	# instantiated uwsgi-plugin-pythonX templates
 	for TEMPLATE_TYPE in dirs install postinst prerm; do\
 		$(RM) $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-, $(UWSGI_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE} \
+			uwsgi-plugin-, $(UWSGI_PLUGIN_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE} \
 		); \
 	done
 	# instantiated libapache2-mod-X templates
@@ -127,10 +108,6 @@ clean::
 	))
 	# generated uwsgi-core manpage
 	$(RM) $(CURDIR)/debian/uwsgi-core.1
-	# uwsgi-pythonX manpages
-	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
-		$(RM) $(CURDIR)/debian/uwsgi-python$${PYVER}.8; \
-	done
 	# instantiated uwsgi-plugin-N.install files
 	$(RM) $(call files_instantiated_in_debian_dir, \
 		uwsgi-plugin-, $(UWSGI_PLUGINS_NAMES), .install \
@@ -186,84 +163,6 @@ install/uwsgi-core::
 		$(CURDIR)/uwsgi-core \
 		> $(CURDIR)/debian/uwsgi-core.1; \
 
-# uwsgi-python/uwsgi-python3 packages
-# -----------------------------------
-
-# Build uwsgi-python% package
-$(patsubst %,build/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS)):: build/uwsgi-% : debian/stamp-uwsgi-%
-
-# Build specific uwsgi-python/uwsgi-python3 package
-$(patsubst %,debian/stamp-uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS)):
-	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval UWSGI_PYTHON = uwsgi-$(PYTHON_KIND))
-	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
-	for PYTHON_VERSION in $(PYVERS); do \
-		sed \
-			-e 's|@@curdir@@|$(CURDIR)|g' \
-			-e "s/@@bin_name_flavor@@/python$${PYTHON_VERSION}/g" \
-			-e "s/@@embedded_plugin@@/python$$(echo $${PYTHON_VERSION}|tr -d .)/g" \
-				< $(CURDIR)/debian/buildconf/uwsgi-flavor.ini.in \
-				> $(CURDIR)/debian/buildconf/uwsgi-flavor.ini; \
-		$(PYTHON) $(UWSGI_BUILDER) \
-			--build $(CURDIR)/debian/buildconf/uwsgi-flavor.ini; \
-	done
-	sed \
-		-e 's/@@uwsgi_binary@@/$(UWSGI_PYTHON)/g' \
-		-e 's/@@python_runtime_name@@/$(PYTHON_KIND)/g' \
-			< $(CURDIR)/debian/uwsgi-python.dirs.in \
-			> $(CURDIR)/debian/$(UWSGI_PYTHON).dirs
-	touch $@
-
-# Install uwsgi-python% package
-$(patsubst %,install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
-	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
-	$(eval PYDEFAULT = $($(subst python,PYTHON,$(PYTHON_KIND))_DEFAULT))
-	for PYTHON_VERSION in $(PYVERS); do \
-		for TEMPLATE_TYPE in install manpages; do \
-			sed -e "s/@@uwsgi_binary@@/uwsgi-python$${PYTHON_VERSION}/g" \
-				< $(CURDIR)/debian/uwsgi-python.$${TEMPLATE_TYPE}.in \
-				>> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
-		done; \
-		help2man \
-			--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
-			--section 8 \
-			--no-info \
-			$(CURDIR)/uwsgi-python$${PYTHON_VERSION} \
-			> $(CURDIR)/debian/uwsgi-python$${PYTHON_VERSION}.8; \
-	done
-	for TEMPLATE_TYPE in $(UWSGI_PYTHON_PKG_TEMPLATES); do \
-		sed \
-			-e 's/@@uwsgi_binary@@/$(cdbs_curpkg)/g' \
-			-e 's/@@available_python_versions@@/$(PYVERS)/g' \
-			-e 's/@@default_python_version@@/$(PYDEFAULT)/g' \
-				< $(CURDIR)/debian/uwsgi-python.$${TEMPLATE_TYPE}.in \
-				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
-	done
-
-# Binary-post-install uwsgi-python% package
-$(patsubst %,binary-post-install/uwsgi-%,$(UWSGI_PYTHON_PKG_KINDS))::
-	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval UWSGI_PYTHON = uwsgi-$(PYTHON_KIND))
-	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
-	$(eval PYTHON_RTUPDATE_SCRIPT = \
-		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(PYTHON_KIND)/runtime.d/$(UWSGI_PYTHON).rtupdate \
-	)
-	$(eval SHAREDOCDIR = $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/doc)
-	sed \
-		-e 's/@@available_python_versions@@/$(PYVERS)/g' \
-		-e 's/@@uwsgi_binary@@/$(UWSGI_PYTHON)/g' \
-			< $(CURDIR)/debian/uwsgi-python.rtupdate.in \
-			> $(PYTHON_RTUPDATE_SCRIPT)
-	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
-	for SUBDIR in apps-available apps-enabled; do \
-		sed -e 's/@@uwsgi_binary@@/$(cdbs_curpkg)/g' \
-			< $(CURDIR)/debian/uwsgi-python.etc.$${SUBDIR}.README.in \
-			> $(CURDIR)/debian/$(cdbs_curpkg)/etc/$(cdbs_curpkg)/$${SUBDIR}/README; \
-	done
-	ln -sf ../uwsgi-common/tests $(SHAREDOCDIR)/$(cdbs_curpkg)/tests
-	ln -sf ../uwsgi-common/examples $(SHAREDOCDIR)/$(cdbs_curpkg)/examples
-
 # uwsgi-plugin-% packages
 # -----------------------
 
@@ -286,7 +185,7 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGINS)):
 	touch $@
 
 # Build python2.x_plugin.so/python3.x_plugin.so
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PYTHON_PKG_KINDS)):
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
 	for PYTHON_VERSION in $(PYVERS); do \
@@ -311,7 +210,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGINS))::
 		> $(CURDIR)/debian/$(cdbs_curpkg).install
 
 # Install uwsgi-plugin-python/uwsgi-plugin-python3 packages
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PYTHON_PKG_KINDS))::
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
 	$(eval PYDEFAULT = $($(subst python,PYTHON,$(PYTHON_KIND))_DEFAULT))
@@ -330,7 +229,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PYTHON_PKG_KINDS))::
 	done
 
 # Binary-post-install uwsgi-plugin-python/uwsgi-plugin-python3 packages
-$(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PYTHON_PKG_KINDS))::
+$(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
 	$(eval PYTHON_RTUPDATE_SCRIPT = \
@@ -371,28 +270,6 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 
 # Some other packages
 # -------------------
-
-install/uwsgi-common::
-	test -e $(COMMON_DOCS_COLLECTION_DIR) || mkdir $(COMMON_DOCS_COLLECTION_DIR)
-	cp -r $(CURDIR)/tests $(COMMON_DOCS_COLLECTION_DIR)
-	for SUBDIR in conffile psgi wsgi; do \
-		mkdir -p $(COMMON_DOCS_COLLECTION_DIR)/examples/$${SUBDIR}; \
-	done
-	for FILE in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py; do\
-		cp $(CURDIR)/$${FILE} $(COMMON_DOCS_COLLECTION_DIR)/examples; \
-	done
-	for FILE in mega.xml uwsgi.xml; do \
-		cp $(CURDIR)/$${FILE} $(COMMON_DOCS_COLLECTION_DIR)/examples/conffile; \
-	done
-	for FILE in mojoapp.pl psgi.py test.psgi; do \
-		cp $(CURDIR)/$${FILE} $(COMMON_DOCS_COLLECTION_DIR)/examples/psgi; \
-	done
-	for FILE in hello_world_rrdtool.py mjpeg_stream.py simple_app.py \
-	            simple_app_wsgi2.py testapp.py ugreenchat.py uploadtest.py \
-	            ; do \
-		cp $(CURDIR)/$${FILE} $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi; \
-	done
-	chmod a-x $(COMMON_DOCS_COLLECTION_DIR)/examples/wsgi/ugreenchat.py
 
 binary-install/python-django-uwsgi-admin::
 	dh_install -p $(cdbs_curpkg) \
