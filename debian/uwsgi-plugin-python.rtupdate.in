@@ -1,0 +1,45 @@
+#!/bin/sh
+
+set -e
+
+if [ "x$1" = "xrtupdate" ]; then
+  # Versions of Python interpreter which was available at packaging moment
+  # (and for which appropriate pythonX.Y_plugin.so was built).
+  KNOWN_PYVERS="@@available_python_versions@@"
+
+  DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY=75
+  ALT_PLUGIN_ALTERNATIVE_PRIORITY=35
+
+  for MAYBE_NEW_DEFAULT_PYVER in $KNOWN_PYVERS; do
+
+    # Check if pythonX.Y runtime (where pythonX.Y is a new default Python
+    # version) was available at packaging moment.
+    #
+    # If it wasn't available, there is no point in changing default alternative
+    # (as appropriate pythonX.Y_plugin.so wasn't built and packaged).
+    if [ "x$3" = "xpython$MAYBE_NEW_DEFAULT_PYVER" ]; then
+
+      # Reset prorities of all packaged alternatives of @@python_kind@@_plugin.so
+      # to lower value.
+      for PYVER in $KNOWN_PYVERS; do
+        update-alternatives --quiet \
+          --install \
+            /usr/lib/uwsgi/plugins/@@python_kind@@_plugin.so \
+            uwsgi-plugin-@@python_kind@@ \
+            /usr/lib/uwsgi/plugins/python${PYVER}_plugin.so \
+            $ALT_PLUGIN_ALTERNATIVE_PRIORITY
+      done
+
+      # Set higher priority for pythonX.Y_plugin.so (where pythonX.Y is a
+      # new default Python version).
+      update-alternatives --quiet \
+        --install \
+          /usr/lib/uwsgi/plugins/@@python_kind@@_plugin.so \
+          uwsgi-plugin-@@python_kind@@ \
+          /usr/lib/uwsgi/plugins/${3}_plugin.so \
+          $DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY
+
+      break # for MAYBE_NEW_DEFAULT_PYVER ...
+    fi
+  done
+fi
