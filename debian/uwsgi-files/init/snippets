@@ -45,6 +45,7 @@ type_of_conffile()
 extract_id()
 {
   local KIND="$1"
+  shift
   local CONFNAME="$@"
 
   local CONFFILE="$(path_to_conffile_with_name "$CONFNAME")"
