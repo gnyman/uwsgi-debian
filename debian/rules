@@ -49,6 +49,7 @@ ruwsgi_to_orig = $(subst ruwsgi,Ruwsgi,$(1))
 LIBAPACHE2_MOD_PKG_TEMPLATES = install postinst prerm
 
 COMMON_DOCS_COLLECTION_DIR = $(CURDIR)/debian/uwsgi-common-files/docs
+UWSGI_CORE_DOCS_STAGING_DIR = $(CURDIR)/debian/uwsgi-core-docs-staging
 
 # Discards directory-part of target and returns substring after last '-'
 # character
@@ -66,6 +67,7 @@ files_instantiated_in_debian_dir = $(addprefix \
 # =======================
 
 DEB_COMPRESS_EXCLUDE_uwsgi-common = .py .pl .xml .psgi .png
+DEB_COMPRESS_EXCLUDE_uwsgi-core = .py .pl .xml .psgi .png
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
 # Rules
@@ -99,6 +101,8 @@ clean::
 	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 	# collected common docs
 	$(RM) -r $(COMMON_DOCS_COLLECTION_DIR)
+	# staging directory of uwsgi-core documentation
+	$(RM) -r $(UWSGI_CORE_DOCS_STAGING_DIR)
 	# instantiated uwsgi-pythonX templates
 	for TEMPLATE_TYPE in $(UWSGI_PYTHON_PKG_TEMPLATES) dirs install manpages; do\
 		$(RM) $(call files_instantiated_in_debian_dir, \
@@ -154,6 +158,27 @@ uwsgi-core:
 		--build $(CURDIR)/debian/buildconf/uwsgi-core.ini
 
 install/uwsgi-core::
+	test -e $(UWSGI_CORE_DOCS_STAGING_DIR) \
+		|| mkdir $(UWSGI_CORE_DOCS_STAGING_DIR)
+	cp -r $(CURDIR)/tests $(UWSGI_CORE_DOCS_STAGING_DIR)
+	for SUBDIR in conffile psgi wsgi; do \
+		mkdir -p $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/$${SUBDIR}; \
+	done
+	for FILE in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py; do\
+		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples; \
+	done
+	for FILE in mega.xml uwsgi.xml; do \
+		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile; \
+	done
+	for FILE in mojoapp.pl psgi.py test.psgi; do \
+		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/psgi; \
+	done
+	for FILE in hello_world_rrdtool.py mjpeg_stream.py simple_app.py \
+	            simple_app_wsgi2.py testapp.py ugreenchat.py uploadtest.py \
+	            ; do \
+		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsgi; \
+	done
+	chmod a-x $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsgi/ugreenchat.py
 	help2man \
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
 		--section 1 \

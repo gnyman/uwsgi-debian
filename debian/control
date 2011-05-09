@@ -58,7 +58,10 @@ Description: fast, self-healing, developer-friendly WSGI server (core)
  a plugin loading technology that can be used to add support for other
  languages or platform.
  .
- This package provides uWSGI core binary (built without any embedded plugins).
+ This package provides:
+   * executable uWSGI core binary (built without any embedded plugins)
+   * uWSGI usage examples
+   * uWSGI test suite
 
 Package: uwsgi-python
 Architecture: any
