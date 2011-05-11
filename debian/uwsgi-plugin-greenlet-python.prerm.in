@@ -18,11 +18,11 @@ set -e
 
 case "$1" in
     remove)
-      for PYVER in @@available_python_versions@@; do
+      for PYVER_DOTLESS in @@available_python_versions_dotless@@; do
         update-alternatives --quiet \
           --remove \
             uwsgi-plugin-greenlet \
-            /usr/lib/uwsgi/plugins/greenlet_python${PYVER}_plugin.so
+            /usr/lib/uwsgi/plugins/greenlet_python${PYVER_DOTLESS}_plugin.so
       done
     ;;
 

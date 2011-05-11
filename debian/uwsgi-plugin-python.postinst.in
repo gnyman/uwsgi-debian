@@ -19,9 +19,9 @@ set -e
 
 case "$1" in
     configure)
-      PYVER_DEFAULT=@@default_python_version@@
-      for PYVER in @@available_python_versions@@; do
-        if [ "x$PYVER" = "x$PYVER_DEFAULT" ]; then
+      PYVER_DEFAULT_DOTLESS=@@default_python_version_dotless@@
+      for PYVER_DOTLESS in @@available_python_versions_dotless@@; do
+        if [ "x$PYVER_DOTLESS" = "x$PYVER_DEFAULT_DOTLESS" ]; then
           ALTERNATIVE_PRIORITY=75
         else
           ALTERNATIVE_PRIORITY=35
@@ -30,7 +30,7 @@ case "$1" in
           --install \
             /usr/lib/uwsgi/plugins/@@python_kind@@_plugin.so \
             uwsgi-plugin-@@python_kind@@ \
-            /usr/lib/uwsgi/plugins/python${PYVER}_plugin.so \
+            /usr/lib/uwsgi/plugins/python${PYVER_DOTLESS}_plugin.so \
             $ALTERNATIVE_PRIORITY
       done
     ;;

@@ -11,10 +11,17 @@ APR_CONFIG=/usr/bin/apr-config
 APU_CONFIG=/usr/bin/apu-config
 UWSGI_BUILDER = $(CURDIR)/uwsgiconfig.py
 
-PYTHON_VERS=$(shell pyversions -vs)
-PYTHON_DEFAULT=$(shell pyversions -dv)
-PYTHON3_VERS=$(shell py3versions -vs)
-PYTHON3_DEFAULT=$(shell py3versions -dv)
+# Dotted versions of Python runtimes (like 'X.Y').
+PYTHON_VERS_DOTTED=$(shell pyversions -vs)
+PYTHON_DEFAULT_DOTTED=$(shell pyversions -dv)
+PYTHON3_VERS_DOTTED=$(shell py3versions -vs)
+PYTHON3_DEFAULT_DOTTED=$(shell py3versions -dv)
+
+# Dotless versions of Python runtimes (like 'XY').
+PYTHON_VERS=$(subst .,,$(PYTHON_VERS_DOTTED))
+PYTHON_DEFAULT=$(subst .,,$(PYTHON_DEFAULT_DOTTED))
+PYTHON3_VERS=$(subst .,,$(PYTHON3_VERS_DOTTED))
+PYTHON3_DEFAULT=$(subst .,,$(PYTHON3_DEFAULT_DOTTED))
 
 # Search in debian/control for packages with name $(1)% and extract % in list.
 list_pkgname_suffixes = $(strip \
@@ -196,13 +203,9 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
 	for PYTHON_VERSION in $(PYVERS); do \
-		PLUGIN_NAME=python$$(echo $${PYTHON_VERSION} | tr -d .); \
 		$(PYTHON) $(UWSGI_BUILDER) \
-			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$${PLUGIN_NAME} \
+			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/python$${PYTHON_VERSION} \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini; \
-		mv \
-			$(CURDIR)/$${PLUGIN_NAME}_plugin.so \
-			$(CURDIR)/python$${PYTHON_VERSION}_plugin.so; \
 	done
 	sed -e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.dirs.in \
@@ -211,13 +214,11 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 
 # Build greenlet plugin
 debian/stamp-plugin-greenlet-python:
-	for PYTHON_VERSION in $(PYTHON_VERS); do \
+	for PYTHON_VERSION in $(PYTHON_VERS_DOTTED); do \
 		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/greenlet \
-			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini; \
-		mv \
-			$(CURDIR)/greenlet_plugin.so \
-			$(CURDIR)/greenlet_python$${PYTHON_VERSION}_plugin.so; \
+			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+			         greenlet_python$$(echo $${PYTHON_VERSION} | tr -d .); \
 	done
 	touch $@
 
@@ -235,8 +236,8 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::
 	$(eval PYDEFAULT = $($(subst python,PYTHON,$(PYTHON_KIND))_DEFAULT))
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
-			-e 's/@@available_python_versions@@/$(PYVERS)/g' \
-			-e 's/@@default_python_version@@/$(PYDEFAULT)/g' \
+			-e 's/@@available_python_versions_dotless@@/$(PYVERS)/g' \
+			-e 's/@@default_python_version_dotless@@/$(PYDEFAULT)/g' \
 			-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-python.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
@@ -250,8 +251,8 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::
 install/uwsgi-plugin-greenlet-python::
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
-			-e 's/@@available_python_versions@@/$(PYTHON_VERS)/g' \
-			-e 's/@@default_python_version@@/$(PYTHON_DEFAULT)/g' \
+			-e 's/@@available_python_versions_dotless@@/$(PYTHON_VERS)/g' \
+			-e 's/@@default_python_version_dotless@@/$(PYTHON_DEFAULT)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
@@ -269,7 +270,7 @@ $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)
 		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(PYTHON_KIND)/runtime.d/uwsgi-plugin-$(PYTHON_KIND).rtupdate \
 	)
 	sed \
-		-e 's/@@available_python_versions@@/$(PYVERS)/g' \
+		-e 's/@@available_python_versions_dotless@@/$(PYVERS)/g' \
 		-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)
@@ -280,7 +281,7 @@ binary-post-install/uwsgi-plugin-greenlet-python::
 		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/python/runtime.d/uwsgi-plugin-greenlet-python.rtupdate \
 	)
 	sed \
-		-e 's/@@available_python_versions@@/$(PYTHON_VERS)/g' \
+		-e 's/@@available_python_versions_dotless@@/$(PYTHON_VERS)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)
 	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
@@ -317,6 +318,6 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 binary-install/python-django-uwsgi-admin::
 	dh_install -p $(cdbs_curpkg) \
 		django/uwsgi_admin \
-		usr/lib/python$(PYTHON_DEFAULT)/dist-packages
+		usr/lib/python$(PYTHON_DEFAULT_DOTTED)/dist-packages
 	dh_python2 -p $(cdbs_curpkg)
 
