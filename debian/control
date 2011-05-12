@@ -79,7 +79,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-pyerl-python3 (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
  uwsgi-plugin-python3 (= ${binary:Version}),
- uwsgi-plugin-rack (= ${binary:Version}),
+ uwsgi-plugin-rack-ruby1.8 (= ${binary:Version}),
  uwsgi-plugin-rpc (= ${binary:Version}),
  uwsgi-plugin-ugreen (= ${binary:Version})
 Description: all available plugins for uWSGI
@@ -277,17 +277,17 @@ Description: Python 3 plugins for uWSGI
  .
  This package provide Python 3.X plugins for uWSGI.
 
-Package: uwsgi-plugin-rack
+Package: uwsgi-plugin-rack-ruby1.8
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Ruby Rack plugin for uWSGI
+Description: Rack plugin for uWSGI (Ruby 1.8)
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
  .
- This package provide Ruby Rack plugin for uWSGI.
+ This package provide Rack plugin for uWSGI (Ruby 1.8).
 
 Package: uwsgi-plugin-rpc
 Architecture: any

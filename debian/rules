@@ -40,7 +40,8 @@ UWSGI_PLUGIN_PYTHON_PKG_KINDS = python python3
 PARTICULARLY_BUILT_UWSGI_PLUGINS = \
 	$(UWSGI_PLUGIN_PYTHON_PKG_KINDS) \
 	greenlet-python \
-	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))
+	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)) \
+	rack-ruby1.8
 ORDINARILY_BUILT_UWSGI_PLUGINS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGINS), $(UWSGI_PLUGINS_NAMES))
 
@@ -93,6 +94,7 @@ clean::
 			$(CURDIR)/pyerl_python$${PYVER}_plugin.so \
 			$(CURDIR)/python$${PYVER}_plugin.so; \
 	done
+	$(RM) $(CURDIR)/rack_ruby18_plugin.so
 	# compiled Apache2 modules
 	$(RM) -r $(CURDIR)/apache2/.libs
 	$(RM) -r $(addprefix $(CURDIR)/apache2/mod_, \
@@ -115,6 +117,7 @@ clean::
 	for TEMPLATE_TYPE in install postinst prerm; do\
 		$(RM) $(CURDIR)/debian/uwsgi-plugin-greenlet-python.$${TEMPLATE_TYPE}; \
 	done
+	$(RM) $(CURDIR)/debian/uwsgi-plugin-rack-ruby1.8.install
 	# instantiated libapache2-mod-X templates
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
 		$(RM) $(call files_instantiated_in_debian_dir, \
@@ -242,6 +245,16 @@ debian/stamp-plugin-greenlet-python:
 	done
 	touch $@
 
+# Build rack-% plugins
+debian/stamp-plugin-rack-ruby1.8:
+	$(eval RUBY_INTERPRETER = $(call target_name_tail, $@))
+	UWSGICONFIG_RUBYPATH=/usr/bin/$(RUBY_INTERPRETER) \
+	$(PYTHON) $(UWSGI_BUILDER) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/rack \
+		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+		         rack_$$(echo $(RUBY_INTERPRETER) | tr -d .)
+	touch $@
+
 # Install uwsgi-plugin-% package for ordinarily built uWSGI plugin
 $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGINS))::
 	$(eval PLUGIN_NAME = $(subst -,_,$(subst uwsgi-plugin-,,$(notdir $@))))
@@ -300,6 +313,12 @@ install/uwsgi-plugin-greenlet-python::
 			< $(CURDIR)/debian/uwsgi-plugin.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
 	done
+
+install/uwsgi-plugin-rack-ruby1.8::
+	$(eval RUBY_INTERPRETER = $(call target_name_tail, $@))
+	sed -e "s/@@plugin_name@@/rack_$$(echo $(RUBY_INTERPRETER) | tr -d .)/g" \
+		< $(CURDIR)/debian/uwsgi-plugin.install.in \
+		> $(CURDIR)/debian/$(cdbs_curpkg).install
 
 # Binary-post-install uwsgi-plugin-pyerl-% packages
 $(patsubst %,binary-post-install/uwsgi-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::
