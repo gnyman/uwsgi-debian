@@ -75,6 +75,8 @@ Depends: ${misc:Depends},
  uwsgi-plugin-nagios (= ${binary:Version}),
  uwsgi-plugin-ping (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
+ uwsgi-plugin-pyerl-python (= ${binary:Version}),
+ uwsgi-plugin-pyerl-python3 (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
  uwsgi-plugin-python3 (= ${binary:Version}),
  uwsgi-plugin-rack (= ${binary:Version}),
@@ -222,6 +224,34 @@ Description: Perl PSGI plugin for uWSGI
  languages or platform.
  .
  This package provide Perl PSGI plugin for uWSGI.
+
+Package: uwsgi-plugin-pyerl-python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ uwsgi-plugin-python (= ${binary:Version}),
+ uwsgi-plugin-erlang (= ${binary:Version})
+Description: pyerl plugins for uWSGI (Python 2.X)
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide pyerl plugins for uWSGI and Python 2.X.
+
+Package: uwsgi-plugin-pyerl-python3
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ uwsgi-plugin-python3 (= ${binary:Version}),
+ uwsgi-plugin-erlang (= ${binary:Version})
+Description: pyerl plugins for uWSGI (Python 3.X)
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide pyerl plugins for uWSGI and Python 3.X.
 
 Package: uwsgi-plugin-python
 Architecture: any
