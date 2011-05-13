@@ -31,7 +31,11 @@ if [ "x$1" = "xrtupdate" ]; then
             /usr/lib/uwsgi/plugins/@@python_kind@@_plugin.so \
             uwsgi-plugin-@@python_kind@@ \
             /usr/lib/uwsgi/plugins/python${PYVER_DOTLESS}_plugin.so \
-            $ALT_PLUGIN_ALTERNATIVE_PRIORITY
+            $ALT_PLUGIN_ALTERNATIVE_PRIORITY \
+          --slave \
+            /usr/share/man/man1/uwsgi_@@python_kind@@.1.gz \
+            uwsgi_@@python_kind@@.1.gz \
+            /usr/share/man/man1/uwsgi_python${PYVER_DOTLESS}.1.gz
       done
 
       # Set higher priority for pythonXY_plugin.so (where pythonX.Y is a
@@ -41,7 +45,11 @@ if [ "x$1" = "xrtupdate" ]; then
           /usr/lib/uwsgi/plugins/@@python_kind@@_plugin.so \
           uwsgi-plugin-@@python_kind@@ \
           /usr/lib/uwsgi/plugins/${NEW_RTNAME_DOTLESS}_plugin.so \
-          $DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY
+          $DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY \
+        --slave \
+          /usr/share/man/man1/uwsgi_@@python_kind@@.1.gz \
+          uwsgi_@@python_kind@@.1.gz \
+          /usr/share/man/man1/uwsgi_${NEW_RTNAME_DOTLESS}.1.gz
 
       break # for MAYBE_NEW_DEFAULT_PYVER_DOTLESS ...
     fi

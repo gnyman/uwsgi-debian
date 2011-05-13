@@ -24,7 +24,6 @@ Description: fast, self-healing, developer-friendly WSGI server
  languages or platform.
  .
  This package installs uWSGI core binary with additional infrastructure:
-   * 'uwsgi' executable binary (which is symbolic link to uwsgi-core)
    * init.d script for running uWSGI daemon(s) with options defined in custom
      user-created configuration files
 
@@ -106,7 +105,7 @@ Description: all available plugins for uWSGI
 
 Package: uwsgi-plugin-cgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: CGI plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -118,7 +117,7 @@ Description: CGI plugin for uWSGI
 
 Package: uwsgi-plugin-echo
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: echo plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -130,7 +129,7 @@ Description: echo plugin for uWSGI
 
 Package: uwsgi-plugin-erlang
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: Erlang plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -142,7 +141,7 @@ Description: Erlang plugin for uWSGI
 
 Package: uwsgi-plugin-fastrouter
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: fastrouter plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -167,7 +166,7 @@ Description: greenlet plugins for uWSGI (Python 2.X)
 
 Package: uwsgi-plugin-http
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: HTTP plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -179,7 +178,7 @@ Description: HTTP plugin for uWSGI
 
 Package: uwsgi-plugin-lua
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: Lua WSAPI plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -191,7 +190,7 @@ Description: Lua WSAPI plugin for uWSGI
 
 Package: uwsgi-plugin-nagios
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: Nagios plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -203,7 +202,7 @@ Description: Nagios plugin for uWSGI
 
 Package: uwsgi-plugin-ping
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: ping plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -215,7 +214,7 @@ Description: ping plugin for uWSGI
 
 Package: uwsgi-plugin-psgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: Perl PSGI plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -255,7 +254,7 @@ Description: pyerl plugins for uWSGI (Python 3.X)
 
 Package: uwsgi-plugin-python
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: Python plugins for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -267,7 +266,7 @@ Description: Python plugins for uWSGI
 
 Package: uwsgi-plugin-python3
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: Python 3 plugins for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -279,7 +278,7 @@ Description: Python 3 plugins for uWSGI
 
 Package: uwsgi-plugin-rack-ruby1.8
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: Rack plugin for uWSGI (Ruby 1.8)
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -291,7 +290,7 @@ Description: Rack plugin for uWSGI (Ruby 1.8)
 
 Package: uwsgi-plugin-rpc
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: RPC plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
@@ -303,7 +302,7 @@ Description: RPC plugin for uWSGI
 
 Package: uwsgi-plugin-ugreen
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: uGreen plugin for uWSGI
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python

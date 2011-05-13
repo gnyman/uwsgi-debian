@@ -5,3 +5,4 @@
 110501_01_remove_assignments_to_LD_RUN_PATH.patch
 110511_01_get_real_filename_of_plugin_through_symlink.patch
 110511_02_dont_link_plugin_with_core_libraries.patch
+110513_01_fix_automagical_plugin_loading.patch
