@@ -5,7 +5,7 @@ Maintainer: Leonid Borisenko <leo.borisenko@gmail.com>
 Uploaders: Stephen Crosby <stevecrozz@gmail.com>
 Build-Depends: cdbs, debhelper (>= 8), python, python-all-dev, python3-all-dev,
  python-greenlet-dev, libxml2-dev, libsctp-dev, erlang-dev, libpcre3-dev,
- libldap2-dev, liblua5.1-0-dev, libperl-dev, ruby, ruby-dev,
+ libldap2-dev, liblua5.1-0-dev, libperl-dev, openjdk-6-jdk, ruby, ruby-dev,
  apache2-threaded-dev, libapr1-dev, libaprutil1-dev, help2man
 Standards-Version: 3.9.2
 Homepage: http://projects.unbit.it/uwsgi/
@@ -69,6 +69,8 @@ Depends: ${misc:Depends},
  uwsgi-plugin-fastrouter (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version}),
  uwsgi-plugin-http (= ${binary:Version}),
+ uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
+ uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
  uwsgi-plugin-lua (= ${binary:Version}),
  uwsgi-plugin-nagios (= ${binary:Version}),
  uwsgi-plugin-ping (= ${binary:Version}),
@@ -174,6 +176,33 @@ Description: HTTP plugin for uWSGI
  languages or platform.
  .
  This package provide HTTP plugin for uWSGI.
+
+Package: uwsgi-plugin-jvm-openjdk-6
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
+  openjdk-6-jre-headless
+Description: Java plugin for uWSGI
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide Java plugin for uWSGI linked with OpenJDK Java 6 runtime.
+
+Package: uwsgi-plugin-jwsgi-openjdk-6
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}), openjdk-6-jre-headless
+Description: JWSGI plugin for uWSGI (OpenJDK 6)
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide JWSGI plugin for uWSGI linked with OpenJDK Java 6
+ runtime.
 
 Package: uwsgi-plugin-lua
 Architecture: any
