@@ -54,6 +54,7 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGIN_PYTHON_PKG_KINDS) \
 	greenlet-python \
 	jvm-openjdk-6 jwsgi-openjdk-6 \
+	lua5.1 luajit \
 	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
@@ -131,7 +132,8 @@ clean::
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
-			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS), .$${TEMPLATE_TYPE} \
+			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) lua5.1 luajit, \
+			.$${TEMPLATE_TYPE} \
 		); do \
 			if [ -f $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
 				$(RM) $${INSTANTIATED_TEMPLATE}; \
@@ -315,6 +317,18 @@ debian/stamp-plugin-greenlet-python:
 	done
 	touch $@
 
+# Build lua51_plugin.so/lua_luajit_plugin.so
+debian/stamp-plugin-lua5.1 debian/stamp-plugin-luajit:
+	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
+		$(subst stamp-plugin-,,$(notdir $@)) \
+	))
+	UWSGICONFIG_LUA_IMPLEMENTATION=$(call target_name_tail, $@) \
+	$(PYTHON) $(UWSGI_BUILDER) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/lua \
+		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+		         $(PLUGIN_NAME)
+	touch $@
+
 # Install uwsgi-plugin-% package for ordinarily built uWSGI plugin
 $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS))::
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
@@ -414,6 +428,33 @@ install/uwsgi-plugin-greenlet-python::
 			< $(CURDIR)/debian/uwsgi-plugin.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
 	done
+
+install/uwsgi-plugin-lua5.1 install/uwsgi-plugin-luajit::
+	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
+		$(subst uwsgi-plugin-,,$(notdir $@)) \
+	))
+	$(eval PLUGIN_PRIORITY = $(if $(findstring uwsgi-plugin-lua5.1, $@),75,35))
+	for TEMPLATE_TYPE in postinst prerm; do \
+		sed \
+			-e 's/@@lua_kind@@/$(subst uwsgi-plugin-,,$(notdir $@))/g' \
+			-e 's/@@plugin_name@@/$(PLUGIN_NAME)/g' \
+			-e 's/@@plugin_alternatives_priority@@/$(PLUGIN_PRIORITY)/g' \
+				< $(CURDIR)/debian/uwsgi-plugin-lua.$${TEMPLATE_TYPE}.in \
+				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
+	done
+	for TEMPLATE_TYPE in install links manpages; do \
+		sed \
+			-e 's/@@plugin_name@@/$(PLUGIN_NAME)/g' \
+				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
+				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
+	done
+	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(PLUGIN_NAME)
+	help2man \
+		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
+		--section 1 \
+		--no-info \
+		$(CURDIR)/uwsgi_$(PLUGIN_NAME) \
+		> $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME).1; \
 
 # Binary-post-install uwsgi-plugin-pyerl-% packages
 $(patsubst %,binary-post-install/uwsgi-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::

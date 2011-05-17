@@ -3,10 +3,12 @@ Section: web
 Priority: extra
 Maintainer: Leonid Borisenko <leo.borisenko@gmail.com>
 Uploaders: Stephen Crosby <stevecrozz@gmail.com>
-Build-Depends: cdbs, debhelper (>= 8), python, python-all-dev, python3-all-dev,
- python-greenlet-dev, libxml2-dev, libsctp-dev, erlang-dev, libpcre3-dev,
- libldap2-dev, liblua5.1-0-dev, libperl-dev, openjdk-6-jdk, ruby, ruby-dev,
- apache2-threaded-dev, libapr1-dev, libaprutil1-dev, help2man
+Build-Depends: cdbs, debhelper (>= 8), pkg-config, python, python-all-dev,
+ python3-all-dev, python-greenlet-dev, libxml2-dev, libsctp-dev, erlang-dev,
+ libpcre3-dev, libldap2-dev, liblua5.1-0-dev,
+ libluajit-5.1-dev [i386 amd64 kfreebsd-i386 armel], libperl-dev,
+ openjdk-6-jdk, ruby, ruby-dev, apache2-threaded-dev, libapr1-dev,
+ libaprutil1-dev, help2man
 Standards-Version: 3.9.2
 Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://git.debian.org/collab-maint/uwsgi.git
@@ -71,7 +73,8 @@ Depends: ${misc:Depends},
  uwsgi-plugin-http (= ${binary:Version}),
  uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
  uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
- uwsgi-plugin-lua (= ${binary:Version}),
+ uwsgi-plugin-lua5.1 (= ${binary:Version}),
+ uwsgi-plugin-luajit (= ${binary:Version}) [i386 amd64 kfreebsd-i386 armel],
  uwsgi-plugin-nagios (= ${binary:Version}),
  uwsgi-plugin-ping (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
@@ -204,17 +207,29 @@ Description: JWSGI plugin for uWSGI (OpenJDK 6)
  This package provide JWSGI plugin for uWSGI linked with OpenJDK Java 6
  runtime.
 
-Package: uwsgi-plugin-lua
+Package: uwsgi-plugin-lua5.1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Lua WSAPI plugin for uWSGI
+Description: Lua WSAPI plugin for uWSGI (Lua 5.1)
  uWSGI is aimed for professional Python webapps deployment and development.
  Over time it has evolved in a complete stack for networked/clustered Python
  applications, implementing message/object passing, RPC, process management and
  a plugin loading technology that can be used to add support for other
  languages or platform.
  .
- This package provide Lua WSAPI plugin for uWSGI.
+ This package provide Lua WSAPI plugin for uWSGI (for Lua 5.1).
+
+Package: uwsgi-plugin-luajit
+Architecture: i386 amd64 kfreebsd-i386 armel
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Lua WSAPI plugin for uWSGI (LuaJIT)
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package provide Lua WSAPI plugin for uWSGI (for LuaJIT).
 
 Package: uwsgi-plugin-nagios
 Architecture: any
