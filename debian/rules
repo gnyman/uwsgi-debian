@@ -85,7 +85,8 @@ files_instantiated_in_debian_dir = $(addprefix \
 # CDBS-specific variables
 # =======================
 
-DEB_COMPRESS_EXCLUDE_uwsgi-core = .py .pl .xml .psgi .png
+DEB_COMPRESS_EXCLUDE_uwsgi-core = .ini .lua .pl .png .psgi .py .ru .ws .xml \
+                                  .yml
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
 # Rules
@@ -202,24 +203,40 @@ install/uwsgi-core::
 	test -e $(UWSGI_CORE_DOCS_STAGING_DIR) \
 		|| mkdir $(UWSGI_CORE_DOCS_STAGING_DIR)
 	cp -r $(CURDIR)/tests $(UWSGI_CORE_DOCS_STAGING_DIR)
-	for SUBDIR in conffile psgi wsgi; do \
+	for SUBDIR in conffile jwsgi psgi rack router wsapi wsgi; do \
 		mkdir -p $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/$${SUBDIR}; \
 	done
-	for FILE in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py; do\
+	for FILE in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py \
+	            testsignals.py ugreenchat.py uwsgistatus.py websockets.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples; \
 	done
-	for FILE in mega.xml uwsgi.xml; do \
+	for FILE in mega.xml multi.ini multi.xml sites.xml uwsgi.xml \
+	            werkzeug_strict.yml werkzeug.yml; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile; \
+	done
+	cp -r $(CURDIR)/vassals $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile
+	for FILE in utest.java; do \
+		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/jwsgi; \
+	done
+	for FILE in config.ru config2.ru fibers.ru fibers.yml; do \
+		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/rack; \
+	done
+	for FILE in router.lua uwsgirouter.py uwsgirouter2.py uwsgirouter3.py \
+	            uwsgirouter4.py uwsgirouter5.py; do \
+		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/router; \
 	done
 	for FILE in mojoapp.pl psgi.py test.psgi; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/psgi; \
 	done
-	for FILE in hello_world_rrdtool.py mjpeg_stream.py simple_app.py \
-	            simple_app_wsgi2.py testapp.py ugreenchat.py uploadtest.py \
-	            ; do \
+	for FILE in sputnik.ws; do \
+		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsapi; \
+	done
+	for FILE in hello_world_rrdtool.py mjpeg_stream.py multiapp.py \
+	            simple_app.py simple_app_wsgi2.py testapp.py testpy3.py \
+	            uploadtest.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsgi; \
 	done
-	chmod a-x $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsgi/ugreenchat.py
+	chmod a-x $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/ugreenchat.py
 	help2man \
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
 		--section 1 \
