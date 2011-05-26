@@ -3,12 +3,28 @@ Section: web
 Priority: extra
 Maintainer: Leonid Borisenko <leo.borisenko@gmail.com>
 Uploaders: Stephen Crosby <stevecrozz@gmail.com>
-Build-Depends: cdbs, debhelper (>= 8), pkg-config, python, python-all-dev,
- python3-all-dev, python-greenlet-dev, libxml2-dev, libsctp-dev, erlang-dev,
- libpcre3-dev, libldap2-dev, liblua5.1-0-dev,
- libluajit-5.1-dev [i386 amd64 kfreebsd-i386 armel], libperl-dev,
- openjdk-6-jdk, ruby, ruby-dev, apache2-threaded-dev, libapr1-dev,
- libaprutil1-dev, help2man
+Build-Depends:
+ cdbs,
+ debhelper (>= 8),
+ apache2-threaded-dev,
+ erlang-dev,
+ help2man,
+ libapr1-dev,
+ libaprutil1-dev,
+ libldap2-dev,
+ liblua5.1-0-dev,
+ libluajit-5.1-dev [i386 amd64 kfreebsd-i386 armel],
+ libperl-dev,
+ libsctp-dev,
+ libxml2-dev,
+ pkg-config,
+ python,
+ python-all-dev,
+ python-greenlet-dev,
+ python3-all-dev,
+ openjdk-6-jdk,
+ ruby,
+ ruby-dev
 Standards-Version: 3.9.2
 Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://git.debian.org/collab-maint/uwsgi.git
