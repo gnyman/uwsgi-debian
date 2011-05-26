@@ -97,25 +97,11 @@ Description: fast, self-healing application container server (core)
 Package: uwsgi-plugins-all
 Architecture: any
 Depends: ${misc:Depends},
- uwsgi-plugin-cgi (= ${binary:Version}),
- uwsgi-plugin-echo (= ${binary:Version}),
- uwsgi-plugin-erlang (= ${binary:Version}),
- uwsgi-plugin-fastrouter (= ${binary:Version}),
+ uwsgi-infrastructure-plugins (= ${binary:Version}),
+ uwsgi-app-integration-plugins (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version}),
- uwsgi-plugin-http (= ${binary:Version}),
- uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
- uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
- uwsgi-plugin-lua5.1 (= ${binary:Version}),
- uwsgi-plugin-luajit (= ${binary:Version}) [i386 amd64 kfreebsd-i386 armel],
- uwsgi-plugin-nagios (= ${binary:Version}),
- uwsgi-plugin-ping (= ${binary:Version}),
- uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-pyerl-python (= ${binary:Version}),
  uwsgi-plugin-pyerl-python3 (= ${binary:Version}),
- uwsgi-plugin-python (= ${binary:Version}),
- uwsgi-plugin-python3 (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.8 (= ${binary:Version}),
- uwsgi-plugin-rpc (= ${binary:Version}),
  uwsgi-plugin-ugreen (= ${binary:Version})
 Description: all available plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
@@ -125,10 +111,55 @@ Description: all available plugins for uWSGI
  the same core.
  .
  This dependency package provides all available plugins for uWSGI:
-   * CGI, echo, fastrouter, HTTP, Nagios, ping, RPC, uGreen
-   * Erlang, Java (OpenJDK 6), JWSGI (OpenJDK 6), Lua WSAPI (Lua 5.1/LuaJIT),
-     Perl PSGI, Python WSGI (Python/Python 3)
-   * greenlet (Python), pyerl (Python/Python 3)
+   * infrastructure plugins (fastrouter, HTTP serving, RPC, etc.)
+   * plugins for integration of uWSGI and application (CGI, PSGI, Rack, WSGI,
+     etc.)
+   * greenlet (Python), pyerl (Python/Python 3), uGreen
+
+Package: uwsgi-infrastructure-plugins
+Architecture: any
+Depends: ${misc:Depends},
+ uwsgi-plugin-echo (= ${binary:Version}),
+ uwsgi-plugin-fastrouter (= ${binary:Version}),
+ uwsgi-plugin-http (= ${binary:Version}),
+ uwsgi-plugin-nagios (= ${binary:Version}),
+ uwsgi-plugin-ping (= ${binary:Version}),
+ uwsgi-plugin-rpc (= ${binary:Version})
+Description: infrastructure plugins for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This dependency package provides infrastructure plugins for uWSGI:
+   * echo, fastrouter, HTTP serving, Nagios, ping, RPC
+
+Package: uwsgi-app-integration-plugins
+Architecture: any
+Depends: ${misc:Depends},
+ uwsgi-plugin-cgi (= ${binary:Version}),
+ uwsgi-plugin-erlang (= ${binary:Version}),
+ uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
+ uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
+ uwsgi-plugin-lua5.1 (= ${binary:Version}),
+ uwsgi-plugin-luajit (= ${binary:Version}) [i386 amd64 kfreebsd-i386 armel],
+ uwsgi-plugin-psgi (= ${binary:Version}),
+ uwsgi-plugin-python (= ${binary:Version}),
+ uwsgi-plugin-python3 (= ${binary:Version}),
+ uwsgi-plugin-rack-ruby1.8 (= ${binary:Version})
+Description: plugins for integration of uWSGI and application
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This dependency package provides plugins for integration of uWSGI and
+ application:
+   * CGI, Erlang, Java (OpenJDK 6), JWSGI (OpenJDK 6),
+     Lua WSAPI (Lua 5.1/LuaJIT), Perl PSGI, Python WSGI (Python/Python 3),
+     Rack (Ruby 1.8)
 
 Package: uwsgi-plugin-cgi
 Architecture: any
