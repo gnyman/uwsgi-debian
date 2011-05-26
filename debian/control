@@ -45,6 +45,22 @@ Description: fast, self-healing, developer-friendly WSGI server
    * init.d script for running uWSGI daemon(s) with options defined in custom
      user-created configuration files
 
+Package: uwsgi-dbg
+Architecture: any
+Section: debug
+Depends: ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Suggests: uwsgi-plugins-all
+Description: debugging symbols for uWSGI server and it's plugins
+ uWSGI is aimed for professional Python webapps deployment and development.
+ Over time it has evolved in a complete stack for networked/clustered Python
+ applications, implementing message/object passing, RPC, process management and
+ a plugin loading technology that can be used to add support for other
+ languages or platform.
+ .
+ This package contains the debug symbols for uWSGI core binary and plugins.
+ Install this package if you need to debug such a program or if you need a
+ useful backtrace of a crash.
+
 Package: uwsgi-core
 Architecture: any
 Priority: optional
@@ -62,21 +78,6 @@ Description: fast, self-healing, developer-friendly WSGI server (core)
    * executable uWSGI core binary (built without any embedded plugins)
    * uWSGI usage examples
    * uWSGI test suite
-
-Package: uwsgi-core-dbg
-Architecture: any
-Section: debug
-Depends: ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: debugging symbols for uWSGI server
- uWSGI is aimed for professional Python webapps deployment and development.
- Over time it has evolved in a complete stack for networked/clustered Python
- applications, implementing message/object passing, RPC, process management and
- a plugin loading technology that can be used to add support for other
- languages or platform.
- .
- This package contains the debug symbols for uWSGI core binary. Install this
- package if you need to debug such a program or if you need a useful backtrace
- of a crash.
 
 Package: uwsgi-plugins-all
 Architecture: any
