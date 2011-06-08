@@ -11,12 +11,16 @@ Build-Depends:
  help2man,
  libapr1-dev,
  libaprutil1-dev,
+ libjansson-dev,
  libldap2-dev,
  liblua5.1-0-dev,
  libluajit-5.1-dev [i386 amd64 kfreebsd-i386 armel],
  libperl-dev,
  libsctp-dev,
+ libsqlite3-dev,
  libxml2-dev,
+ libyaml-dev,
+ libzmq-dev,
  pkg-config,
  python,
  python-all-dev,
@@ -24,7 +28,8 @@ Build-Depends:
  python3-all-dev,
  openjdk-6-jdk,
  ruby,
- ruby-dev
+ ruby-dev,
+ uuid-dev
 Standards-Version: 3.9.2
 Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://git.debian.org/collab-maint/uwsgi.git
