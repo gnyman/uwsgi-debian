@@ -1,0 +1,18 @@
+Description: Fix usage of proto_write in echo plugin
+Author: Leonid Borisenko <leo.borisenko@gmail.com>
+Forwarded: no
+Last-Update: 2011-06-08
+
+Index: uwsgi/plugins/echo/echo_plugin.c
+===================================================================
+--- uwsgi.orig/plugins/echo/echo_plugin.c	2011-06-08 23:42:38.000000000 +0300
++++ uwsgi/plugins/echo/echo_plugin.c	2011-06-08 23:42:52.000000000 +0300
+@@ -5,7 +5,7 @@
+ 
+ int uwsgi_echo_request(struct wsgi_request *wsgi_req) {
+ 
+-	wsgi_req->response_size = wsgi_req->socket_proto_write(wsgi_req, wsgi_req->buffer, wsgi_req->uh.pktsize);
++	wsgi_req->response_size = wsgi_req->socket->proto_write(wsgi_req, wsgi_req->buffer, wsgi_req->uh.pktsize);
+ 	
+ 	return 0;
+ }
