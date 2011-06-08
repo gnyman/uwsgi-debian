@@ -125,6 +125,7 @@ Package: uwsgi-infrastructure-plugins
 Architecture: any
 Depends: ${misc:Depends},
  uwsgi-plugin-admin (= ${binary:Version}),
+ uwsgi-plugin-cache (= ${binary:Version}),
  uwsgi-plugin-echo (= ${binary:Version}),
  uwsgi-plugin-fastrouter (= ${binary:Version}),
  uwsgi-plugin-http (= ${binary:Version}),
@@ -139,7 +140,7 @@ Description: infrastructure plugins for uWSGI
  the same core.
  .
  This dependency package provides infrastructure plugins for uWSGI:
-   * admin, echo, fastrouter, HTTP serving, Nagios, ping, RPC
+   * admin, cache, echo, fastrouter, HTTP serving, Nagios, ping, RPC
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -178,6 +179,18 @@ Description: admin plugin for uWSGI
  the same core.
  .
  This package provides admin plugin for uWSGI.
+
+Package: uwsgi-plugin-cache
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: cache plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides cache plugin for uWSGI.
 
 Package: uwsgi-plugin-cgi
 Architecture: any
