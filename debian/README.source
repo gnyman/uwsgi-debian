@@ -21,26 +21,6 @@ Algorithmically speaking (see it in debian/rules):
 Also, _remember to add new plugin_ in Depends: and Description: fields of
 'uwsgi-plugins-all' binary package (in debian/control).
 
-Managing of quilt-based patch queue in debian/patches
-=====================================================
-
-As there is specific patch for Ubuntu, there is also Ubuntu-specific .series
-file (namely debian/patches/ubuntu.series).
-
-'series' and 'ubuntu.series' doesn't stacks up, so on adding/removing/renaming
-patch you must add/remove/rename it manually both in 'series' and
-'ubuntu.series'.
-
-quilt operates with 'series' file by default.
-
-You could manage 'ubuntu.series' with command:
-
-    QUILT_SERIES=ubuntu.series quilt <specific_command>
-
-For example:
-
-    QUILT_SERIES=ubuntu.series quilt series
-
 Why #!/bin/bash in uwsgi-pythonX init.d script?
 ===============================================
 

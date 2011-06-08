@@ -18,23 +18,24 @@ Last-Update: 2011-05-13
 
 Index: uwsgi/uwsgi.c
 ===================================================================
---- uwsgi.orig/uwsgi.c	2011-05-13 16:19:42.000000000 +0300
-+++ uwsgi/uwsgi.c	2011-05-13 20:38:39.000000000 +0300
-@@ -595,18 +595,18 @@
+--- uwsgi.orig/uwsgi.c	2011-06-08 22:21:33.000000000 +0300
++++ uwsgi/uwsgi.c	2011-06-08 22:22:09.000000000 +0300
+@@ -848,19 +848,18 @@
+ 
  	//initialize embedded plugins
  	UWSGI_LOAD_EMBEDDED_PLUGINS
- 
--	// now a bit of magic, if the argv[0] contains a _ try to automatically load a plugin
-+	// now a bit of magic, if the argv[0] basename contains a 'uwsgi_' string,
-+	// try to automatically load a plugin
- 	//uwsgi_log("executable name: %s\n", argv[0]);
+-		// now a bit of magic, if the argv[0] contains a _ try to automatically load a plugin
++		// now a bit of magic, if the argv[0] basename contains a 'uwsgi_' string,
++		// try to automatically load a plugin
+ 		//uwsgi_log("executable name: %s\n", argv[0]);
 -	char *p = strtok(argv[0], "_");
 -	plugins_requested = NULL;
 -	while (p != NULL) {
 -		p = strtok(NULL, "_");
--		if (p) plugins_requested = p;
+-		if (p)
+-			plugins_requested = p;
 -	}
--	
+-
 -	if (plugins_requested) {
 -		uwsgi_log("plugin = %s\n", plugins_requested);
 -		uwsgi_load_plugin(0, plugins_requested, NULL, 0);

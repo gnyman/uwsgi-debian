@@ -7,11 +7,11 @@ Last-Update: 2011-05-01
 
 Index: uwsgi/uwsgiconfig.py
 ===================================================================
---- uwsgi.orig/uwsgiconfig.py	2011-04-29 03:35:42.000000000 +0300
-+++ uwsgi/uwsgiconfig.py	2011-04-29 04:04:00.000000000 +0300
-@@ -24,6 +24,17 @@
-     GCC = 'gcc'
- 
+--- uwsgi.orig/uwsgiconfig.py	2011-06-08 21:51:27.000000000 +0300
++++ uwsgi/uwsgiconfig.py	2011-06-08 21:51:35.000000000 +0300
+@@ -28,6 +28,17 @@
+ 	
+     
  
 +# add -fno-strict-aliasing only on python2 and gcc < 4.3
 +def strict_aliasing_must_be_disabled(plugin_name, uconf):
@@ -25,9 +25,9 @@ Index: uwsgi/uwsgiconfig.py
 +
 +
  def spcall(cmd):
-     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,stderr=open('/dev/null','w'))
  
-@@ -110,6 +121,9 @@
+@@ -120,6 +131,9 @@
                  p_cflags = cflags[:]
                  p_cflags += up.CFLAGS
  
@@ -37,7 +37,7 @@ Index: uwsgi/uwsgiconfig.py
                  for cfile in up.GCC_LIST:
                      compile(' '.join(p_cflags),
                          path + '/' + cfile + '.o', path + '/' + cfile + '.c')
-@@ -166,12 +180,9 @@
+@@ -182,12 +196,9 @@
          except:
              print("*** you need a c compiler to build uWSGI ***")
              sys.exit(1)
@@ -53,7 +53,7 @@ Index: uwsgi/uwsgiconfig.py
              self.cflags = self.cflags + [ '-Wextra', '-Wno-unused-parameter', '-Wno-missing-field-initializers' ]
  
          self.ldflags = os.environ.get("LDFLAGS", "").split()
-@@ -475,6 +486,9 @@
+@@ -595,6 +606,9 @@
  
      p_cflags.insert(0, '-I.')
  
