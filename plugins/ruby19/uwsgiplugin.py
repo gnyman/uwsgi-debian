@@ -2,8 +2,10 @@ import os,sys
 
 NAME='ruby19'
 
-#RUBYPATH = '/opt/ruby19/bin/ruby'
-RUBYPATH = '/Users/roberto/RUBY/bin/ruby'
+try:
+        RUBYPATH = os.environ['UWSGICONFIG_RUBYPATH']
+except:
+        RUBYPATH = 'ruby'
 
 GCC_LIST = ['../rack/rack_plugin']
 CFLAGS = os.popen(RUBYPATH + " -e \"require 'rbconfig';print Config::CONFIG['CFLAGS']\"").read().rstrip().split()
@@ -13,7 +15,6 @@ v = version.split('.')
 
 if v[0] == '1' and v[1] == '9':
 	CFLAGS.append('-DRUBY19')
-	GCC_LIST.append('../rack/fiber')
 
 includedir = os.popen(RUBYPATH + " -e \"require 'rbconfig';print Config::CONFIG['rubyhdrdir']\"").read().rstrip()
 if includedir == 'nil':

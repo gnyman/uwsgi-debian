@@ -2,12 +2,85 @@
 
 extern struct uwsgi_server uwsgi;
 
-#define psgi_xs(func) newXS("uwsgi::" #func, XS_##func, "uwsgi")
-#define psgi_check_args(x) if (items < x) Perl_croak(aTHX_ "Usage: uwsgi::%s takes %d arguments", __FUNCTION__ + 3, x)
+#ifdef UWSGI_ASYNC
+
+
+XS(XS_async_sleep) {
+
+        dXSARGS;
+        int timeout ;
+
+        psgi_check_args(1);
+
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+        timeout = SvIV(ST(0));
+
+        if (timeout >= 0) {
+		async_add_timeout(wsgi_req, timeout);
+        }
+
+	wsgi_req->async_force_again = 1;
+
+	XSRETURN_UNDEF;
+}
+
+
+
+XS(XS_wait_fd_read) {
+
+	dXSARGS;
+        int fd, timeout = 0;
+
+	psgi_check_args(1);
+
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+	fd = SvIV(ST(0));
+	if (items > 1) {
+		timeout = SvIV(ST(1));
+	} 
+
+        if (fd >= 0) {
+                async_add_fd_read(wsgi_req, fd, timeout);
+        }
+
+	wsgi_req->async_force_again = 1;
+
+	XSRETURN_UNDEF;
+}
+
+
+XS(XS_wait_fd_write) {
+
+        dXSARGS;
+        int fd, timeout = 0;
+
+        psgi_check_args(1);
+
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+        fd = SvIV(ST(0));
+        if (items > 1) {
+                timeout = SvIV(ST(1));
+        }
+
+        if (fd >= 0) {
+                async_add_fd_read(wsgi_req, fd, timeout);
+        }
+
+	wsgi_req->async_force_again = 1;
+
+	XSRETURN_UNDEF;
+}
+
+#endif
+
 
 XS(XS_reload) {
     dXSARGS;
-    items = 0;
+
+	psgi_check_args(0);
 
     uwsgi_log("SENDING HUP TO %d\n", (int) uwsgi.workers[0].pid);
     if (kill(uwsgi.workers[0].pid, SIGHUP)) {
@@ -57,6 +130,27 @@ XS(XS_cache_get) {
 	
 }
 
+XS(XS_log) {
+
+	dXSARGS;
+
+	psgi_check_args(1);
+
+	uwsgi_log("%s", SvPV_nolen(ST(0)));
+
+	XSRETURN_UNDEF;
+}
+
+XS(XS_async_connect) {
+
+	dXSARGS;
+	psgi_check_args(1);
+
+	ST(0) = newSViv(uwsgi_connect(SvPV_nolen(ST(0)), 0, 1));
+
+	XSRETURN(1);
+}
+
 XS(XS_call) {
 
 	dXSARGS;
@@ -88,11 +182,30 @@ XS(XS_call) {
 }
 
 
+XS(XS_suspend) {
+
+	dXSARGS;
+	psgi_check_args(0);
+
+	struct wsgi_request *wsgi_req = current_wsgi_req();
+
+	wsgi_req->async_force_again = 0;
+
+        if (uwsgi.schedule_to_main) uwsgi.schedule_to_main(wsgi_req);
+
+	XSRETURN_UNDEF;
+}
 
 void init_perl_embedded_module() {
 	psgi_xs(reload);
 	psgi_xs(cache_set);
 	psgi_xs(cache_get);
 	psgi_xs(call);
+	psgi_xs(wait_fd_read);
+	psgi_xs(wait_fd_write);
+	psgi_xs(async_sleep);
+	psgi_xs(log);
+	psgi_xs(async_connect);
+	psgi_xs(suspend);
 }
 
