@@ -2,12 +2,16 @@
 
 extern struct uwsgi_server uwsgi;
 
-struct wsgi_request* threaded_current_wsgi_req() { return pthread_getspecific(uwsgi.tur_key); }
-struct wsgi_request* simple_current_wsgi_req() { return uwsgi.wsgi_req; }
+struct wsgi_request *threaded_current_wsgi_req() {
+	return pthread_getspecific(uwsgi.tur_key);
+}
+struct wsgi_request *simple_current_wsgi_req() {
+	return uwsgi.wsgi_req;
+}
 
 
 void uwsgi_register_loop(char *name, void *loop) {
-	
+
 	if (uwsgi.loops_cnt >= MAX_LOOPS) {
 		uwsgi_log("you can define %d loops at max\n", MAX_LOOPS);
 		exit(1);
@@ -21,8 +25,8 @@ void uwsgi_register_loop(char *name, void *loop) {
 void *uwsgi_get_loop(char *name) {
 
 	int i;
-	
-	for(i=0;i<uwsgi.loops_cnt;i++) {
+
+	for (i = 0; i < uwsgi.loops_cnt; i++) {
 		if (!strcmp(name, uwsgi.loops[i].name)) {
 			return uwsgi.loops[i].loop;
 		}
@@ -44,46 +48,155 @@ void *simple_loop(void *arg1) {
 
 	if (uwsgi.threads > 1) {
 
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &i);
+		pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &i);
 		pthread_setspecific(uwsgi.tur_key, (void *) wsgi_req);
 
 		if (core_id > 0) {
 			// block all signals on new threads
 			sigfillset(&smask);
 			pthread_sigmask(SIG_BLOCK, &smask, NULL);
-			for(i=0;i<0xFF;i++) {
+			for (i = 0; i < 0xFF; i++) {
 				if (uwsgi.p[i]->init_thread) {
 					uwsgi.p[i]->init_thread(core_id);
 				}
 			}
-			/*
-			   pts = PyThreadState_New(uwsgi.main_thread->interp);
-			   pthread_setspecific(uwsgi.ut_save_key, (void *) pts);
-			   */
 		}
 	}
 #endif
 
+	// initialize the main event queue to monitor sockets
+	uwsgi.main_queue = event_queue_init();
+
+	uwsgi_add_sockets_to_queue(uwsgi.main_queue);
+
+	if (uwsgi.signal_socket > -1) {
+		event_queue_add_fd_read(uwsgi.main_queue, uwsgi.signal_socket);
+	}
+
 	while (uwsgi.workers[uwsgi.mywid].manage_next_request) {
 
-
-		UWSGI_CLEAR_STATUS;
-
-
-		wsgi_req_setup(wsgi_req, core_id);
+		wsgi_req_setup(wsgi_req, core_id, NULL);
 
 		if (wsgi_req_accept(wsgi_req)) {
 			continue;
 		}
 
 		if (wsgi_req_recv(wsgi_req)) {
+			uwsgi_destroy_request(wsgi_req);
 			continue;
 		}
 
 		uwsgi_close_request(wsgi_req);
 	}
 
-	pthread_exit(NULL);
-	
-	//never here
+	// end of the loop
 	return NULL;
 }
+
+#ifdef UWSGI_ZEROMQ
+void *zeromq_loop(void *arg1) {
+	sigset_t smask;
+	int i;
+
+	long core_id = (long) arg1;
+
+	struct wsgi_request *wsgi_req = uwsgi.wsgi_requests[core_id];
+	uwsgi.zeromq_recv_flag = 0;
+	zmq_pollitem_t zmq_poll_items[2];
+	char uwsgi_signal;
+
+	if (uwsgi.threads > 1) {
+
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &i);
+		pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &i);
+		pthread_setspecific(uwsgi.tur_key, (void *) wsgi_req);
+
+		if (core_id > 0) {
+			// block all signals on new threads
+			sigfillset(&smask);
+			pthread_sigmask(SIG_BLOCK, &smask, NULL);
+			for (i = 0; i < 0xFF; i++) {
+				if (uwsgi.p[i]->init_thread) {
+					uwsgi.p[i]->init_thread(core_id);
+				}
+			}
+
+
+			void *tmp_zmq_pull = zmq_socket(uwsgi.zmq_context, ZMQ_PULL);
+			if (tmp_zmq_pull == NULL) {
+				uwsgi_error("zmq_socket()");
+				exit(1);
+			}
+			if (zmq_connect(tmp_zmq_pull, uwsgi.zmq_receiver) < 0) {
+				uwsgi_error("zmq_connect()");
+				exit(1);
+			}
+
+			pthread_setspecific(uwsgi.zmq_pull, tmp_zmq_pull);
+		}
+
+	}
+
+
+	if (uwsgi.signal_socket > -1) {
+		zmq_poll_items[0].socket = pthread_getspecific(uwsgi.zmq_pull);
+		zmq_poll_items[0].fd = -1;
+		zmq_poll_items[0].events = ZMQ_POLLIN;
+
+		zmq_poll_items[1].socket = NULL;
+		zmq_poll_items[1].fd = uwsgi.signal_socket;
+		zmq_poll_items[1].events = ZMQ_POLLIN;
+	}
+
+
+	while (uwsgi.workers[uwsgi.mywid].manage_next_request) {
+
+		wsgi_req_setup(wsgi_req, core_id, NULL);
+
+		uwsgi.edge_triggered = 1;
+		wsgi_req->socket = uwsgi.zmq_socket;
+
+
+		if (uwsgi.signal_socket > -1) {
+			if (zmq_poll(zmq_poll_items, 2, -1) < 0) {
+				uwsgi_error("zmq_poll()");
+				continue;
+			}
+
+			if (zmq_poll_items[1].revents & ZMQ_POLLIN) {
+                		if (read(uwsgi.signal_socket, &uwsgi_signal, 1) <= 0) {
+                        		if (uwsgi.no_orphans) {
+                                		uwsgi_log_verbose("uWSGI worker %d screams: UAAAAAAH my master died, i will follow him...\n", uwsgi.mywid);
+                                		end_me(0);
+                        		}
+                		}
+                		else {
+                        		uwsgi_log_verbose("master sent signal %d to worker %d\n", uwsgi_signal, uwsgi.mywid);
+                        		if (uwsgi_signal_handler(uwsgi_signal)) {
+                                		uwsgi_log_verbose("error managing signal %d on worker %d\n", uwsgi_signal, uwsgi.mywid);
+                        		}
+                		}
+				continue;
+			}
+
+			if (zmq_poll_items[0].revents & ZMQ_POLLIN) {
+				wsgi_req->poll.fd = wsgi_req->socket->proto_accept(wsgi_req, uwsgi.zmq_socket->fd);
+			}
+		}
+		else {
+			wsgi_req->poll.fd = wsgi_req->socket->proto_accept(wsgi_req, uwsgi.zmq_socket->fd);
+		}
+
+		if (wsgi_req->poll.fd >= 0) {
+			wsgi_req_recv(wsgi_req);
+		}
+
+		uwsgi_close_request(wsgi_req);
+	}
+
+
+        // end of the loop
+        return NULL;
+}
+#endif

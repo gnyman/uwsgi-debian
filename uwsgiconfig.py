@@ -1,5 +1,7 @@
 # uWSGI build system
 
+uwsgi_version = '0.9.8'
+
 import os
 import re
 import time
@@ -23,9 +25,11 @@ GCC = os.environ.get('CC', sysconfig.get_config_var('CC'))
 if not GCC:
     GCC = 'gcc'
 
+	
+    
 
 def spcall(cmd):
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,stderr=open('/dev/null','w'))
 
     if p.wait() == 0:
         if sys.version_info[0] > 2:
@@ -33,6 +37,12 @@ def spcall(cmd):
         return p.stdout.read().rstrip()
     else:
         return None
+
+if uwsgi_version.endswith('-dev') and os.path.exists('%s/.hg' % os.path.dirname(os.path.abspath( __file__ ))):
+    try:
+        uwsgi_version += spcall('hg tip --template "-{rev}"')
+    except:
+        pass
 
 
 def spcall2(cmd):
@@ -156,10 +166,16 @@ class uConf(object):
         self.config = ConfigParser.ConfigParser()
         print("using profile: %s" % filename)
         self.config.read(filename)
-        self.gcc_list = ['utils', 'protocol', 'socket', 'logging', 'master', 'emperor',
+        self.gcc_list = ['utils', 'protocol', 'socket', 'logging', 'master', 'master_utils', 'emperor', 'notify',
             'plugins', 'lock', 'cache', 'queue', 'event', 'signal', 'rpc', 'gateway', 'loop', 'lib/rbtree', 'lib/amqp', 'rb_timers', 'uwsgi']
-        #if uwsgi_os == 'Linux':
-        #    self.gcc_list.append('lib/netlink')
+        # add protocols
+        self.gcc_list.append('proto/base')
+        self.gcc_list.append('proto/uwsgi')
+        self.gcc_list.append('proto/http')
+        self.gcc_list.append('proto/fastcgi')
+        if uwsgi_os == 'Linux':
+            self.gcc_list.append('lib/linux_ns')
+            self.gcc_list.append('lib/netlink')
         self.cflags = ['-O2', '-Wall', '-Werror', '-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64'] + os.environ.get("CFLAGS", "").split()
         try:
             gcc_version = str(spcall("%s -dumpversion" % GCC))
@@ -175,7 +191,7 @@ class uConf(object):
             self.cflags = self.cflags + [ '-Wextra', '-Wno-unused-parameter', '-Wno-missing-field-initializers' ]
 
         self.ldflags = os.environ.get("LDFLAGS", "").split()
-        self.libs = ['-lpthread', '-rdynamic']
+        self.libs = ['-lpthread', '-lm', '-rdynamic']
         if uwsgi_os == 'Linux':
             self.libs.append('-ldl')
 
@@ -221,12 +237,18 @@ class uConf(object):
 
     def get_gcll(self):
 
+        global uwsgi_version
+
         self.cflags.append('-DUWSGI_BUILD_DATE="\\"%s\\""' % time.strftime("%d %B %Y %H:%M:%S"))
         kvm_list = ['FreeBSD', 'OpenBSD', 'NetBSD', 'DragonFly']
+
+        if os.path.exists('/usr/include/ifaddrs.h') or os.path.exists('/usr/local/include/ifaddrs.h'):
+            self.cflags.append('-DUWSGI_HAS_IFADDRS')
 
         if uwsgi_os == 'SunOS':
             self.libs.append('-lsendfile')
             self.gcc_list.append('lib/sun_fixes')
+            self.ldflags.append('-L/lib')
             if not uwsgi_os_v.startswith('Nexenta'):
                 self.libs.remove('-rdynamic')
 
@@ -344,6 +366,12 @@ class uConf(object):
             self.cflags.append('-DUWSGI_EVENT_FILEMONITOR_USE_NONE')
 
 
+        if self.get('malloc_implementation') != 'libc':
+            if self.get('malloc_implementation') == 'tcmalloc':
+                self.libs.append('-ltcmalloc')
+            if self.get('malloc_implementation') == 'jemalloc':
+                self.libs.append('-ljemalloc')
+
         if self.get('embedded'):
             self.cflags.append('-DUWSGI_EMBEDDED')
 
@@ -373,6 +401,50 @@ class uConf(object):
                     self.gcc_list.append('regexp')
                     self.cflags.append("-DUWSGI_PCRE")
 
+        has_json = False
+        has_uuid = False
+
+        if os.path.exists('/usr/include/uuid/uuid.h') or os.path.exists('/usr/local/include/uuid/uuid.h'):
+            has_uuid = True
+            self.cflags.append("-DUWSGI_UUID")
+            if os.path.exists('/usr/lib/libuuid.so') or os.path.exists('/usr/local/lib/libuuid.so'):
+                self.libs.append('-luuid')
+
+        if self.get('append_version'):
+            if not self.get('append_version').startswith('-'):
+                uwsgi_version += '-'
+            uwsgi_version += self.get('append_version')
+
+        self.cflags.append('-DUWSGI_VERSION="\\"' + uwsgi_version + '\\""')
+
+        uver_whole = uwsgi_version.split('-', 1)
+        if len(uver_whole) == 1:
+            uver_custom = ''
+        else:
+            uver_custom = uver_whole[1]
+
+        uver_dots = uver_whole[0].split('.')
+
+        uver_base = uver_dots[0]
+        uver_maj = uver_dots[1]
+        uver_min = '0'
+        uver_rev = '0'
+
+        if len(uver_dots) > 2:
+            uver_min = uver_dots[2]
+
+        if len(uver_dots) > 3:
+            uver_rev = uver_dots[3]
+        
+
+        self.cflags.append('-DUWSGI_VERSION_BASE="' + uver_base + '"')
+        self.cflags.append('-DUWSGI_VERSION_MAJOR="' + uver_maj + '"')
+        self.cflags.append('-DUWSGI_VERSION_MINOR="' + uver_min + '"')
+        self.cflags.append('-DUWSGI_VERSION_REVISION="' + uver_rev + '"')
+        self.cflags.append('-DUWSGI_VERSION_CUSTOM="\\"' + uver_custom + '\\""')
+
+	
+
         if self.get('async'):
             self.cflags.append("-DUWSGI_ASYNC")
             self.gcc_list.append('async')
@@ -391,6 +463,33 @@ class uConf(object):
         if self.get('yaml'):
             self.cflags.append("-DUWSGI_YAML")
             self.gcc_list.append('yaml')
+            if self.get('yaml_implementation') == 'libyaml':
+                self.cflags.append("-DUWSGI_LIBYAML")
+                self.libs.append('-lyaml')
+            if self.get('yaml_implementation') == 'auto':
+                if os.path.exists('/usr/include/yaml.h') or os.path.exists('/usr/local/include/yaml.h'):
+                    self.cflags.append("-DUWSGI_LIBYAML")
+                    self.libs.append('-lyaml')
+
+        if self.get('json'):
+            if self.get('json') == 'auto':
+                jsonconf = spcall("pkg-config --cflags jansson")
+                if jsonconf:
+                    self.cflags.append(jsonconf)
+                    self.cflags.append("-DUWSGI_JSON")
+                    self.gcc_list.append('json')
+                    self.libs.append(spcall("pkg-config --libs jansson"))
+                    has_json = True
+                elif os.path.exists('/usr/include/jansson.h') or os.path.exists('/usr/local/include/jansson.h'):
+                    self.cflags.append("-DUWSGI_JSON")
+                    self.gcc_list.append('json')
+                    self.libs.append('-ljansson')
+                    has_json = True
+            else:
+                self.cflags.append("-DUWSGI_JSON")
+                self.gcc_list.append('json')
+                self.libs.append('-ljansson')
+                has_json = True
 
         if self.get('ldap'):
             if self.get('ldap') == 'auto':
@@ -402,6 +501,17 @@ class uConf(object):
                 self.cflags.append("-DUWSGI_LDAP")
                 self.gcc_list.append('ldap')
                 self.libs.append('-lldap')
+
+        if has_uuid and self.get('zeromq'):
+            if self.get('zeromq') == 'auto':
+                if os.path.exists('/usr/include/zmq.h') or os.path.exists('/usr/local/include/zmq.h'):
+                    self.cflags.append("-DUWSGI_ZEROMQ")
+                    self.gcc_list.append('proto/zeromq')
+                    self.libs.append('-lzmq')
+            else:
+                self.cflags.append("-DUWSGI_ZEROMQ")
+                self.gcc_list.append('proto/zeromq')
+                self.libs.append('-lzmq')
 
         if self.get('evdis'):
             self.cflags.append("-DUWSGI_EVDIS")
@@ -440,6 +550,17 @@ class uConf(object):
                 self.libs.append('-lexpat')
                 self.gcc_list.append('xmlconf')
 
+        if self.get('sqlite3'):
+            if self.get('sqlite3') == 'auto':
+                if os.path.exists('/usr/include/sqlite3.h') or os.path.exists('/usr/local/include/sqlite3.h'):
+                    self.cflags.append("-DUWSGI_SQLITE3")
+                    self.libs.append('-lsqlite3')
+                    self.gcc_list.append('sqlite3')
+            else:
+                self.cflags.append("-DUWSGI_SQLITE3")
+                self.libs.append('-lsqlite3')
+                self.gcc_list.append('sqlite3')
+
 
         if self.get('plugin_dir'):
             self.cflags.append('-DUWSGI_PLUGIN_DIR=\\"%s\\"' % self.get('plugin_dir'))
@@ -467,11 +588,10 @@ def build_plugin(path, uc, cflags, ldflags, libs, name = None):
 
     p_cflags = cflags[:]
     p_ldflags = ldflags[:]
-    p_libs = libs[:]
 
     p_cflags += up.CFLAGS
     p_ldflags += up.LDFLAGS
-    p_libs += up.LIBS
+    p_libs = up.LIBS
 
     p_cflags.insert(0, '-I.')
 

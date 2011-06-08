@@ -3,10 +3,10 @@
 
 #include <frameobject.h>
 
-#define MAX_PYTHONPATH 64
 #define MAX_PYMODULE_ALIAS 64
+#define MAX_PYARGV 10
 
-#define LONG_ARGS_PYTHON_BASE      17000 + ((0 + 1) * 100)
+#define LONG_ARGS_PYTHON_BASE      17000 + ((0 + 1) * 1000)
 
 #define LONG_ARGS_PYTHONPATH            LONG_ARGS_PYTHON_BASE + 1
 #define LONG_ARGS_PASTE                 LONG_ARGS_PYTHON_BASE + 2
@@ -16,6 +16,14 @@
 
 #if PY_MINOR_VERSION == 4 && PY_MAJOR_VERSION == 2
 #define Py_ssize_t ssize_t
+#endif
+
+#if PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION < 7
+#define HAS_NOT_PyFrame_GetLineNumber 
+#endif
+
+#if PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION < 2
+#define HAS_NOT_PyFrame_GetLineNumber 
 #endif
 
 #if PY_MAJOR_VERSION > 2
@@ -90,8 +98,7 @@ struct uwsgi_python {
 
 	char *test_module;
 
-	char *python_path[MAX_PYTHONPATH];
-	int python_path_cnt;
+	struct uwsgi_string_list *python_path;
 
 	PyObject *loader_dict;
 	PyObject* (*loaders[LOADER_MAX]) (void *);
@@ -212,3 +219,5 @@ void threaded_swap_ts(struct wsgi_request *, struct uwsgi_app *);
 void simple_swap_ts(struct wsgi_request *, struct uwsgi_app *);
 void threaded_reset_ts(struct wsgi_request *, struct uwsgi_app *);
 void simple_reset_ts(struct wsgi_request *, struct uwsgi_app *);
+
+int uwsgi_python_profiler_call(PyObject *, PyFrameObject *, int, PyObject *);

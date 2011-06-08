@@ -4,6 +4,8 @@
 #include <linux/rtnetlink.h>
 #include <net/if.h>
 
+#ifdef CLONE_NEWNET
+
 #define NLMSG_TAIL(nmsg) \
         ((struct rtattr *) (((void *) (nmsg)) + NLMSG_ALIGN((nmsg)->nlmsg_len)))
 
@@ -377,3 +379,4 @@ int uwsgi_nl_send(struct nlmsghdr *nlmsg) {
 	close(nlfd);
 	return ret;
 }
+#endif

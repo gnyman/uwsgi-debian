@@ -1,5 +1,7 @@
 #include "psgi.h"
 
+extern struct uwsgi_server uwsgi;
+
 /* statistically ordered */
 struct http_status_codes hsc[] = {
         {"200", "OK"},
@@ -55,16 +57,54 @@ int psgi_response(struct wsgi_request *wsgi_req, PerlInterpreter *my_perl, AV *r
 	struct http_status_codes *http_sc;
 	int i,vi, base;
 	char *chitem;
-	dSP;
+
+#ifdef UWSGI_ASYNC
+	if (wsgi_req->async_status == UWSGI_AGAIN) {
+
+		wsgi_req->async_force_again = 0;
+
+		wsgi_req->switches++;
+                SV *chunk = uwsgi_perl_obj_call(wsgi_req->async_placeholder, "getline");
+		if (!chunk) {
+			internal_server_error(wsgi_req, "exception raised");
+			return UWSGI_OK;
+		}
+
+		if (wsgi_req->async_force_again) {
+			SvREFCNT_dec(chunk);
+			return UWSGI_AGAIN;
+		}
+
+                chitem = SvPV( chunk, hlen);
+
+                if (hlen <= 0) {
+			SvREFCNT_dec(chunk);
+			SV *closed = uwsgi_perl_obj_call(wsgi_req->async_placeholder, "close");
+                	if (closed) {
+                        	SvREFCNT_dec(closed);
+                	}
+
+			SvREFCNT_dec(wsgi_req->async_environ);
+        		SvREFCNT_dec(wsgi_req->async_result);
+
+			return UWSGI_OK;
+                }
+
+                wsgi_req->response_size += wsgi_req->socket->proto_write(wsgi_req, chitem, hlen);
+		SvREFCNT_dec(chunk);
+
+		return UWSGI_AGAIN;
+	}
+#endif
 
 	status_code = av_fetch(response, 0, 0);
+	if (!status_code) { uwsgi_log("invalid PSGI status code\n"); return UWSGI_OK;}
 
         wsgi_req->hvec[0].iov_base = "HTTP/1.1 ";
         wsgi_req->hvec[0].iov_len = 9;
 
-        //uwsgi_log("setting status %d %d\n", SvTYPE(*status_code), SvIV(*status_code));
-
         wsgi_req->hvec[1].iov_base = SvPV(*status_code, hlen);
+
         wsgi_req->hvec[1].iov_len = 3;
 
         wsgi_req->status = atoi(wsgi_req->hvec[1].iov_base);
@@ -92,8 +132,10 @@ int psgi_response(struct wsgi_request *wsgi_req, PerlInterpreter *my_perl, AV *r
         wsgi_req->hvec[4].iov_len = 2;
 
         hitem = av_fetch(response, 1, 0);
+	if (!hitem) { uwsgi_log("invalid PSGI headers\n"); return UWSGI_OK;}
 
         headers = (AV *) SvRV(*hitem);
+	if (!headers) { uwsgi_log("invalid PSGI headers\n"); return UWSGI_OK;}
 
         base = 5;
 
@@ -122,34 +164,76 @@ int psgi_response(struct wsgi_request *wsgi_req, PerlInterpreter *my_perl, AV *r
 	vi = (i*2)+base;
         wsgi_req->hvec[vi].iov_base = "\r\n"; wsgi_req->hvec[vi].iov_len = 2;
 
-        if ( !(wsgi_req->headers_size = writev(wsgi_req->poll.fd, wsgi_req->hvec, vi+1)) ) {
+        if ( !(wsgi_req->headers_size += wsgi_req->socket->proto_writev_header(wsgi_req, wsgi_req->hvec, vi+1)) ) {
                 uwsgi_error("writev()");
         }
 
         hitem = av_fetch(response, 2, 0);
 
-        if (SvTYPE(SvRV(*hitem)) == SVt_PVGV || SvTYPE(SvRV(*hitem)) == SVt_PVHV) {
+	if (!hitem) {
+		return UWSGI_OK;
+	}
+
+	if (!SvRV(*hitem)) { uwsgi_log("invalid PSGI response body\n") ; return UWSGI_OK; }
+	
+        if (SvTYPE(SvRV(*hitem)) == SVt_PVGV || SvTYPE(SvRV(*hitem)) == SVt_PVHV || SvTYPE(SvRV(*hitem)) == SVt_PVMG) {
+
+		// respond to fileno ?
+		if (uwsgi.async < 2) {
+			if (uwsgi_perl_obj_can(*hitem, "fileno", 6)) {
+				SV *fn = uwsgi_perl_obj_call(*hitem, "fileno");
+				wsgi_req->sendfile_fd = SvIV(fn);
+				SvREFCNT_dec(fn);	
+				wsgi_req->response_size += uwsgi_sendfile(wsgi_req);
+				return UWSGI_OK;
+			}
+			
+			if (uwsgi_perl_obj_can(*hitem, "path", 4)) {
+				SV *p = uwsgi_perl_obj_call(*hitem, "path");
+				wsgi_req->sendfile_fd = open(SvPV_nolen(p), O_RDONLY);
+				SvREFCNT_dec(p);	
+				wsgi_req->response_size += uwsgi_sendfile(wsgi_req);
+				close(wsgi_req->sendfile_fd);
+				return UWSGI_OK;
+			}
+		}
 
                 for(;;) {
-                        PUSHMARK(SP);
-                        XPUSHs(*hitem);
-                        PUTBACK;
-                        perl_call_method("getline", G_SCALAR);
-                        SPAGAIN;
 
-                        if(SvTRUE(ERRSV)) {
-                                uwsgi_log("%s\n", SvPV_nolen(ERRSV));
-                                break;
-                        }
-
-                        SV *chunk = POPs;
+			wsgi_req->switches++;
+                        SV *chunk = uwsgi_perl_obj_call(*hitem, "getline");
+			if (!chunk) {
+				internal_server_error(wsgi_req, "exception raised");
+				break;
+			}
                         chitem = SvPV( chunk, hlen);
+#ifdef UWSGI_ASYNC
+			if (uwsgi.async > 1 && wsgi_req->async_force_again) {
+				SvREFCNT_dec(chunk);
+				wsgi_req->async_status = UWSGI_AGAIN;
+				wsgi_req->async_placeholder = (SV *) *hitem;
+				return UWSGI_AGAIN;
+			}
+#endif
                         if (hlen <= 0) {
+				SvREFCNT_dec(chunk);
                                 break;
                         }
-                        wsgi_req->response_size = write(wsgi_req->poll.fd, chitem, hlen);
+                        wsgi_req->response_size += wsgi_req->socket->proto_write(wsgi_req, chitem, hlen);
+			SvREFCNT_dec(chunk);
+#ifdef UWSGI_ASYNC
+			if (uwsgi.async > 1) {
+				wsgi_req->async_status = UWSGI_AGAIN;
+				wsgi_req->async_placeholder = (SV *) *hitem;
+				return UWSGI_AGAIN;
+			}
+#endif
                 }
 
+		SV *closed = uwsgi_perl_obj_call(*hitem, "close");
+		if (closed) {
+			SvREFCNT_dec(closed);
+		}
 
         }
         else if (SvTYPE(SvRV(*hitem)) == SVt_PVAV)  {
@@ -159,7 +243,7 @@ int psgi_response(struct wsgi_request *wsgi_req, PerlInterpreter *my_perl, AV *r
                 for(i=0; i<=av_len(body); i++) {
                         hitem = av_fetch(body,i,0);
                         chitem = SvPV(*hitem, hlen);
-                        wsgi_req->response_size = write(wsgi_req->poll.fd, chitem, hlen);
+                        wsgi_req->response_size += wsgi_req->socket->proto_write(wsgi_req, chitem, hlen);
                 }
 
         }
@@ -167,6 +251,6 @@ int psgi_response(struct wsgi_request *wsgi_req, PerlInterpreter *my_perl, AV *r
                 uwsgi_log("unsupported response body type: %d\n", SvTYPE(SvRV(*hitem)));
         }
 	
-	return 1;
+	return UWSGI_OK;
 
 }

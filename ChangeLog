@@ -1,3 +1,87 @@
+*** june 2011 ***
+
+ * 0.9.8 [20110605]
+
+- support for --callable in virtualhosting mode
+- a NetBSD fix
+- abstract unix socket can be prefixed with \0 (nginx-style)
+- add /lib to the linker in sun-like systems
+- a mercy mode of 5 seconds is enabled by default on SIGINT/SIGQUIT
+
+ * 0.9.8-rc4 [20110602]
+
+- fixed REMOTE_ADDR when --protocol=http
+- official support for OpenIndiana
+- added a welcome.py test script
+- new api attribute uwsgi.version_info
+- improved the admin plugin
+- two new management flag for backlog queue monitoring
+- fixed uwsgi_log for bigger loglines
+- new option --early-emperor to allows out-of-jail emperors
+- emperor can now spawn other emperors (sub-emperors)
+- fixed idle mode in single-process
+- fixed solaris iovec
+
+*** may 2011 ***
+
+ * 0.9.8-rc3 [20110530]
+
+- snapshotting support
+- fixed python 3.x spooler
+- improvements for grunt processes
+- better abstract unix socket
+- --log-socket allows logging to generic DGRAM sockets
+- a bunch of solaris fixes
+- new option --no-fd-passing for fastrouter
+- --fastrouter-subscription-slot to set the number of slot in subscription server
+- unlimited shared sockets
+- fixed netlink compilation
+- auto-reconnect on emperor+amqp server disconnection
+- various emperor fixes
+- unlimited fastrouter sockets
+- better cgroup support
+- --add-header option allow adding of custom HTTP response headers
+- cheap and idle operational modes
+
+
+ * 0.9.8-rc2 [20110521]
+
+- new option --die-on-term
+- fixed touch reload
+- a couple of optimizations for wsgi.input
+- systemd integration
+
+ * 0.9.8-rc1 [20110514]
+
+- massive code cleanup and refactoring
+- added vassals loyalty concept
+- fixed virtualhosting with dynamic virtualenv
+- fixed reloading on grand-central-dispatch-enabled OSX
+- improved PSGI support with uGreen and async support
+- improved Rack support with complete fiber+async in ruby 1.9
+- support for JSON config files
+- native multi-protocol support (added fastcgi and http)
+- Mongrel2 support
+- support for templates in vassals
+- various threading fixes
+- gcc-4.6 support
+- support for logging via zeromq
+- support for configuration passed via pipe/stdin
+- pythonpath entries are now unlimited
+- socket entries are unlimited
+- pythonpath can be a glob
+- lazy mode added
+- new language-independent profiling subsystem
+- support for configuration stored in a sqlite3 db
+- allow workers to survive to syslogd death (when --log-syslog is used)
+- fix traceback in Python 3.x
+- support for uwsgi signals in threads
+- plugin autoloading
+- graceful reloading for threads
+- new wsgi.input object
+- support for alternative allocators (tcmalloc and jemalloc)
+
+
 *** april 2011 ***
 
  * 0.9.7.2 [20110406]
