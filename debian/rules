@@ -56,6 +56,7 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	jvm-openjdk-6 jwsgi-openjdk-6 \
 	lua5.1 luajit \
 	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))
+
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
 
@@ -274,7 +275,7 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):
 	$(eval RUBY_INTERPRETER = $(if $(findstring rack_, $(PLUGIN_NAME)), \
 		$(call target_name_tail, $@), ruby1.8 \
 	))
-	UWSGICONFIG_RUBYPATH=/usr/bin/$(RUBY_INTERPRETER)
+	UWSGICONFIG_RUBYPATH=/usr/bin/$(RUBY_INTERPRETER) \
 	$(PYTHON) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_SRC_SUBDIR) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \

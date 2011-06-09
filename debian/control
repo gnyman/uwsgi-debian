@@ -27,8 +27,10 @@ Build-Depends:
  python-greenlet-dev,
  python3-all-dev,
  openjdk-6-jdk,
- ruby,
- ruby-dev,
+ ruby1.8,
+ ruby1.8-dev,
+ ruby1.9.1,
+ ruby1.9.1-dev,
  uuid-dev
 Standards-Version: 3.9.2
 Homepage: http://projects.unbit.it/uwsgi/
@@ -154,7 +156,8 @@ Depends: ${misc:Depends},
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
  uwsgi-plugin-python3 (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.8 (= ${binary:Version})
+ uwsgi-plugin-rack-ruby1.8 (= ${binary:Version}),
+ uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
 Description: plugins for integration of uWSGI and application
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -166,7 +169,7 @@ Description: plugins for integration of uWSGI and application
  application:
    * CGI, Erlang, Java (OpenJDK 6), JWSGI (OpenJDK 6),
      Lua WSAPI (Lua 5.1/LuaJIT), Perl PSGI, Python WSGI (Python/Python 3),
-     Rack (Ruby 1.8)
+     Rack (Ruby 1.8/Ruby 1.9.1)
 
 Package: uwsgi-plugin-admin
 Architecture: any
@@ -421,6 +424,18 @@ Description: Rack plugin for uWSGI (Ruby 1.8)
  the same core.
  .
  This package provides Rack plugin for uWSGI (linked with Ruby 1.8 runtime).
+
+Package: uwsgi-plugin-rack-ruby1.9.1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Rack plugin for uWSGI (Ruby 1.9.1)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Rack plugin for uWSGI (linked with Ruby 1.9.1 runtime).
 
 Package: uwsgi-plugin-rpc
 Architecture: any
