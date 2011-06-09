@@ -106,6 +106,7 @@ Architecture: any
 Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
+ uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version}),
  uwsgi-plugin-pyerl-python (= ${binary:Version}),
  uwsgi-plugin-pyerl-python3 (= ${binary:Version}),
@@ -121,7 +122,7 @@ Description: all available plugins for uWSGI
    * infrastructure plugins (fastrouter, HTTP serving, RPC, etc.)
    * plugins for integration of uWSGI and application (CGI, PSGI, Rack, WSGI,
      etc.)
-   * greenlet (Python), pyerl (Python/Python 3), uGreen
+   * fiber loop engine, greenlet (Python), pyerl (Python/Python 3), uGreen
 
 Package: uwsgi-infrastructure-plugins
 Architecture: any
@@ -242,6 +243,21 @@ Description: fastrouter plugin for uWSGI
  the same core.
  .
  This package provides fastrouter plugin for uWSGI.
+
+Package: uwsgi-plugin-fiber
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
+ uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
+Description: fiber loop engine plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Ruby 1.9 fiber loop engine plugin for uWSGI. Fibers are
+ a form of coroutine, useful for implementing cooperative multitasking in your
+ Ruby 1.9.x apps.
 
 Package: uwsgi-plugin-greenlet-python
 Architecture: any
