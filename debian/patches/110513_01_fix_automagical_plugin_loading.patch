@@ -13,8 +13,8 @@ Description: Fix automagical plugin loading
  try to load plugin only if basename of argv[0] contains 'uwsgi_' string. Name
  of plugin to load is computed as part of basename after 'uwsgi_' string.
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
-Forwarded: no
-Last-Update: 2011-05-13
+Bug: http://projects.unbit.it/uwsgi/ticket/10
+Last-Update: 2011-06-10
 
 Index: uwsgi/uwsgi.c
 ===================================================================

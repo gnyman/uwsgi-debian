@@ -1,7 +1,7 @@
 Description: Add possibility of overriding of JVM_PATH into JWSGI buildscript
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
-Forwarded: no
-Last-Update: 2011-05-15
+Bug: http://projects.unbit.it/uwsgi/ticket/11
+Last-Update: 2011-06-10
 
 Index: uwsgi/plugins/jwsgi/uwsgiplugin.py
 ===================================================================
