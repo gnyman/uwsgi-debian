@@ -2,7 +2,6 @@ Source: uwsgi
 Section: web
 Priority: extra
 Maintainer: Leonid Borisenko <leo.borisenko@gmail.com>
-Uploaders: Stephen Crosby <stevecrozz@gmail.com>
 Build-Depends:
  cdbs,
  debhelper (>= 8),
