@@ -58,8 +58,9 @@ do_command()
   #
   # With executing 'sed' over found confnames, filenames (without extension)
   # are extracted from full paths provided with 'find' output. Firstly,
-  # directory path is deleted from 'find' output. Secondly, extensions are
-  # deleted from result of first substitution.
+  # common directory path is stripped from 'find' output. Secondly, remained
+  # directories and file extensions are stripped from result of first
+  # substitution.
   while IFS="" read -r -d "" CONFNAME <&4 ; do
     if [ "x$SOME_CONF_WAS_FOUND" = "xno" -a "x$VERBOSE" != "xno" ]; then
       log_progress_msg "->"
@@ -72,7 +73,7 @@ do_command()
                   -iregex ".*\.${UWSGI_CONFFILE_TYPES_REGEXP}\$" -a -xtype f \
                   -print0 \
             | sed -e "s:\(^\|\x0\)${UWSGI_CONFDIR}/:\1:g" \
-                  -e "s:\.${UWSGI_CONFFILE_TYPES_REGEXP}\x0:\x0:g" \
+                  -e "s:\([^\x0]*/\)\?\([^/\x0]\+\)\.${UWSGI_CONFFILE_TYPES_REGEXP}\x0:\2\x0:g" \
             | sort --zero-terminated --unique \
             )
 

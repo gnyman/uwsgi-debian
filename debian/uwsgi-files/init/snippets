@@ -32,12 +32,16 @@ conffile_option_name()
 path_to_conffile_with_name()
 {
   local CONFNAME="$@"
-  local CONFFILE="${UWSGI_CONFDIR}/${CONFNAME}"
   local CONFFILE_PATH=""
 
   for CONFFILE_EXT in ${UWSGI_CONFFILE_TYPES}; do
-    CONFFILE_PATH="${CONFFILE}.${CONFFILE_EXT}"
-    if [ -e "$CONFFILE_PATH" ]; then break; fi
+    CONFFILE_PATH="$(\
+      find \
+        "${UWSGI_CONFDIR}" \
+         -name "${CONFNAME}.${CONFFILE_EXT}" -a -xtype f \
+      | head -1 \
+    )"
+    if [ -n "$CONFFILE_PATH" ]; then break; fi
   done
 
   echo "$CONFFILE_PATH"
