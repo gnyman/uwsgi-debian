@@ -214,12 +214,13 @@ install/uwsgi-core::
 	for SUBDIR in conffile jwsgi psgi rack router wsapi wsgi; do \
 		mkdir -p $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/$${SUBDIR}; \
 	done
-	for FILE in logo_uWSGI.png myadmin.py simple_logger.py staticfilesnmp.py \
-	            testsignals.py ugreenchat.py uwsgistatus.py websockets.py; do \
+	for FILE in logo_uWSGI.png mongrel2-uwsgi.conf myadmin.py simple_logger.py \
+	            staticfilesnmp.py testsignals.py ugreenchat.py uwsgistatus.py \
+	            websockets.py welcome.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples; \
 	done
 	for FILE in mega.xml multi.ini multi.xml sites.xml uwsgi.xml \
-	            werkzeug_strict.yml werkzeug.yml; do \
+	            werkzeug_strict.yml werkzeug.js werkzeug.yml; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile; \
 	done
 	cp -r $(CURDIR)/vassals $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile
