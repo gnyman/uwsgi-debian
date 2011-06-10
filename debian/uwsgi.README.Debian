@@ -9,36 +9,57 @@ Automatic starting of instances of uWSGI
 ========================================
 
 On boot init.d script automatically starts one instance of uWSGI for each
-INI/XML/YAML configuration file found in /etc/uwsgi/apps-enabled.
+configuration file found in /etc/uwsgi/apps-enabled.
 
 Note: sub-directories of /etc/uwsgi/apps-enabled (if any) are also searched for
       configuration files. Though it can be useful feature, rules of searching
-      order and choosing between same named files form several directories
+      order and choosing between same named files from several directories
       might be a little confusing ('find' command is used for searching and
       ordering of search results). As a general anticonfusion rule, you must
       strictly avoid creating of same named files in several directories
-      ('name' is the file name without extension).
+      ('name' here meant as the file name without extension).
 
-INI file has higher precedence than XML and YAML. If INI file was found, then
-XML and YAML files with the same name will be ignored.
+'configuration file' is the file with one of following extensions (listed in
+alphabetical order):
 
-XML file has higher precedence than YAML. If XML file was found, then YAML file
-with the same name will be ignored.
+    db, ini, js, json, sqlite, sqlite3, xml, yaml, yml
 
-INI file must have '.ini' extension and may be empty.
+When files with the same name but different extensions are found, only one of
+them will be processed: first in sorting by alphabetic order.
 
-Example of INI file:
+Path to found configuration file is passed to new uWSGI instance as value of
+appropriate option, basing on file extension:
+  * ini                 | --ini       | expecting INI format
+  * js, json            | --json      | expecting JSON format
+  * db, sqlite, sqlite3 | --sqlite    | expecting SQLite3 database
+  * xml                 | --xmlconfig | expecting XML format
+  * yaml, yml           | --yaml      | expecting YAML format
+
+INI configuration file may be empty. Example of INI configuration:
 
     [uwsgi]
     uid = uwsgi_user
     gid = uwsgi_group
     socket = /tmp/uwsgi.sock
 
-XML file must have '.xml' extension and, at least, following content:
+JSON configuration file must contain at least following content:
+
+    { "uwsgi": {} }
+
+Example of more realistic JSON configuration:
+
+    {
+      "uwsgi": {
+        "uid":    "uwsgi_user",
+        "gid":    "uwsgi_group",
+        "socket": "/tmp/uwsgi.sock"
+    }}
+
+XML configuration file must contain at least following content:
 
     <uwsgi></uwsgi>
 
-Example of more realistic configuration file:
+Example of more realistic XML configuration:
 
     <uwsgi>
       <uid>uwsgi_user</uid>
@@ -46,10 +67,18 @@ Example of more realistic configuration file:
       <socket>/tmp/uwsgi.sock</socket>
     </uwsgi>
 
-YAML file must have one of two extensions '.yaml'/'.yml' (the first one has
-higher precedence) and may be empty.
+SQLite3 configuration database must contain 'uwsgi' table. First column of this
+table must contain valid option name and second column must contain appropriate
+option value. Name of columns aren't significant. All other columns (except
+first and second) are ignored. Example of creating of SQLite3 configuration:
 
-Example of YAML file:
+    $ sqlite3 /etc/uwsgi/apps-enabled/example.sqlite
+    sqlite> CREATE TABLE uwsgi (option_name varchar, option_value varchar);
+    sqlite> INSERT INTO uwsgi VALUES ('uid', 'uwsgi_user');
+    sqlite> INSERT INTO uwsgi VALUES ('gid', 'uwsgi_group');
+    sqlite> INSERT INTO uwsgi VALUES ('socket', '/tmp/uwsgi.sock');
+
+YAML configuration file may be empty. Example of YAML configuration:
 
     uwsgi:
         uid: uwsgi_uwser
@@ -60,7 +89,7 @@ For list of options passed by default to each started instance look at
 /etc/default/uwsgi.
 
 Service files of started uWSGI instance are located in directory named after
-configuration file (without '.ini'/'.xml'/'.yaml'/'.yml' extension):
+configuration file (without extension):
   * UNIX socket | /var/run/uwsgi/<confname>/socket
   * pidfile     | /var/run/uwsgi/<confname>/pid
 
