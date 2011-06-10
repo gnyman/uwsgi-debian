@@ -1,22 +1,46 @@
 # This is shell script, (indirectly) sourced by uWSGI init.d script
 
+# uWSGI handles several types of configuration files.
+# This list contains extensions of configuration files recognized by uWSGI.
+UWSGI_CONFFILE_TYPES="ini xml yaml yml"
+
+# Regular expression matching any of extension of uWSGI configuration files.
+#
+# Made in format of basic regexp and looks like '\(ini\|xml\)': spaces are
+# replaced with '\|' and whole expression is surrounded with '\(...\)'
+UWSGI_CONFFILE_TYPES_REGEXP="$(\
+  echo "$UWSGI_CONFFILE_TYPES" \
+  | sed -e 's/ /\\|/g' -e 's/^\(.*\)$/\\(\1\\)/g' \
+)"
+
+# Echo name of uWSGI option for handling of configuration file with given
+# extension.
+conffile_option_name()
+{
+  case "$1" in
+    ini)      echo ini       ;;
+    xml)      echo xmlconfig ;;
+    yaml|yml) echo yaml      ;;
+  esac
+}
+
+# Given a configuration file name, look for it in uWSGI configuration
+# directory.
+#
+# Echo full path to first found configuration file, which has given name and
+# extension from list of known extensions of configuration files.
 path_to_conffile_with_name()
 {
   local CONFNAME="$@"
   local CONFFILE="${UWSGI_CONFDIR}/${CONFNAME}"
-  local PATH=""
+  local CONFFILE_PATH=""
 
-  if [ -e "${CONFFILE}.ini" ]; then
-    PATH="${CONFFILE}.ini"
-  elif [ -e "${CONFFILE}.xml" ]; then
-    PATH="${CONFFILE}.xml"
-  elif [ -e "${CONFFILE}.yaml" ]; then
-    PATH="${CONFFILE}.yaml"
-  elif [ -e "${CONFFILE}.yml" ]; then
-    PATH="${CONFFILE}.yml"
-  fi
+  for CONFFILE_EXT in ${UWSGI_CONFFILE_TYPES}; do
+    CONFFILE_PATH="${CONFFILE}.${CONFFILE_EXT}"
+    if [ -e "$CONFFILE_PATH" ]; then break; fi
+  done
 
-  echo "$PATH"
+  echo "$CONFFILE_PATH"
 }
 
 # Extract extension of configuration file from it's path/name.
@@ -26,7 +50,7 @@ type_of_conffile()
   #
   # So one's needed to process and return only last line from configuration
   # file name.
-  echo "$@" | sed '$s/^.*\(ini\|xml\|yaml\|yml\)$/\1/g' | tail -1
+  echo "$@" | sed "\$s/^.*${UWSGI_CONFFILE_TYPES_REGEXP}\$/\1/g" | tail -1
 }
 
 # Get value of user-defined id (specifically, 'uid' or 'gid') for uWSGI

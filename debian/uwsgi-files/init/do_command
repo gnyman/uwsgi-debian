@@ -1,5 +1,6 @@
 # This is shell script, sourced by uWSGI init.d script
 
+. /usr/lib/uwsgi/init/snippets
 . /usr/lib/uwsgi/init/specific_daemon
 
 do_command()
@@ -68,10 +69,10 @@ do_command()
     ERRORS="$(expr "$ERRORS" + "$?")"
   done 4< <(find "$UWSGI_CONFDIR" \
                   -regextype posix-basic \
-                  -iregex '.*\.\(xml\|ini\|yaml\|yml\)$' -a -xtype f \
+                  -iregex ".*\.${UWSGI_CONFFILE_TYPES_REGEXP}\$" -a -xtype f \
                   -print0 \
             | sed -e "s:\(^\|\x0\)${UWSGI_CONFDIR}/:\1:g" \
-                  -e 's:\.\(xml\|ini\|yaml\|yml\)\x0:\x0:g' \
+                  -e "s:\.${UWSGI_CONFFILE_TYPES_REGEXP}\x0:\x0:g" \
             | sort --zero-terminated --unique \
             )
 

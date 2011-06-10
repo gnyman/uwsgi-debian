@@ -31,15 +31,8 @@ do_start_specific_daemon()
     --test > /dev/null \
       || return 1
 
-  local CONFFILE_OPTION_NAME
   local CONFTYPE="$(type_of_conffile "$CONFFILE")"
-  if [ "$CONFTYPE" = "ini" ]; then
-    CONFFILE_OPTION_NAME=ini
-  elif [ "$CONFTYPE" = "xml" ]; then
-    CONFFILE_OPTION_NAME=xmlconfig
-  elif [ "$CONFTYPE" = "yaml" -o "$CONFTYPE" = "yml" ]; then
-    CONFFILE_OPTION_NAME=yaml
-  fi
+  local CONFFILE_OPTION_NAME="$(conffile_option_name "$CONFTYPE")"
 
   start-stop-daemon --start --quiet \
     --pidfile "$PIDFILE" \
