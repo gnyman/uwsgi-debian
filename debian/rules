@@ -91,6 +91,11 @@ DEB_COMPRESS_EXCLUDE_uwsgi-core = .ini .lua .pl .png .psgi .py .ru .ws .xml \
                                   .yml
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
+DEB_DH_STRIP_ARGS_uwsgi-core := --dbg-package=uwsgi-dbg
+$(foreach PLUGIN_PKG_NAME, $(UWSGI_PLUGIN_PKGS_NAMES), $(eval \
+	DEB_DH_STRIP_ARGS_uwsgi-plugin-$(PLUGIN_PKG_NAME) := --dbg-package=uwsgi-dbg\
+))
+
 # Rules
 # =====
 
