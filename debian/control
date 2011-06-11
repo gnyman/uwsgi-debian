@@ -39,7 +39,8 @@ Vcs-Browser: http://git.debian.org/?p=collab-maint/uwsgi.git
 Package: uwsgi
 Architecture: any
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
+ lsb-base
 Description: fast, self-healing application container server
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
