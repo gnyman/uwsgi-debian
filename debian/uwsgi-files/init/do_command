@@ -11,8 +11,8 @@ do_command()
   local ERRORS=0
 
   # If command is given with arguments, i.e. 'start smth smth_else'
-  if [ ! -z "$1" ]; then
-    [ "$VERBOSE" != "no" ] && log_progress_msg "->"
+  if [ -n "$1" ]; then
+    [ "x$VERBOSE" != "xno" ] && log_progress_msg "->"
 
     # Iterate over given configuration file names and:
     # * either print notice that this conffile wasn't found (if it wasn't)
@@ -33,7 +33,7 @@ do_command()
 
   # Do not start daemon if it was disabled.
   if [ "x$COMMAND" = "xstart" -a "x$RUN_AT_STARTUP" != "xyes" ]; then
-    [ "$VERBOSE" != no ] && log_progress_msg "(disabled; see /etc/default/${NAME})"
+    [ "x$VERBOSE" != "xno" ] && log_progress_msg "(disabled; see /etc/default/${NAME})"
     return 2
   fi
 

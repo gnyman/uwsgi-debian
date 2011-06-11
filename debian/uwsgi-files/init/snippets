@@ -67,8 +67,8 @@ type_of_conffile()
 # Get value of user-defined id (specifically, 'uid' or 'gid') for uWSGI
 # process.
 #
-# It parses INI/XML/YAML configuration file with name $CONFNAME for value of
-# first found "subsection" $KIND. "Subsection" may be:
+# It parses configuration file with name $CONFNAME for value of first found
+# "subsection" $KIND. "Subsection" may be:
 # * assignment '$KIND =' in INI file
 # * hash value '"$KIND":' in JSON file
 # * row of 'uwsgi' table in SQLite3 database where value of first field equals
@@ -165,7 +165,7 @@ extract_id()
       echo "$DAEMON_OPTS" \
       | sed -e "s/.*--${KIND}\s*\([^[:space:]]\+\).*/\1/g"
     )"
-    if [ "$ID" = "$DAEMON_OPTS" ]; then ID=""; fi
+    if [ "x$ID" = "x$DAEMON_OPTS" ]; then ID=""; fi
   fi
 
   echo "$ID"
