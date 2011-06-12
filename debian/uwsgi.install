@@ -1,1 +1,2 @@
+debian/uwsgi-files/conf usr/lib/uwsgi
 debian/uwsgi-files/init usr/lib/uwsgi
