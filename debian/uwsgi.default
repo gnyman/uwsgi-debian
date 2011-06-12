@@ -25,20 +25,6 @@ PRINT_CONFNAMES_IN_INITD_SCRIPT_OUTPUT=no
 # init.d script starts instance of uWSGI daemon for each found user-created
 # configuration file.
 #
-# These options are passed to each instance of uWSGI, ran by init.d script.
-#
-# Note: options '--socket', '--daemonize' and '--pidfile' are always added
-#       automatically by init.d script
-#
-# Default socket location: /var/run/uwsgi/<confname>/socket
-# Tip: you could add custom socket location with defining of '--socket' option
-#      in configuration file.
-DAEMON_OPTS=" \
-  --master \
-  --no-orphans \
-  --processes 2 \
-  --logdate \
-  --chmod-socket=660 \
-  --uid www-data \
-  --gid www-data \
-"
+# Options from inherited configuration file are passed to each instance by
+# default. They could be overrided (or extended) by user configuration file.
+INHERITED_CONFIG=/usr/lib/uwsgi/conf/default.ini

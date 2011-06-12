@@ -6,7 +6,7 @@
 #
 # ! After changing of this list, appropriate changes must be made in functions:
 #   * conffile_option_name
-#   * extract_id
+#   * extract_id_from_conffile
 UWSGI_CONFFILE_TYPES="db ini js json sqlite sqlite3 xml yaml yml"
 
 # Regular expression matching any of extension of uWSGI configuration files.
@@ -31,29 +31,6 @@ conffile_option_name()
   esac
 }
 
-# Given a configuration file name, look for it in uWSGI configuration
-# directory.
-#
-# Echo full path to first found configuration file, which has given name and
-# extension from list of known extensions of configuration files.
-path_to_conffile_with_name()
-{
-  local CONFNAME="$@"
-  local CONFFILE_PATH=""
-
-  for CONFFILE_EXT in ${UWSGI_CONFFILE_TYPES}; do
-    CONFFILE_PATH="$(
-      find \
-        "${UWSGI_CONFDIR}" \
-         -name "${CONFNAME}.${CONFFILE_EXT}" -a -xtype f \
-      | head -1
-    )"
-    if [ -n "$CONFFILE_PATH" ]; then break; fi
-  done
-
-  echo "$CONFFILE_PATH"
-}
-
 # Extract extension of configuration file from it's path/name.
 type_of_conffile()
 {
@@ -64,11 +41,11 @@ type_of_conffile()
   echo "$@" | sed "\$s/^.*${UWSGI_CONFFILE_TYPES_REGEXP}\$/\1/g" | tail -1
 }
 
-# Get value of user-defined id (specifically, 'uid' or 'gid') for uWSGI
-# process.
+# Get value of user-defined id (specifically, 'uid' or 'gid') ffrom uWSGI
+# configuration file.
 #
-# It parses configuration file with name $CONFNAME for value of first found
-# "subsection" $KIND. "Subsection" may be:
+# It parses configuration file $CONFFILE for value of first found "subsection"
+# $KIND. "Subsection" may be:
 # * assignment '$KIND =' in INI file
 # * hash value '"$KIND":' in JSON file
 # * row of 'uwsgi' table in SQLite3 database where value of first field equals
@@ -76,19 +53,14 @@ type_of_conffile()
 # * tag '<$KIND></$KIND>' in XML file
 # * hash value '$KIND:' in YAML file
 #
-# If not found, parse $DAEMON_OPTS (defined in /etc/default/uwsgi),
-# for value of '--$KIND' option.
-#
 # Echo found value or empty string if not found.
-extract_id()
+extract_id_from_conffile()
 {
   local KIND="$1"
   shift
-  local CONFNAME="$@"
+  local CONFFILE="$@"
 
-  local CONFFILE="$(path_to_conffile_with_name "$CONFNAME")"
   local CONFTYPE="$(type_of_conffile "$CONFFILE")"
-
   local ID=""
 
   case "$CONFTYPE" in
@@ -140,7 +112,11 @@ extract_id()
                         FROM ${UWSGI_TABLE} \
                         WHERE ${FIRST_FIELD} = '${KIND}' \
                         LIMIT 1"
-        ID="$("$SQLITE3" -column -noheader "$CONFFILE" "$QUERY_ID")"
+        ID="$(
+          "$SQLITE3" -column -noheader "$CONFFILE" \
+          "$QUERY_ID" \
+          2>/dev/null \
+        )"
         ID="${ID%% *}" # strip trailing spaces
       fi
     ;;
@@ -160,12 +136,57 @@ extract_id()
     ;;
   esac
 
-  if [ -z "$ID" ]; then
-    ID="$(
-      echo "$DAEMON_OPTS" \
-      | sed -e "s/.*--${KIND}\s*\([^[:space:]]\+\).*/\1/g"
+  echo "$ID"
+}
+
+# Given a configuration file name, look for it in uWSGI configuration
+# directory.
+#
+# Echo full path to first found configuration file, which has given name and
+# extension from list of known extensions of configuration files.
+path_to_conffile_with_name()
+{
+  local CONFNAME="$@"
+  local CONFFILE_PATH=""
+
+  for CONFFILE_EXT in ${UWSGI_CONFFILE_TYPES}; do
+    CONFFILE_PATH="$(
+      find \
+        "${UWSGI_CONFDIR}" \
+         -name "${CONFNAME}.${CONFFILE_EXT}" -a -xtype f \
+      | head -1
     )"
-    if [ "x$ID" = "x$DAEMON_OPTS" ]; then ID=""; fi
+    if [ -n "$CONFFILE_PATH" ]; then break; fi
+  done
+
+  echo "$CONFFILE_PATH"
+}
+
+# Get value of user-defined id (specifically, 'uid' or 'gid') for uWSGI
+# process.
+#
+# It parses configuration file with name $CONFNAME for value of first found
+# "subsection" $ID_KIND. See 'extract_id_from_conffile' for details.
+#
+# If not found, parse $INHERITED_CONFIG (defined in /etc/default/uwsgi),
+# for value of id.
+#
+# Echo found value or 'root' if value wasn't not found.
+extract_id()
+{
+  local ID_KIND="$1"
+  shift
+  local CONFNAME="$@"
+
+  local CONFFILE="$(path_to_conffile_with_name "$CONFNAME")"
+
+  local ID="$(extract_id_from_conffile "$ID_KIND" "$CONFFILE")"
+  if [ -z "$ID" -a -e "$INHERITED_CONFIG" ]; then
+    ID="$(extract_id_from_conffile "$ID_KIND" "$INHERITED_CONFIG")"
+  fi
+
+  if [ -z "$ID" ]; then
+    ID=root
   fi
 
   echo "$ID"
@@ -184,14 +205,6 @@ find_specific_pidfile()
   local CONFNAME="$@"
   local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
   echo "${SPECIFIC_RUNDIR}/pid"
-}
-
-# Location of UNIX socket for specific uWSGI process.
-find_specific_socket()
-{
-  local CONFNAME="$@"
-  local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
-  echo "${SPECIFIC_RUNDIR}/socket"
 }
 
 # Assigns owner, group and permissions to pidfile of uWSGI process.

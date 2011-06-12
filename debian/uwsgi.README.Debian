@@ -86,7 +86,7 @@ YAML configuration file may be empty. Example of YAML configuration:
         socket: /tmp/uwsgi.sock
 
 For list of options passed by default to each started instance look at
-/etc/default/uwsgi.
+file, defined by option INHERITED_CONFIG in /etc/default/uwsgi.
 
 Service files of started uWSGI instance are located in directory named after
 configuration file (without extension):
@@ -105,12 +105,11 @@ If mentioned directory doesn't exist it will be created. Note that this
 directory will be chowned/chmodded only if it was created by init.d script.
 
 init.d script tries to parse configuration file for values of uid/gid. If such
-the key/tag didn't found, init.d tries to parse DAEMON_OPTS for '--uid' or
-'--gid' option. If even this fails, then directory will be chowned to
-root:root.
+the key/tag didn't found, script tries to parse file, defined by option
+INHERITED_CONFIG in /etc/default/uwsgi, for 'uid' or 'gid' option. If even this
+fails, directory will be chowned to 'root'.
 
-Chmodding of UNIX socket is made by using uWSGI option '--chmod-socket' in
-DAEMON_OPTS. For value of this variable see /etc/default/uwsgi.
+Chmodding of UNIX socket is made by using of uWSGI option 'chmod-socket'.
 
 Commands recognized by init.d script
 ====================================
