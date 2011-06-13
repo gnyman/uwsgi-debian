@@ -112,6 +112,11 @@ the key/tag didn't found, script tries to parse file, defined by option
 INHERITED_CONFIG in /etc/default/uwsgi, for 'uid' or 'gid' option. If even this
 fails, directory will be chowned to 'root'.
 
+Note: for possibility of parsing of SQLite3 configuration database
+      /usr/bin/sqlite3 executable must be available in system. It is provided
+      by 'sqlite3' package. If it isn't available, parsing of configuration
+      database will be silently skipped.
+
 Chmodding of UNIX socket is made by using of uWSGI option 'chmod-socket'.
 
 Commands recognized by init.d script
