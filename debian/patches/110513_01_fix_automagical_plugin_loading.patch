@@ -14,7 +14,8 @@ Description: Fix automagical plugin loading
  of plugin to load is computed as part of basename after 'uwsgi_' string.
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Bug: http://projects.unbit.it/uwsgi/ticket/10
-Last-Update: 2011-06-10
+Applied-Upstream: 0.9.8.1, http://projects.unbit.it/hg/uwsgi/rev/52baeef6d327
+Last-Update: 2011-06-13
 
 Index: uwsgi/uwsgi.c
 ===================================================================

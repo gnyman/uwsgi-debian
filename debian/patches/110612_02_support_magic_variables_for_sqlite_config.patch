@@ -1,12 +1,13 @@
 Description: Support magic variables for/in SQLite3 configuration file
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Bug: http://projects.unbit.it/uwsgi/ticket/18
-Last-Update: 2011-06-12
+Applied-Upstream: 0.9.8.1, http://projects.unbit.it/hg/uwsgi/rev/2817a1f422eb
+Last-Update: 2011-06-13
 
 Index: uwsgi/uwsgi.h
 ===================================================================
---- uwsgi.orig/uwsgi.h	2011-06-12 17:19:16.000000000 +0300
-+++ uwsgi/uwsgi.h	2011-06-12 17:32:46.000000000 +0300
+--- uwsgi.orig/uwsgi.h	2011-06-13 17:25:41.000000000 +0300
++++ uwsgi/uwsgi.h	2011-06-13 17:25:49.000000000 +0300
 @@ -1566,7 +1566,7 @@
  #endif
  
@@ -18,9 +19,9 @@ Index: uwsgi/uwsgi.h
  
 Index: uwsgi/uwsgi.c
 ===================================================================
---- uwsgi.orig/uwsgi.c	2011-06-12 17:32:46.000000000 +0300
-+++ uwsgi/uwsgi.c	2011-06-12 17:32:46.000000000 +0300
-@@ -995,7 +995,8 @@
+--- uwsgi.orig/uwsgi.c	2011-06-13 17:25:49.000000000 +0300
++++ uwsgi/uwsgi.c	2011-06-13 17:25:49.000000000 +0300
+@@ -1006,7 +1006,8 @@
  #endif
  #ifdef UWSGI_SQLITE3
  	if (uwsgi.sqlite3 != NULL) {
@@ -30,7 +31,7 @@ Index: uwsgi/uwsgi.c
  	}
  #endif
  #ifdef UWSGI_LDAP
-@@ -1035,13 +1036,13 @@
+@@ -1046,13 +1047,13 @@
  #endif
  #ifdef UWSGI_SQLITE3
  		if (!strcmp(uct->filename + strlen(uct->filename) - 3, ".db")) {
@@ -49,8 +50,8 @@ Index: uwsgi/uwsgi.c
  		uct = uct->next;
 Index: uwsgi/sqlite3.c
 ===================================================================
---- uwsgi.orig/sqlite3.c	2011-06-12 17:19:16.000000000 +0300
-+++ uwsgi/sqlite3.c	2011-06-12 17:33:01.000000000 +0300
+--- uwsgi.orig/sqlite3.c	2011-06-13 17:25:41.000000000 +0300
++++ uwsgi/sqlite3.c	2011-06-13 17:25:49.000000000 +0300
 @@ -5,18 +5,19 @@
  
  extern struct uwsgi_server uwsgi;

@@ -1,14 +1,14 @@
 Description: Remove shebang line from ugreenchat.py
- Packaged ugreenchat.py is placed to /usr/share/doc/uwsgi-common/examples, so
+ Packaged ugreenchat.py is placed to /usr/share/doc/uwsgi-core/examples, so
  Lintian warns about relative interpreter path with informational tag
  (I: example-interpreter-not-absolute).
  .
- As user can install only one of uwsgi-python/uwsgi-python3 packages, we have
- no guaranteed path to uWSGI that could be placed into shebang line. So it's
- removed.
+ As user can install only the uwsgi-core package (without uwsgi-plugin-python
+ package), we have no guaranteed path to uWSGI that could be placed into
+ shebang line. So it's removed.
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: not-needed
-Last-Update: 2011-02-01
+Last-Update: 2011-06-13
 
 Index: uwsgi/ugreenchat.py
 ===================================================================

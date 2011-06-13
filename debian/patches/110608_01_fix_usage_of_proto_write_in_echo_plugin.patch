@@ -1,7 +1,8 @@
 Description: Fix usage of proto_write in echo plugin
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Bug: http://projects.unbit.it/uwsgi/ticket/9
-Last-Update: 2011-06-10
+Applied-Upstream: 0.9.8.1, http://projects.unbit.it/hg/uwsgi/rev/451470789b0a
+Last-Update: 2011-06-13
 
 Index: uwsgi/plugins/echo/echo_plugin.c
 ===================================================================
