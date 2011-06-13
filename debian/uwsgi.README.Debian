@@ -4,6 +4,7 @@ Contents:
   3. Commands recognized by init.d script
   4. Controling specific instances of uWSGI
   5. Status of executing init.d command for specific instance
+  6. Alternatives of /usr/bin/uwsgi executable
 
 Automatic starting of instances of uWSGI
 ========================================
@@ -92,6 +93,8 @@ Service files of started uWSGI instance are located in directory named after
 configuration file (without extension):
   * UNIX socket | /var/run/uwsgi/<confname>/socket
   * pidfile     | /var/run/uwsgi/<confname>/pid
+
+Log of started uWSGI instance is placed at /var/log/uwsgi/<confname>.log
 
 Owner, group and permissions of UNIX socket and pidfile
 =======================================================
@@ -192,3 +195,25 @@ It means that:
   * starting 'moogl' was failed
 
 Return value of init.d script is the number of instances with '!' mark.
+
+Alternatives of /usr/bin/uwsgi executable
+=========================================
+
+init.d script runs uWSGI instances with command /usr/bin/uwsgi.
+
+/usr/bin/uwsgi executable is provided with using of Debian alternatives system.
+It is registered as master link in link group with generic name 'uwsgi' and,
+by default, references to /usr/bin/uwsgi-core.
+
+Most of plugins' packages provides /usr/bin/uwsgi_plugin_name executable. It is
+a simple symlink to /usr/bin/uwsgi-core. When uWSGI notices that it has been
+called with name 'uwsgi_smth' it is automagically loads appropriate plugin
+shared library with name 'smth_plugin.so'.
+
+Every executable /usr/bin/uwsgi_plugin_name is added as low-priority
+alternative to link group 'uwsgi'. Because of low priority, it doesn't change
+automatically current choice of alternative in group. /usr/bin/uwsgi can be
+manually configured as reference to /usr/bin/uwsgi_plugin_name with command:
+
+    # update-alternatives --config uwsgi
+
