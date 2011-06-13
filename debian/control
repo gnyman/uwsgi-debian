@@ -8,6 +8,7 @@ Build-Depends:
  apache2-threaded-dev,
  erlang-dev,
  help2man,
+ javahelper,
  libapr1-dev,
  libaprutil1-dev,
  libjansson-dev,
