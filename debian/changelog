@@ -1,19 +1,21 @@
-uwsgi (0.9.8-2) UNRELEASED; urgency=low
+uwsgi (0.9.8-2) unstable; urgency=low
 
-  * Exclude uwsgi-plugin-luajit from building on armel architecture.
-    Build-Dependency libluajit-5.1-dev doesn't available on armel, bug #630814
-    was filed.
-  * Remove Build-Dependency on libsctp-dev.
-    SCTP build option doesn't handled by uWSGI build configuration since
-    20 Oct 2010 (Mercurial changeset f1841e46cd29). So Build-Dependency on
-    libsctp-dev could be safely discarded without loss of any uWSGI features.
-    With discarding of this Build-Dependency packages could be built on
-    kfreebsd-i386, kfreebsd-amd64 and hurd-i386 architectures.
-  * Restrict set of uwsgi-plugin-greenlet-python architectures to amd64, i386,
-    mips, powerpc, s390 (where python-greenlet and python-greenlet-dev
-    packages are available).
+  * Resolve package building issues on some architectures:
+    - exclude uwsgi-plugin-luajit from building on armel architecture.
+      Build-Dependency libluajit-5.1-dev doesn't available on armel,
+      bug #630814 was filed.
+    - remove Build-Dependency on libsctp-dev.
+      Build-Dependency on libsctp-dev prevents packages from building on
+      architectures kfreebsd-i386, kfreebsd-amd64, hurd-i386.
+      SCTP build option doesn't handled by uWSGI build configuration since
+      20 Oct 2010 (Mercurial changeset f1841e46cd29). So Build-Dependency on
+      libsctp-dev could be safely discarded without loss of any uWSGI
+      features.
+    - restrict set of uwsgi-plugin-greenlet-python architectures to
+      amd64, i386, mips, powerpc, s390 (where python-greenlet and
+      python-greenlet-dev packages are available).
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Fri, 17 Jun 2011 21:39:27 +0300
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Fri, 17 Jun 2011 22:51:01 +0300
 
 uwsgi (0.9.8-1) unstable; urgency=low
 
