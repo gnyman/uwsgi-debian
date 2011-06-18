@@ -1,3 +1,13 @@
+uwsgi (0.9.8-3) UNRELEASED; urgency=low
+
+  * d/uwsgi-plugin-greenlet-python.prerm.in:
+    - correct error in name of alternatives link group
+      (replace 'uwsgi-plugin-greenlet' with 'uwsgi-plugin-greenlet-python')
+      so as to fix process of uwsgi-plugin-greenlet-python package
+      uninstallation (and pass piuparts test)
+
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Sat, 18 Jun 2011 14:19:38 +0300
+
 uwsgi (0.9.8-2) unstable; urgency=low
 
   * Resolve package building issues on some architectures:
