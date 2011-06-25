@@ -251,9 +251,9 @@ install/uwsgi-core::
 	for FILE in sputnik.ws; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsapi; \
 	done
-	for FILE in hello_world_rrdtool.py mjpeg_stream.py multiapp.py \
-	            simple_app.py simple_app_wsgi2.py testapp.py testpy3.py \
-	            uploadtest.py; do \
+	for FILE in hello_world_rrdtool.py decoratortest.py mjpeg_stream.py \
+	            multiapp.py simple_app.py simple_app_wsgi2.py testapp.py \
+	            testpy3.py uploadtest.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsgi; \
 	done
 	chmod a-x $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/ugreenchat.py
