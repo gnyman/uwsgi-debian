@@ -1,5 +1,6 @@
-uwsgi (0.9.8-3) UNRELEASED; urgency=low
+uwsgi (0.9.8.1-1) UNRELEASED; urgency=low
 
+  * New upstream version (0.9.8.1)
   * d/uwsgi-plugin-greenlet-python.prerm.in:
     - correct error in name of alternatives link group
       (replace 'uwsgi-plugin-greenlet' with 'uwsgi-plugin-greenlet-python')
@@ -12,7 +13,7 @@ uwsgi (0.9.8-3) UNRELEASED; urgency=low
       require preserving across reboots. It has been appeared in Debian with
       initscripts upgrade to 2.88dsf-13.3.
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Sat, 25 Jun 2011 13:58:12 +0300
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Sat, 25 Jun 2011 17:11:08 +0300
 
 uwsgi (0.9.8-2) unstable; urgency=low
 
