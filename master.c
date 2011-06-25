@@ -42,32 +42,24 @@ void expire_rb_timeouts(struct rb_root *root) {
         }
 }
 
-
-void uwsgi_subscribe(char *subscription) {
-
+void uwsgi_send_subscription(char *udp_address, char *key, size_t keysize, char *modifier1, size_t modifier1_len) {
 	char *ssb;
 	char subscrbuf[4096];
+
 	uint16_t ustrlen;
 
-	char *udp_address = strchr(subscription,':');
-        if (!udp_address) return;
+	ssb = subscrbuf;
 
-        char *subscription_key = strchr(udp_address+1, ':');
-	if (!subscription_key) return;
-        udp_address = uwsgi_concat2n(subscription, subscription_key-subscription, "", 0);
-
-        ssb = subscrbuf;
-
-	ustrlen = 3;
+        ustrlen = 3;
         *ssb++ = (uint8_t) (ustrlen  & 0xff);
         *ssb++ = (uint8_t) ((ustrlen >>8) & 0xff);
         memcpy(ssb, "key", ustrlen);
         ssb+=ustrlen;
 
-        ustrlen = strlen(subscription_key+1);
+        ustrlen = keysize;
         *ssb++ = (uint8_t) (ustrlen  & 0xff);
         *ssb++ = (uint8_t) ((ustrlen >>8) & 0xff);
-        memcpy(ssb, subscription_key+1, ustrlen);
+        memcpy(ssb, key, ustrlen);
         ssb+=ustrlen;
 
         ustrlen = 7;
@@ -82,8 +74,106 @@ void uwsgi_subscribe(char *subscription) {
         memcpy(ssb, uwsgi.sockets->name, ustrlen);
         ssb+=ustrlen;
 
+	if (modifier1) {
+		ustrlen = 9;
+        	*ssb++ = (uint8_t) (ustrlen  & 0xff);
+        	*ssb++ = (uint8_t) ((ustrlen >>8) & 0xff);
+        	memcpy(ssb, "modifier1", ustrlen);
+        	ssb+=ustrlen;
+
+        	ustrlen = modifier1_len;
+        	*ssb++ = (uint8_t) (ustrlen  & 0xff);
+        	*ssb++ = (uint8_t) ((ustrlen >>8) & 0xff);
+        	memcpy(ssb, modifier1, ustrlen);
+        	ssb+=ustrlen;
+	}
+
         send_udp_message(224, udp_address, subscrbuf, ssb-subscrbuf);
-	free(udp_address);
+}
+
+void uwsgi_subscribe(char *subscription) {
+
+	int subfile_size;
+	int i;
+	char *key = NULL;
+	int keysize = 0;
+	char *modifier1 = NULL;
+	int modifier1_len = 0;
+
+	char *udp_address = strchr(subscription,':');
+        if (!udp_address) return;
+
+        char *subscription_key = strchr(udp_address+1, ':');
+	if (!subscription_key) return;
+
+        udp_address = uwsgi_concat2n(subscription, subscription_key-subscription, "", 0);
+
+	if (subscription_key[1] == '@') {
+		if (!uwsgi_file_exists(subscription_key+2)) goto clear;
+		char *lines = uwsgi_open_and_read(subscription_key+2, &subfile_size, 1, NULL);
+		if (subfile_size > 0) {
+			key = lines;
+			for(i=0;i<subfile_size;i++) {
+				if (lines[i] == 0) {
+					if (keysize > 0) {
+						if (key[0] != '#' && key[0] != '\n') {
+							modifier1 = strchr(key, ':');
+                					if (modifier1) {
+                        					modifier1[0] = 0;
+                        					modifier1++;
+                        					modifier1_len = strlen(modifier1);
+								keysize = strlen(key);
+                					}
+							uwsgi_send_subscription(udp_address, key, keysize, modifier1, modifier1_len);
+							modifier1 = NULL;
+							modifier1_len = 0;
+						}
+					}	
+					break;
+				}
+				else if (lines[i] == '\n') {
+					if (keysize > 0) {
+						if (key[0] != '#' && key[0] != '\n') {
+							lines[i] = 0;
+							modifier1 = strchr(key, ':');
+                					if (modifier1) {
+                        					modifier1[0] = 0;
+                        					modifier1++;
+                        					modifier1_len = strlen(modifier1);
+								keysize = strlen(key);
+                					}
+							uwsgi_send_subscription(udp_address, key, keysize, modifier1, modifier1_len);
+							modifier1 = NULL;
+							modifier1_len = 0;
+							lines[i] = '\n';
+						}
+					}
+					key = lines+i+1;
+					keysize = 0;
+					continue;
+				}
+				keysize++;
+			}
+
+			free(lines);
+		}
+	}
+	else {
+		modifier1 = strchr(subscription_key+1, ':');
+		if (modifier1) {
+			modifier1[0] = 0;
+			modifier1++;
+			modifier1_len = strlen(modifier1);
+		}
+
+		uwsgi_send_subscription(udp_address, subscription_key+1, strlen(subscription_key+1), modifier1, modifier1_len);
+		if (modifier1)
+			modifier1[-1] = ':';
+	}
+
+clear:
+
+        free(udp_address);
 
 }
 
@@ -110,7 +200,10 @@ void manage_cluster_announce(char *key, uint16_t keylen, char *val, uint16_t val
 
 	char *tmpstr;
 	struct uwsgi_cluster_node *ucn = (struct uwsgi_cluster_node *) data;
+
+#ifdef UWSGI_DEBUG
 	uwsgi_log("%.*s = %.*s\n", keylen, key, vallen, val);
+#endif
 
 	if (!uwsgi_strncmp("hostname", 8, key, keylen)) {
 		strncpy(ucn->nodename, val, UMIN(vallen, 255));
@@ -187,7 +280,6 @@ void master_loop(char **argv, char **environ) {
 
 	struct uwsgi_rb_timer *min_timeout;
 	struct rb_root *rb_timers = uwsgi_init_rb_timer();
-	struct tm *uwsgi_cron_delta;
 
 	uwsgi.current_time = time(NULL);
 
@@ -205,7 +297,6 @@ void master_loop(char **argv, char **environ) {
 	if (uwsgi.auto_snapshot) {
 		uwsgi_unix_signal(SIGURG, uwsgi_restore_auto_snapshot);
 	}
-
 
 	uwsgi.master_queue = event_queue_init();
 
@@ -227,6 +318,12 @@ void master_loop(char **argv, char **environ) {
 
 	if (uwsgi.has_emperor) {
 		event_queue_add_fd_read(uwsgi.master_queue, uwsgi.emperor_fd);
+	}
+
+	if (uwsgi.zerg_server) {
+		uwsgi.zerg_server_fd = bind_to_unix(uwsgi.zerg_server, uwsgi.listen_queue, 0, 0);
+		event_queue_add_fd_read(uwsgi.master_queue, uwsgi.zerg_server_fd);
+		uwsgi_log("*** Zerg server enabled on %s ***\n", uwsgi.zerg_server);
 	}
 #ifdef UWSGI_UDP
 	if (uwsgi.udp_socket) {
@@ -600,70 +697,11 @@ void master_loop(char **argv, char **environ) {
 			
 				// check uwsgi-cron table
 				if (ushared->cron_cnt) {
-					uwsgi.current_time = time(NULL);
-					uwsgi_cron_delta = localtime( &uwsgi.current_time );
+					uwsgi_manage_signal_cron(time(NULL));
+				}
 
-					if (uwsgi_cron_delta) {
-
-						// fix month
-						uwsgi_cron_delta->tm_mon++;
-
-						uwsgi_lock(uwsgi.cron_table_lock);
-						for(i=0;i<ushared->cron_cnt;i++) {
-	
-							struct uwsgi_cron *ucron = &ushared->cron[i];
-							int uc_minute, uc_hour, uc_day, uc_month, uc_week;
-
-							uc_minute = ucron->minute;
-							uc_hour = ucron->hour;
-							uc_day = ucron->day;
-							uc_month = ucron->month;
-							uc_week = ucron->week;
-	
-							if (ucron->minute == -1) uc_minute = uwsgi_cron_delta->tm_min;
-							if (ucron->hour == -1) uc_hour = uwsgi_cron_delta->tm_hour;
-							if (ucron->month == -1) uc_month = uwsgi_cron_delta->tm_mon;
-
-							// mday and wday are ORed
-							if (ucron->day == -1 && ucron->week == -1) {
-								if (ucron->day == -1) uc_day = uwsgi_cron_delta->tm_mday;
-								if (ucron->week == -1) uc_week = uwsgi_cron_delta->tm_wday;
-							}
-							else if (ucron->day == -1) {
-								ucron->day = uwsgi_cron_delta->tm_mday;
-							}
-							else if (ucron->week == -1) {
-								ucron->week = uwsgi_cron_delta->tm_wday;
-							}
-							else {
-								if (ucron->day == uwsgi_cron_delta->tm_mday) {
-									ucron->week = uwsgi_cron_delta->tm_wday;
-								}
-								else if (ucron->week == uwsgi_cron_delta->tm_wday) {
-									ucron->day = uwsgi_cron_delta->tm_mday;
-								}
-							}
-							
-							if (uwsgi_cron_delta->tm_min == uc_minute &&
-								uwsgi_cron_delta->tm_hour == uc_hour &&
-								uwsgi_cron_delta->tm_mon == uc_month &&
-								uwsgi_cron_delta->tm_mday == uc_day &&
-								uwsgi_cron_delta->tm_wday == uc_week) {
-
-
-								// date match, signal it ?
-								if (uwsgi.current_time - ucron->last_job > 60) {
-									uwsgi_route_signal(ucron->sig);
-									ucron->last_job = uwsgi.current_time;
-								}
-							}
-					
-						}
-						uwsgi_unlock(uwsgi.cron_table_lock);
-					}
-					else {
-						uwsgi_error("localtime()");
-					}
+				if (uwsgi.crons) {
+					uwsgi_manage_command_cron(time(NULL));
 				}
 
 				if (rlen > 0) {
@@ -693,12 +731,62 @@ void master_loop(char **argv, char **environ) {
 						}
 					}
 
+					if (uwsgi.zerg_server) {
+						if (interesting_fd == uwsgi.zerg_server_fd) {
+							struct sockaddr_un zsun;
+							socklen_t zsun_len = sizeof(struct sockaddr_un);
+							int zerg_client = accept(uwsgi.zerg_server_fd, (struct sockaddr *) &zsun, &zsun_len);
+							if (zerg_client < 0) {
+								uwsgi_error("zerg: accept()");
+								continue;
+							}
+
+							struct msghdr zerg_msg;
+							void *zerg_msg_control = uwsgi_malloc(CMSG_SPACE (sizeof (int) * uwsgi_count_sockets(uwsgi.sockets)));
+							struct iovec zerg_iov;
+							struct cmsghdr *cmsg;
+
+							zerg_iov.iov_base = "uwsgi-zerg";
+                        				zerg_iov.iov_len = 10;
+
+							zerg_msg.msg_name    = NULL;
+                                        		zerg_msg.msg_namelen = 0;
+                                        		zerg_msg.msg_iov     = &zerg_iov;
+                                        		zerg_msg.msg_iovlen  = 1;
+                                        		zerg_msg.msg_flags   = 0;
+                                        		zerg_msg.msg_control    = zerg_msg_control;
+                                        		zerg_msg.msg_controllen = CMSG_SPACE (sizeof (int) * uwsgi_count_sockets(uwsgi.sockets));
+
+                                        		cmsg = CMSG_FIRSTHDR (&zerg_msg);
+                                        		cmsg->cmsg_len   = CMSG_LEN (sizeof (int) * uwsgi_count_sockets(uwsgi.sockets));
+                                        		cmsg->cmsg_level = SOL_SOCKET;
+                                        		cmsg->cmsg_type  = SCM_RIGHTS;
+
+							struct uwsgi_socket *uwsgi_sock = uwsgi.sockets; 
+							unsigned char *zerg_fd_ptr = CMSG_DATA(cmsg);
+							while(uwsgi_sock) {
+								memcpy(zerg_fd_ptr, &uwsgi_sock->fd, sizeof(int));
+								zerg_fd_ptr += sizeof(int);
+								uwsgi_sock = uwsgi_sock->next;
+							}
+
+                                        		if (sendmsg(zerg_client, &zerg_msg, 0) < 0) {
+                                                		uwsgi_error("sendmsg()");
+                                        		}
+
+
+                                        		close(zerg_client);
+
+							free(zerg_msg_control);
+						}
+					}
+
 					if (uwsgi.has_emperor) {
 						if (interesting_fd == uwsgi.emperor_fd) {
 							char byte;
 							rlen = read(uwsgi.emperor_fd, &byte, 1);
                                                         if (rlen > 0) {
-								uwsgi_log("received message %d from emperor\n", byte);
+								uwsgi_log_verbose("received message %d from emperor\n", byte);
 								// remove me
 								if (byte == 0) {
 									close(uwsgi.emperor_fd);
@@ -888,7 +976,7 @@ void master_loop(char **argv, char **environ) {
 							uwsgi_error("read()");
 						}	
 						else if (rlen > 0) {
-							uwsgi_log("received uwsgi signal %d from workers\n", uwsgi_signal);
+							uwsgi_log_verbose("received uwsgi signal %d from a worker\n", uwsgi_signal);
 							uwsgi_route_signal(uwsgi_signal);
 						}
 						else {

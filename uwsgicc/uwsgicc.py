@@ -23,15 +23,23 @@ def log():
     flash("log message written")
     return redirect(url_for('index'))
 
+@app.route("/sig", methods=['POST'])
+def sig():
+    try:
+        uwsgi.signal(int(request.form['signum']))
+        flash("uwsgi signal sent")
+    except:
+        flash("unable to send signal")
+    return redirect(url_for('index'))
+
 @app.route("/rpc", methods=['POST'])
 def rpc():
     node = str(request.form['node'])
-    if node == '':
-	node = None
 
     fargs = str(request.form['args'])
 
     args = fargs.split()
+
 
     if len(args) > 0:
         ret = uwsgi.rpc(str(node), str(request.form['func']), *map(str, args))

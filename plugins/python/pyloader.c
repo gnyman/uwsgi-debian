@@ -38,7 +38,6 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 
 	struct uwsgi_app *wi;
 
-
 	if (wsgi_req->script_name_len == 0) {
 		wsgi_req->script_name = "";
 	}
@@ -50,7 +49,7 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 	}
 
 
-	if (uwsgi.vhost && wsgi_req->host_len > 0) {
+	if (uwsgi.vhost) {
 		mountpoint = uwsgi_concat3n(wsgi_req->host, wsgi_req->host_len, "|", 1, wsgi_req->script_name, wsgi_req->script_name_len);
 	}
 	else {
@@ -304,6 +303,7 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 	if (uwsgi.threads > 1 && id) {
 		// if we have multiple threads we need to initialize a PyThreadState for each one
 		for(i=0;i<uwsgi.threads;i++) {
+			//uwsgi_log("%p\n", uwsgi.core[i]->ts[id]);
 			uwsgi.core[i]->ts[id] = PyThreadState_New( ((PyThreadState *)wi->interpreter)->interp);
 			if (!uwsgi.core[i]->ts[id]) {
 				uwsgi_log("unable to allocate new PyThreadState structure for app %s", mountpoint);
@@ -439,7 +439,7 @@ PyObject *uwsgi_uwsgi_loader(void *arg1) {
 	if (quick_callable[strlen(quick_callable) -2 ] == '(' && quick_callable[strlen(quick_callable) -1] ==')') {
 		quick_callable[strlen(quick_callable) -2 ] = 0;
 		tmp_callable = PyDict_GetItemString(wsgi_dict, quick_callable);
-		quick_callable[strlen(quick_callable) -2 ] = '(';
+		quick_callable[strlen(quick_callable)] = '(';
 		if (tmp_callable) {
 			return python_call(tmp_callable, PyTuple_New(0), 0);
 		}
@@ -524,7 +524,10 @@ PyObject *uwsgi_file_loader(void *arg1) {
 	if (!callable) callable = "application";
 
 	wsgi_file_module = uwsgi_pyimport_by_filename("uwsgi_wsgi_file", filename);
-	// no need to check here for module import as it is already done by uwsgi_pyimport_by_file
+	if (!wsgi_file_module) {
+		PyErr_Print();
+		exit(1);
+	}
 
 	wsgi_file_dict = PyModule_GetDict(wsgi_file_module);
 	if (!wsgi_file_dict) {

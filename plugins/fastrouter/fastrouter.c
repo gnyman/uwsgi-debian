@@ -111,6 +111,10 @@ void fastrouter_manage_subscription(char *key, uint16_t keylen, char *val, uint1
 		usr->address = val;
 		usr->address_len = vallen;
 	}
+
+	else if (!uwsgi_strncmp("modifier1", 9, key, keylen)) {
+		usr->modifier1 = uwsgi_str_num(val, vallen);
+	}
 }
 
 struct fastrouter_session {
@@ -126,6 +130,8 @@ struct fastrouter_session {
 	char *hostname;
 	uint16_t hostname_len;
 
+	int has_key;
+
 	char *instance_address;
 	uint64_t instance_address_len;
 
@@ -134,6 +140,8 @@ struct fastrouter_session {
 
 	struct uwsgi_rb_timer *timeout;
 	int instance_failed;
+
+	uint8_t modifier1;
 };
 
 static void close_session(struct fastrouter_session **fr_table, struct fastrouter_session *fr_session) {
@@ -187,7 +195,14 @@ void fr_get_hostname(char *key, uint16_t keylen, char *val, uint16_t vallen, voi
 		return;
 	}
 
-	if (!uwsgi_strncmp("HTTP_HOST", 9, key, keylen)) {
+	if (!uwsgi_strncmp("HTTP_HOST", 9, key, keylen) && !fr_session->has_key) {
+		fr_session->hostname = val;
+		fr_session->hostname_len = vallen;
+		return;
+	}
+
+	if (!uwsgi_strncmp("UWSGI_FASTROUTER_KEY", 20, key, keylen)) {
+		fr_session->has_key = 1;
 		fr_session->hostname = val;
 		fr_session->hostname_len = vallen;
 		return;
@@ -360,7 +375,7 @@ void fastrouter_loop() {
 				if (len > 0) {
 					memset(&usr, 0, sizeof(struct uwsgi_subscribe_req));
 					uwsgi_hooked_parse(bbuf+4, len-4, fastrouter_manage_subscription, &usr);
-					uwsgi_add_subscriber(ufr.subscription_dict, usr.key, usr.keylen, usr.address, usr.address_len);
+					uwsgi_add_subscriber(ufr.subscription_dict, &usr);
 				}
 			}
 			else {
@@ -414,7 +429,9 @@ void fastrouter_loop() {
                                                         	break;
 							}
 
-							//uwsgi_log("requested domain %.*s\n", fr_session->hostname_len, fr_session->hostname);
+#ifdef UWSGI_DEBUG
+							uwsgi_log("requested domain %.*s\n", fr_session->hostname_len, fr_session->hostname);
+#endif
 							if (ufr.use_cache) {
 								fr_session->instance_address = uwsgi_cache_get(fr_session->hostname, fr_session->hostname_len, &fr_session->instance_address_len);
 							}
@@ -430,6 +447,7 @@ void fastrouter_loop() {
 								if (fr_session->un && fr_session->un->len) {
 									fr_session->instance_address = fr_session->un->name;
 									fr_session->instance_address_len = fr_session->un->len;
+									fr_session->modifier1 = fr_session->un->modifier1;
 								}
 							}
 							else if (ufr.base) {
@@ -486,6 +504,8 @@ void fastrouter_loop() {
 								close_session(fr_table, fr_session);
                                                         	break;
 							}
+
+							fr_session->uh.modifier1 = fr_session->modifier1;
 
 							iov[0].iov_base = &fr_session->uh;
 							iov[0].iov_len = 4;

@@ -89,14 +89,15 @@ int uwsgi_python_init() {
 	if (up.home != NULL) {
 #ifdef PYTHREE
 		wchar_t *wpyhome;
-		wpyhome = malloc((sizeof(wchar_t) * strlen(up.home)) + 2);
+		wpyhome = malloc((sizeof(wchar_t) * strlen(up.home)) + sizeof(wchar_t) );
 		if (!wpyhome) {
 			uwsgi_error("malloc()");
 			exit(1);
 		}
 		mbstowcs(wpyhome, up.home, strlen(up.home));
 		Py_SetPythonHome(wpyhome);
-		free(wpyhome);
+		// do not free this memory !!!
+		//free(wpyhome);
 #else
 		Py_SetPythonHome(up.home);
 #endif
@@ -136,27 +137,32 @@ int uwsgi_python_init() {
 
 }
 
-void uwsgi_python_post_fork() {
+void uwsgi_python_reset_random_seed() {
 
 	PyObject *random_module, *random_dict, *random_seed;
 
-	// reinitialize the random seed (thanks Jonas Borgström)
-	random_module = PyImport_ImportModule("random");
-	if (random_module) {
-		random_dict = PyModule_GetDict(random_module);
-		if (random_dict) {
-			random_seed = PyDict_GetItemString(random_dict, "seed");
-			if (random_seed) {
-				PyObject *random_args = PyTuple_New(1);
-				// pass no args
-				PyTuple_SetItem(random_args, 0, Py_None);
-				PyEval_CallObject(random_seed, random_args);
-				if (PyErr_Occurred()) {
-					PyErr_Print();
-				}
-			}
-		}
-	}
+        // reinitialize the random seed (thanks Jonas Borgström)
+        random_module = PyImport_ImportModule("random");
+        if (random_module) {
+                random_dict = PyModule_GetDict(random_module);
+                if (random_dict) {
+                        random_seed = PyDict_GetItemString(random_dict, "seed");
+                        if (random_seed) {
+                                PyObject *random_args = PyTuple_New(1);
+                                // pass no args
+                                PyTuple_SetItem(random_args, 0, Py_None);
+                                PyEval_CallObject(random_seed, random_args);
+                                if (PyErr_Occurred()) {
+                                        PyErr_Print();
+                                }
+                        }
+                }
+        }
+}
+
+void uwsgi_python_post_fork() {
+
+	uwsgi_python_reset_random_seed();
 
 #ifdef UWSGI_EMBEDDED
 	// call the post_fork_hook
@@ -189,12 +195,12 @@ PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
 		pyfile = fopen(filename, "r");
 		if (!pyfile) {
 			uwsgi_log("failed to open python file %s\n", filename);
-			exit(1);
+			return NULL;
 		}
 
 		if (fstat(fileno(pyfile), &pystat)) {
 			uwsgi_error("fstat()");
-			exit(1);
+			return NULL;
 		}
 
 		if (S_ISDIR(pystat.st_mode)) {
@@ -204,7 +210,9 @@ PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
 			pyfile = fopen(real_filename, "r");
 			if (!pyfile) {
 				uwsgi_error_open(real_filename);
-				exit(1);
+				free(real_filename);
+				fclose(pyfile);
+				return NULL;
 			}
 		}
 
@@ -212,7 +220,9 @@ PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
 		if (!py_file_node) {
 			PyErr_Print();
 			uwsgi_log("failed to parse file %s\n", real_filename);
-			exit(1);
+			free(real_filename);
+			fclose(pyfile);
+			return NULL;
 		}
 
 		fclose(pyfile);
@@ -226,7 +236,7 @@ PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
 			if (!py_file_node) {
 				PyErr_Print();
 				uwsgi_log("failed to parse url %s\n", real_filename);
-				exit(1);
+				return NULL;
 			}
 		}
 	}
@@ -236,13 +246,13 @@ PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
 	if (!py_compiled_node) {
 		PyErr_Print();
 		uwsgi_log("failed to compile python file %s\n", real_filename);
-		exit(1);
+		return NULL;
 	}
 
 	py_file_module = PyImport_ExecCodeModule(name, py_compiled_node);
 	if (!py_file_module) {
 		PyErr_Print();
-		exit(1);
+		return NULL;
 	}
 
 	Py_DECREF(py_compiled_node);
@@ -365,6 +375,10 @@ void init_uwsgi_vars() {
 		else {
 			// this is a filepath that need to be mapped
 			tmp_module = uwsgi_pyimport_by_filename(up.pymodule_alias[i], value + 1);
+			if (!tmp_module) {
+				PyErr_Print();
+				exit(1);
+			}
 		}
 		uwsgi_log("mapped virtual pymodule \"%s\" to real pymodule \"%s\"\n", up.pymodule_alias[i], value + 1);
 		// reset original value
@@ -822,6 +836,29 @@ void uwsgi_python_init_apps() {
 
 }
 
+void uwsgi_python_master_fixup(int step) {
+
+	static int master_fixed = 0;
+	static int worker_fixed = 0;
+
+	if (!uwsgi.master_process) return;
+
+	if (uwsgi.has_threads) {
+		if (step == 0) {
+			if (!master_fixed) {
+				UWSGI_RELEASE_GIL;
+				master_fixed = 1;
+			}
+		}	
+		else {
+			if (!worker_fixed) {
+				UWSGI_GET_GIL;
+				worker_fixed = 1;
+			}
+		}
+	}
+}
+
 void uwsgi_python_enable_threads() {
 
 	PyEval_InitThreads();
@@ -841,9 +878,12 @@ void uwsgi_python_enable_threads() {
 	up.gil_get = gil_real_get;
 	up.gil_release = gil_real_release;
 
-	up.swap_ts = threaded_swap_ts;
-	up.reset_ts = threaded_reset_ts;
+	if (uwsgi.threads > 1) {
+		up.swap_ts = threaded_swap_ts;
+		up.reset_ts = threaded_reset_ts;
+	}
 	uwsgi_log("threads support enabled\n");
+
 }
 
 void uwsgi_python_init_thread(int core_id) {
@@ -994,8 +1034,14 @@ void uwsgi_python_add_item(char *key, uint16_t keylen, char *val, uint16_t valle
 
 int uwsgi_python_spooler(char *buf, uint16_t len) {
 
+	static int random_seed_reset = 0;
 	PyObject *spool_dict = PyDict_New();
 	PyObject *spool_func, *pyargs, *ret;
+
+	if (!random_seed_reset) {
+		uwsgi_python_reset_random_seed();
+		random_seed_reset = 1;	
+	}
 
 	if (!up.embedded_dict) {
 		// ignore
@@ -1068,6 +1114,7 @@ struct uwsgi_plugin python_plugin = {
 	.init_apps = uwsgi_python_init_apps,
 
 	.fixup = uwsgi_python_fixup,
+	.master_fixup = uwsgi_python_master_fixup,
 
 	.mount_app = uwsgi_python_mount_app,
 
