@@ -1,4 +1,4 @@
-uwsgi (0.9.8.1-1) UNRELEASED; urgency=low
+uwsgi (0.9.8.1-1) unstable; urgency=low
 
   * New upstream version (0.9.8.1)
   * d/patches:
@@ -27,7 +27,7 @@ uwsgi (0.9.8.1-1) UNRELEASED; urgency=low
       require preserving across reboots. It has been appeared in Debian with
       initscripts upgrade to 2.88dsf-13.3.
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Sat, 25 Jun 2011 23:57:16 +0300
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Sun, 26 Jun 2011 01:01:06 +0300
 
 uwsgi (0.9.8-2) unstable; urgency=low
 
