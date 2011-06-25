@@ -257,6 +257,10 @@ SV *build_psgi_env(struct wsgi_request *wsgi_req) {
 	
 	if (!hv_store(env, "psgix.input.buffered", 20, newSViv(wsgi_req->body_as_file), 0)) goto clear;
 
+	if (uwsgi.master_process) {
+		if (!hv_store(env, "psgix.harakiri", 14, newSViv(1), 0)) goto clear;
+	}
+
 	SV *pe = uwsgi_perl_obj_new("uwsgi::error", 12);
         if (!hv_store(env, "psgi.errors", 11, pe, 0)) goto clear;
 
@@ -278,6 +282,10 @@ int uwsgi_perl_init(){
 	uperl.embedding[2] = "0";
 
 	if (setenv("PLACK_ENV", "uwsgi", 0)) {
+		uwsgi_error("setenv()");
+	}
+
+	if (setenv("PLACK_SERVER", "uwsgi", 0)) {
 		uwsgi_error("setenv()");
 	}
 
@@ -364,6 +372,7 @@ void uwsgi_perl_enable_threads() {
 
 int uwsgi_perl_request(struct wsgi_request *wsgi_req) {
 
+	SV **harakiri;
 	SV *psgi_func = uperl.psgi_main;
 	// ugly hack
 	register PerlInterpreter *my_perl = uperl.main;
@@ -426,6 +435,12 @@ int uwsgi_perl_request(struct wsgi_request *wsgi_req) {
 	}
 
 clear2:
+	// check for psgix.harakiri
+        harakiri = hv_fetch((HV*)SvRV( (SV*)wsgi_req->async_environ), "psgix.harakiri.commit", 21, 0);
+        if (harakiri) {
+                if (SvTRUE(*harakiri)) wsgi_req->async_plagued = 1;
+        }
+
 	SvREFCNT_dec(wsgi_req->async_environ);
 	SvREFCNT_dec(wsgi_req->async_result);
 clear:
@@ -441,6 +456,12 @@ void uwsgi_perl_after_request(struct wsgi_request *wsgi_req) {
 
 	if (uwsgi.shared->options[UWSGI_OPTION_LOGGING])
 		log_request(wsgi_req);
+
+	if (wsgi_req->async_plagued) {
+		uwsgi_log("*** psgix.harakiri.commit requested ***\n");
+		goodbye_cruel_world();
+	}
+
 }
 
 void uwsgi_perl_init_thread(int core_id) {

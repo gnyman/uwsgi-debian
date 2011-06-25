@@ -173,6 +173,8 @@ ssize_t send_udp_message(uint8_t modifier1, char *host, char *message, uint16_t 
 	}
 	close(fd);
 
+	udp_port[0] = ':';
+
 	return ret;
 	
 }
@@ -339,7 +341,7 @@ ssize_t uwsgi_send_message(int fd, uint8_t modifier1, uint8_t modifier2, char *m
 }
 
 
-int uwsgi_parse_response(struct pollfd *upoll, int timeout, struct uwsgi_header *uh, char *buffer, int (*socket_proto)(struct wsgi_request *)) {
+int uwsgi_parse_packet(struct wsgi_request *wsgi_req, int timeout) {
 	int rlen;
 	int status = UWSGI_AGAIN;
 
@@ -347,7 +349,7 @@ int uwsgi_parse_response(struct pollfd *upoll, int timeout, struct uwsgi_header 
 		timeout = 1;
 
 	while(status == UWSGI_AGAIN) {
-		rlen = poll(upoll, 1, timeout * 1000);
+		rlen = poll(&wsgi_req->poll, 1, timeout * 1000);
 		if (rlen < 0) {
 			uwsgi_error("poll()");
 			exit(1);
@@ -357,7 +359,12 @@ int uwsgi_parse_response(struct pollfd *upoll, int timeout, struct uwsgi_header 
 			//close(upoll->fd);
 			return 0;
 		}
-		status = socket_proto((struct wsgi_request *) uh);
+		if (wsgi_req->socket) {
+			status = wsgi_req->socket->proto(wsgi_req);
+		}
+		else {
+			status = uwsgi_proto_uwsgi_parser(wsgi_req);
+		}
 		if (status < 0) {
 			uwsgi_log("error parsing request\n");
 			//close(upoll->fd);
@@ -393,6 +400,7 @@ int uwsgi_parse_array(char *buffer, uint16_t size, char **argv, uint8_t *argc) {
                         if (ptrbuf + strsize <= bufferend) {
                                 // item
 				argv[*argc] = uwsgi_cheap_string(ptrbuf, strsize);
+				uwsgi_log("arg %s\n", argv[*argc]);
                                 ptrbuf += strsize;
 				*argc = *argc + 1;
 			}
@@ -754,7 +762,7 @@ int uwsgi_ping_node(int node, struct wsgi_request *wsgi_req) {
 	}
 
 	uwsgi_poll.events = POLLIN;
-	if (!uwsgi_parse_response(&uwsgi_poll, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT], (struct uwsgi_header *) wsgi_req, wsgi_req->buffer, uwsgi_proto_uwsgi_parser)) {
+	if (!uwsgi_parse_packet(wsgi_req, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT])) {
 		return -1;
 	}
 
@@ -819,7 +827,9 @@ int uwsgi_get_dgram(int fd, struct wsgi_request *wsgi_req) {
                 return -1;
         }
 
-	uwsgi_log("recevied request from %s\n", inet_ntoa(sin.sin_addr));
+#ifdef UWSGI_DEBUG
+	uwsgi_log("received request from %s\n", inet_ntoa(sin.sin_addr));
+#endif
 
         if (rlen < 4) {
                 uwsgi_log("invalid uwsgi packet\n");
@@ -843,7 +853,9 @@ int uwsgi_get_dgram(int fd, struct wsgi_request *wsgi_req) {
 
 	wsgi_req->buffer = buffer+4;
 
+#ifdef UWSGI_DEBUG
 	uwsgi_log("request received %d %d\n", wsgi_req->uh.modifier1, wsgi_req->uh.modifier2);
+#endif
 
 	return 0;
 
@@ -909,20 +921,27 @@ int uwsgi_hooked_parse_dict_dgram(int fd, char *buffer, size_t len, uint8_t modi
 		return -1;
 	}
 
-	uwsgi_log("recevied request from %s\n", inet_ntoa(sin.sin_addr));
 
+#ifdef UWSGI_DEBUG
 	uwsgi_log("RLEN: %d\n", rlen);
+#endif
 
 	// check for valid dict 4(header) 2(non-zero key)+1 2(value)
 	if (rlen < (4+2+1+2)) {
+#ifdef UWSGI_DEBUG
 		uwsgi_log("invalid uwsgi dictionary\n");
+#endif
 		return -1;
 	}
+
+	uwsgi_log("received message from %s\n", inet_ntoa(sin.sin_addr));
 	
 	uh = (struct uwsgi_header *) buffer;
 
 	if (uh->modifier1 != modifier1 || uh->modifier2 != modifier2) {
+#ifdef UWSGI_DEBUG
 		uwsgi_log("invalid uwsgi dictionary received, modifier1: %d modifier2: %d\n", uh->modifier1, uh->modifier2);
+#endif
 		return -1;
 	}
 
@@ -942,7 +961,9 @@ int uwsgi_hooked_parse_dict_dgram(int fd, char *buffer, size_t len, uint8_t modi
 	}
 
 	
+#ifdef UWSGI_DEBUG
 	uwsgi_log("%p %p %d\n", ptrbuf, bufferend, bufferend-ptrbuf);
+#endif
 
 	uwsgi_hooked_parse(ptrbuf, bufferend-ptrbuf, hook, data);
 
@@ -1096,8 +1117,7 @@ uint16_t fcgi_get_record(int fd, char *buf) {
 
 char *uwsgi_simple_message_string(char *socket_name, uint8_t modifier1, uint8_t modifier2, char *what, uint16_t what_len, char *buffer, uint16_t *response_len, int timeout) {
 
-	struct uwsgi_header uh;
-	struct pollfd upoll;
+	struct wsgi_request msg_req;
 
 	int fd = uwsgi_connect(socket_name, timeout, 0);
 
@@ -1112,19 +1132,22 @@ char *uwsgi_simple_message_string(char *socket_name, uint8_t modifier1, uint8_t 
 		return NULL;
 	}
 
-	upoll.fd = fd;
-	upoll.events = POLLIN;
+	memset(&msg_req, 0, sizeof(struct wsgi_request));
+	msg_req.poll.fd = fd;
+	msg_req.poll.events = POLLIN;
+	msg_req.buffer = buffer;
 
 	if (buffer) {
-		if (!uwsgi_parse_response(&upoll, timeout, &uh, buffer, uwsgi_proto_uwsgi_parser)) {
+		if (!uwsgi_parse_packet(&msg_req, timeout)) {
 			close(fd);
 			if (response_len) *response_len = 0;
 			return NULL;
 		}
+
+		if (response_len) *response_len = msg_req.uh.pktsize;
 	}
 
 	close(fd);
-	if (response_len) *response_len = uh.pktsize;
 	return buffer;
 }
 

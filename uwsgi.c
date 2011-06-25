@@ -69,6 +69,8 @@ static struct option long_base_options[] = {
 	{"emperor-amqp-username", required_argument, 0, LONG_ARGS_EMPEROR_AMQP_USERNAME},
 	{"emperor-amqp-password", required_argument, 0, LONG_ARGS_EMPEROR_AMQP_PASSWORD},
 	{"vassals-inherit", required_argument, 0, LONG_ARGS_VASSALS_INHERIT},
+	{"vassals-start-hook", required_argument, 0, LONG_ARGS_VASSALS_START_HOOK},
+	{"vassals-stop-hook", required_argument, 0, LONG_ARGS_VASSALS_STOP_HOOK},
 	{"auto-snapshot", optional_argument, 0, LONG_ARGS_AUTO_SNAPSHOT},
 	{"reload-mercy", required_argument, 0, LONG_ARGS_RELOAD_MERCY},
 	{"exit-on-reload", no_argument, &uwsgi.exit_on_reload, 1},
@@ -127,6 +129,7 @@ static struct option long_base_options[] = {
 	{"reload-on-as", required_argument, 0, LONG_ARGS_RELOAD_ON_AS},
 	{"reload-on-rss", required_argument, 0, LONG_ARGS_RELOAD_ON_RSS},
 	{"touch-reload", required_argument, 0, LONG_ARGS_TOUCH_RELOAD},
+	{"propagate-touch", no_argument, &uwsgi.propagate_touch, 1},
 	{"limit-post", required_argument, 0, LONG_ARGS_LIMIT_POST},
 	{"no-orphans", no_argument, &uwsgi.no_orphans, 1},
 	{"prio", required_argument, 0, LONG_ARGS_PRIO},
@@ -158,6 +161,7 @@ static struct option long_base_options[] = {
 	{"async", required_argument, 0, LONG_ARGS_ASYNC},
 #endif
 	{"logto", required_argument, 0, LONG_ARGS_LOGTO},
+	{"logto2", required_argument, 0, LONG_ARGS_LOGTO2},
 	{"logfile-chown", no_argument, &uwsgi.logfile_chown, 1},
 	{"log-syslog", optional_argument, 0, LONG_ARGS_LOG_SYSLOG},
 	{"log-socket", required_argument, 0, LONG_ARGS_LOG_SOCKET},
@@ -206,6 +210,10 @@ static struct option long_base_options[] = {
 	{"namespace-net", required_argument, 0, LONG_ARGS_LINUX_NS_NET},
 	{"ns-net", required_argument, 0, LONG_ARGS_LINUX_NS_NET},
 #endif
+	{"reuse-port", no_argument, &uwsgi.reuse_port, 1},
+	{"zerg", required_argument, 0, LONG_ARGS_ZERG},
+	{"zerg-server", required_argument, 0, LONG_ARGS_ZERG_SERVER},
+	{"cron", required_argument, 0, LONG_ARGS_CRON},
 	{"loop", required_argument, 0, LONG_ARGS_LOOP},
 	{"worker-exec", required_argument, 0, LONG_ARGS_WORKER_EXEC},
 	{"attach-daemon", required_argument, 0, LONG_ARGS_ATTACH_DAEMON},
@@ -222,14 +230,29 @@ static struct option long_base_options[] = {
 
 void uwsgi_configure(void) {
 
-	struct option *lopt = uwsgi.long_options;
+	struct option *lopt;
 	struct option *aopt;
 	char *val;
 	int i;
 	int is_retry;
 	int found;
 
+	// option must be processed in reverse (to have a consistent template system)
+	// but first load plugins...
 	for (i = 0; i < uwsgi.exported_opts_cnt; i++) {
+		if (uwsgi.exported_opts[i]->configured)
+                        continue;
+
+		if (!strcmp("plugin", uwsgi.exported_opts[i]->key) || !strcmp("plugins", uwsgi.exported_opts[i]->key)) {
+			manage_opt(LONG_ARGS_PLUGINS, uwsgi.exported_opts[i]->value);
+		}
+	}
+
+	for (i = uwsgi.exported_opts_cnt-1; i >= 0; i--) {
+
+#ifdef UWSGI_DEBUG
+		uwsgi_log("i = %d %p\n", i, uwsgi.exported_opts[i]);
+#endif
 
 		if (uwsgi.exported_opts[i]->configured)
 			continue;
@@ -297,6 +320,8 @@ void uwsgi_configure(void) {
 
 void config_magic_table_fill(char *filename, char **magic_table) {
 
+	char *tmp = NULL;
+
 	magic_table['o'] = filename;
 	if (filename[0] == '/') {
 		magic_table['p'] = filename;
@@ -306,6 +331,16 @@ void config_magic_table_fill(char *filename, char **magic_table) {
 	}
 	magic_table['s'] = uwsgi_get_last_char(magic_table['p'], '/') + 1;
 	magic_table['d'] = uwsgi_concat2n(magic_table['p'], magic_table['s'] - magic_table['p'], "", 0);
+	if (magic_table['d'][strlen(magic_table['d'])-1] == '/') {
+		tmp = magic_table['d'] + (strlen(magic_table['d']) -1) ;
+		uwsgi_log("tmp = %c\n", *tmp);
+		*tmp = 0;
+	}
+	if (uwsgi_get_last_char(magic_table['d'], '/'))
+		magic_table['c'] = uwsgi_get_last_char(magic_table['d'], '/') + 1;
+
+	if (tmp) *tmp = '/';
+
 	if (uwsgi_get_last_char(filename, '.'))
 		magic_table['e'] = uwsgi_get_last_char(filename, '.') + 1;
 	if (uwsgi_get_last_char(magic_table['s'], '.'))
@@ -439,7 +474,7 @@ void kill_them_all(int signum) {
 
 	for (i = 0; i < uwsgi.shared->daemons_cnt; i++) {
 		if (uwsgi.shared->daemons[i].pid > 0)
-			kill(uwsgi.shared->daemons[i].pid, SIGKILL);
+			kill(-uwsgi.shared->daemons[i].pid, SIGKILL);
 	}
 
 	for (i = 0; i < uwsgi.gateways_cnt; i++) {
@@ -474,7 +509,7 @@ void grace_them_all(int signum) {
 
 	for (i = 0; i < uwsgi.shared->daemons_cnt; i++) {
 		if (uwsgi.shared->daemons[i].pid > 0)
-			kill(uwsgi.shared->daemons[i].pid, SIGKILL);
+			kill(-uwsgi.shared->daemons[i].pid, SIGKILL);
 	}
 
 	for (i = 0; i < uwsgi.gateways_cnt; i++) {
@@ -535,7 +570,7 @@ void reap_them_all(int signum) {
 
 	for (i = 0; i < uwsgi.shared->daemons_cnt; i++) {
 		if (uwsgi.shared->daemons[i].pid > 0)
-			kill(uwsgi.shared->daemons[i].pid, SIGKILL);
+			kill(-uwsgi.shared->daemons[i].pid, SIGKILL);
 	}
 
 	for (i = 0; i < uwsgi.gateways_cnt; i++) {
@@ -725,7 +760,6 @@ int main(int argc, char *argv[], char *envp[]) {
 	char *magic_table[0xff];
 	char *optname;
 
-
 	signal(SIGHUP, SIG_IGN);
 	signal(SIGTERM, SIG_IGN);
 
@@ -848,19 +882,18 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	//initialize embedded plugins
 	UWSGI_LOAD_EMBEDDED_PLUGINS
-		// now a bit of magic, if the argv[0] contains a _ try to automatically load a plugin
+		// now a bit of magic, if the argv[0] basename contains a 'uwsgi_' string,
+		// try to automatically load a plugin
 		//uwsgi_log("executable name: %s\n", argv[0]);
-	char *p = strtok(argv[0], "_");
-	plugins_requested = NULL;
-	while (p != NULL) {
-		p = strtok(NULL, "_");
-		if (p)
-			plugins_requested = p;
-	}
-
-	if (plugins_requested) {
-		uwsgi_log("plugin = %s\n", plugins_requested);
-		uwsgi_load_plugin(0, plugins_requested, NULL, 0);
+	char *p = strrchr(argv[0], '/');
+	if (p == NULL) p = argv[0];
+	p = strstr(p, "uwsgi_");
+	if (p != NULL) {
+		plugins_requested = strchr(p, '_');
+		if (plugins_requested != NULL && *(++plugins_requested) != '\0') {
+			uwsgi_log("plugin = %s\n", plugins_requested);
+			uwsgi_load_plugin(0, plugins_requested, NULL, 0);
+		}
 	}
 
 	plugins_requested = getenv("UWSGI_PLUGINS");
@@ -996,7 +1029,8 @@ int main(int argc, char *argv[], char *envp[]) {
 #endif
 #ifdef UWSGI_SQLITE3
 	if (uwsgi.sqlite3 != NULL) {
-		uwsgi_sqlite3_config(uwsgi.sqlite3);
+		config_magic_table_fill(uwsgi.sqlite3, magic_table);
+		uwsgi_sqlite3_config(uwsgi.sqlite3, magic_table);
 	}
 #endif
 #ifdef UWSGI_LDAP
@@ -1036,13 +1070,13 @@ int main(int argc, char *argv[], char *envp[]) {
 #endif
 #ifdef UWSGI_SQLITE3
 		if (!strcmp(uct->filename + strlen(uct->filename) - 3, ".db")) {
-			uwsgi_sqlite3_config(uct->filename);
+			uwsgi_sqlite3_config(uct->filename, magic_table);
 		}
 		if (!strcmp(uct->filename + strlen(uct->filename) - 7, ".sqlite")) {
-			uwsgi_sqlite3_config(uct->filename);
+			uwsgi_sqlite3_config(uct->filename, magic_table);
 		}
 		if (!strcmp(uct->filename + strlen(uct->filename) - 8, ".sqlite3")) {
-			uwsgi_sqlite3_config(uct->filename);
+			uwsgi_sqlite3_config(uct->filename, magic_table);
 		}
 #endif
 		uct = uct->next;
@@ -1319,6 +1353,10 @@ int uwsgi_start(void *v_argv) {
 		uwsgi_as_root();
 	}
 
+	if (uwsgi.logto2) {
+		logto(uwsgi.logto2);
+	}
+
 	if (uwsgi.chdir) {
 		if (chdir(uwsgi.chdir)) {
 			uwsgi_error("chdir()");
@@ -1585,11 +1623,26 @@ int uwsgi_start(void *v_argv) {
 	if (!uwsgi.no_server) {
 
 		//check for inherited sockets
-		if (uwsgi.is_a_reload) {
+		if (uwsgi.is_a_reload || uwsgi.zerg) {
+
+			if (uwsgi.zerg) {
+				int zerg_fd;
+				i = 0;
+				for(;;) {
+					zerg_fd = uwsgi.zerg[i];
+					if (zerg_fd == -1) {
+						break;
+					}
+					uwsgi_sock = uwsgi_new_socket(NULL);
+					uwsgi_add_socket_from_fd(uwsgi_sock, zerg_fd);
+					i++;
+				}
+			}
+
 			uwsgi_sock = uwsgi.sockets;
 			while (uwsgi_sock) {
 				//a bit overengineering
-				if (uwsgi_sock->name[0] != 0) {
+				if (uwsgi_sock->name[0] != 0 && !uwsgi_sock->bound) {
 					for (j = 3; j < sysconf(_SC_OPEN_MAX); j++) {
 						uwsgi_add_socket_from_fd(uwsgi_sock, j);
 					}
@@ -1686,6 +1739,15 @@ int uwsgi_start(void *v_argv) {
 				}
 			}
 
+		}
+	
+		// check for auto_port socket
+		uwsgi_sock = uwsgi.sockets;
+                while (uwsgi_sock) {
+			if (uwsgi_sock->auto_port) {
+				uwsgi_log("uwsgi socket %d bound to TCP address %s (port auto-assigned) fd %d\n", uwsgi_get_socket_num(uwsgi_sock), uwsgi_sock->name, uwsgi_sock->fd);
+			}
+			uwsgi_sock = uwsgi_sock->next;
 		}
 
 
@@ -1834,6 +1896,15 @@ int uwsgi_start(void *v_argv) {
 	uwsgi_log("your server socket listen backlog is limited to %d connections\n", uwsgi.listen_queue);
 #endif
 
+	if (uwsgi.crons) {
+                struct uwsgi_cron *ucron = uwsgi.crons;
+                while(ucron) {
+                        uwsgi_log("command \"%s\" registered as uWSGI-cron task\n", ucron->command);
+                        ucron = ucron->next;
+                }
+        }
+
+
 
 	memset(uwsgi.apps, 0, sizeof(uwsgi.apps));
 
@@ -1899,6 +1970,14 @@ int uwsgi_start(void *v_argv) {
 
 	uwsgi_rawlog(" ***\n");
 
+	// even the master has cores..
+	uwsgi.core = uwsgi_malloc(sizeof(struct uwsgi_core *) * uwsgi.cores);
+	for (j = 0; j < uwsgi.cores; j++) {
+		uwsgi.core[j] = uwsgi_malloc(sizeof(struct uwsgi_core));
+		memset(uwsgi.core[j], 0, sizeof(struct uwsgi_core));
+	}
+
+
 	//init apps hook (if not lazy)
 	if (!uwsgi.lazy) {
 		uwsgi_init_all_apps();
@@ -1948,6 +2027,15 @@ int uwsgi_start(void *v_argv) {
 #ifdef UWSGI_ROUTING
 	routing_setup();
 #endif
+
+	// master fixup
+
+        for (i = 0; i < 0xFF; i++) {
+                if (uwsgi.p[i]->master_fixup) {
+                        uwsgi.p[i]->master_fixup(0);
+                }
+        }
+
 
 	if (!uwsgi.master_process) {
 		if (uwsgi.numproc == 1) {
@@ -2099,12 +2187,6 @@ int uwsgi_start(void *v_argv) {
 		exit(1);
 	}
 
-	uwsgi.core = uwsgi_malloc(sizeof(struct uwsgi_core *) * uwsgi.cores);
-	for (j = 0; j < uwsgi.cores; j++) {
-		uwsgi.core[j] = uwsgi_malloc(sizeof(struct uwsgi_core));
-		memset(uwsgi.core[j], 0, sizeof(struct uwsgi_core));
-	}
-
 	if (uwsgi.master_as_root) {
 		uwsgi_as_root();
 	}
@@ -2206,17 +2288,17 @@ int uwsgi_start(void *v_argv) {
 		}
 
 		uwsgi_add_sockets_to_queue(uwsgi.async_queue);
+
+		uwsgi.rb_async_timeouts = uwsgi_init_rb_timer();
+
+		uwsgi.async_queue_unused = uwsgi_malloc(sizeof(struct wsgi_request *) * uwsgi.async);
+
+		for (i = 0; i < uwsgi.async; i++) {
+			uwsgi.async_queue_unused[i] = uwsgi.wsgi_requests[i];
+		}
+
+		uwsgi.async_queue_unused_ptr = uwsgi.async - 1;
 	}
-
-	uwsgi.rb_async_timeouts = uwsgi_init_rb_timer();
-
-	uwsgi.async_queue_unused = uwsgi_malloc(sizeof(struct wsgi_request *) * uwsgi.async);
-
-	for (i = 0; i < uwsgi.async; i++) {
-		uwsgi.async_queue_unused[i] = uwsgi.wsgi_requests[i];
-	}
-
-	uwsgi.async_queue_unused_ptr = uwsgi.async - 1;
 #endif
 
 
@@ -2361,6 +2443,7 @@ void uwsgi_ignition() {
 #else
 		if (uwsgi.threads > 1) {
 #endif
+
 			if (pthread_key_create(&uwsgi.tur_key, NULL)) {
 				uwsgi_error("pthread_key_create()");
 				exit(1);
@@ -2393,6 +2476,8 @@ static int manage_base_opt(int i, char *optarg) {
 	char *p;
 	struct uwsgi_static_map *usm, *old_usm;
 	struct uwsgi_config_template *uct, *old_uct;
+	struct uwsgi_cron *uc, *old_uc;
+	int zerg_fd;
 
 	switch (i) {
 
@@ -2473,6 +2558,7 @@ static int manage_base_opt(int i, char *optarg) {
 		return 1;
 #ifdef UWSGI_THREADING
 	case LONG_ARGS_THREADS:
+		uwsgi.has_threads = 1;
 		uwsgi.threads = atoi(optarg);
 		return 1;
 #endif
@@ -2486,6 +2572,9 @@ static int manage_base_opt(int i, char *optarg) {
 #endif
 	case LONG_ARGS_LOGTO:
 		logto(optarg);
+		return 1;
+	case LONG_ARGS_LOGTO2:
+		uwsgi.logto2 = optarg;
 		return 1;
 	case LONG_ARGS_EMPEROR:
 		uwsgi.emperor_dir = optarg;
@@ -2651,6 +2740,12 @@ static int manage_base_opt(int i, char *optarg) {
 		uct->next = NULL;
 
 		return 1;
+	case LONG_ARGS_VASSALS_START_HOOK:
+		uwsgi.vassals_start_hook = optarg;
+		return 1;
+	case LONG_ARGS_VASSALS_STOP_HOOK:
+		uwsgi.vassals_stop_hook = optarg;
+		return 1;
 	case LONG_ARGS_VASSALS_INHERIT:
 		uct = uwsgi.vassals_templates;
 		if (!uct) {
@@ -2671,6 +2766,32 @@ static int manage_base_opt(int i, char *optarg) {
 		uct->filename = optarg;
 		uct->next = NULL;
 
+		return 1;
+	case LONG_ARGS_CRON:
+		uwsgi.master_process = 1;
+		uc = uwsgi.crons;
+		if (!uc) {
+			uc = uwsgi_malloc(sizeof(struct uwsgi_cron));
+			uwsgi.crons = uc;
+		}
+		else {
+			old_uc = uc;
+			while(uc->next) {
+				uc = uc->next;
+				old_uc = uc;
+			}
+
+			old_uc->next = uwsgi_malloc(sizeof(struct uwsgi_cron));
+			uc = old_uc->next;
+		}
+
+		memset(uc, 0, sizeof(struct uwsgi_cron));
+
+		if (sscanf(optarg, "%d %d %d %d %d %n", &uc->minute, &uc->hour, &uc->day, &uc->month, &uc->week, &i) != 5) {
+			uwsgi_log("invalid cron syntax\n");
+			exit(1);
+		}	
+		uc->command = optarg+i;
 		return 1;
 	case LONG_ARGS_STATIC_MAP:
 		usm = uwsgi.static_maps;
@@ -2889,6 +3010,23 @@ static int manage_base_opt(int i, char *optarg) {
 	case 's':
 		uwsgi_new_socket(generate_socket_name(optarg));
 		return 1;
+	case LONG_ARGS_ZERG:
+		zerg_fd = uwsgi_connect(optarg, 30, 0);
+		if (zerg_fd < 0) {
+			uwsgi_log("--- unable to connect to zerg server ---\n");
+			exit(1);
+		}
+		uwsgi.zerg = uwsgi_attach_fd(zerg_fd, 8, "uwsgi-zerg", 11);
+		if (uwsgi.zerg == NULL) {
+			uwsgi_log("--- invalid data received from zerg-server ---\n");
+			exit(1);
+		}
+		close(zerg_fd);
+		return 1;
+	case LONG_ARGS_ZERG_SERVER:
+		uwsgi.zerg_server = optarg;
+		uwsgi.master_process = 1;
+		return 1;
 	case LONG_ARGS_SHARED_SOCKET:
 		uwsgi_new_shared_socket(generate_socket_name(optarg));
 		return 1;
@@ -3046,79 +3184,24 @@ void manage_opt(int i, char *optarg) {
 
 }
 
-void uwsgi_cluster_simple_add_node(char *nodename, int workers, int type) {
-
-	int i;
-	struct uwsgi_cluster_node *ucn;
-	char *tcp_port;
-
-	if (strlen(nodename) > 100) {
-		uwsgi_log("invalid cluster node name %s\n", nodename);
-		return;
-	}
-
-	tcp_port = strchr(nodename, ':');
-	if (tcp_port == NULL) {
-		fprintf(stdout, "invalid cluster node name %s\n", nodename);
-		return;
-	}
-
-	// first check for already present node
-	for (i = 0; i < MAX_CLUSTER_NODES; i++) {
-		ucn = &uwsgi.shared->nodes[i];
-		if (ucn->name[0] != 0) {
-			if (!strcmp(ucn->name, nodename)) {
-				ucn->status = UWSGI_NODE_OK;
-				ucn->last_seen = time(NULL);
-				return;
-			}
-		}
-	}
-
-	for (i = 0; i < MAX_CLUSTER_NODES; i++) {
-		ucn = &uwsgi.shared->nodes[i];
-
-		if (ucn->name[0] == 0) {
-			memcpy(ucn->name, nodename, strlen(nodename) + 1);
-			ucn->workers = workers;
-			ucn->ucn_addr.sin_family = AF_INET;
-			ucn->ucn_addr.sin_port = htons(atoi(tcp_port + 1));
-			tcp_port[0] = 0;
-			if (nodename[0] == 0) {
-				ucn->ucn_addr.sin_addr.s_addr = INADDR_ANY;
-			}
-			else {
-				uwsgi_log("%s\n", nodename);
-				ucn->ucn_addr.sin_addr.s_addr = inet_addr(nodename);
-			}
-
-			ucn->type = type;
-			// here memory can be freed, as it is allocated by uwsgi_concat2n
-			if (type == CLUSTER_NODE_DYNAMIC) {
-				free(nodename);
-			}
-			else {
-				tcp_port[0] = ':';
-			}
-			ucn->last_seen = time(NULL);
-			uwsgi_log("[uWSGI cluster] added node %s\n", ucn->name);
-			return;
-		}
-	}
-
-	uwsgi_log("unable to add node %s\n", nodename);
-}
-
 void uwsgi_cluster_add_node(struct uwsgi_cluster_node *nucn, int type) {
 
 	int i;
 	struct uwsgi_cluster_node *ucn;
 	char *tcp_port;
 
+#ifdef UWSGI_DEBUG
 	uwsgi_log("adding node\n");
+#endif
 
 	tcp_port = strchr(nucn->name, ':');
+#ifndef UWSGI_ZEROMQ
 	if (tcp_port == NULL) {
+#else
+	char *zmq_dash = strchr(nucn->name, '-');
+	if (tcp_port == NULL && zmq_dash == NULL) {
+#endif
+
 		fprintf(stdout, "invalid cluster node name %s\n", nucn->name);
 		return;
 	}
@@ -3145,19 +3228,23 @@ void uwsgi_cluster_add_node(struct uwsgi_cluster_node *nucn, int type) {
 			memcpy(ucn->nodename, nucn->nodename, strlen(nucn->nodename) + 1);
 			ucn->workers = nucn->workers;
 			ucn->ucn_addr.sin_family = AF_INET;
-			ucn->ucn_addr.sin_port = htons(atoi(tcp_port + 1));
-			tcp_port[0] = 0;
+			if (tcp_port) {
+				ucn->ucn_addr.sin_port = htons(atoi(tcp_port + 1));
+				tcp_port[0] = 0;
+			}
 			if (nucn->name[0] == 0) {
 				ucn->ucn_addr.sin_addr.s_addr = INADDR_ANY;
 			}
 			else {
+#ifdef UWSGI_DEBUG
 				uwsgi_log("%s\n", nucn->name);
+#endif
 				ucn->ucn_addr.sin_addr.s_addr = inet_addr(nucn->name);
 			}
 
 			ucn->type = type;
 			// here memory can be freed, as it is allocated by uwsgi_concat2n
-			if (type != CLUSTER_NODE_DYNAMIC) {
+			if (type != CLUSTER_NODE_DYNAMIC && tcp_port) {
 				tcp_port[0] = ':';
 			}
 			ucn->last_seen = time(NULL);
@@ -3292,7 +3379,9 @@ void manage_string_opt(char *key, uint16_t keylen, char *val, uint16_t vallen, v
 	char *key2 = uwsgi_concat2n(key, keylen, "", 0);
 	char *val2 = uwsgi_concat2n(val, vallen, "", 0);
 
+#ifdef UWSGI_DEBUG
 	uwsgi_log("%s = %s\n", key2, val2);
+#endif
 	add_exported_option(key2, val2, 0);
 }
 
@@ -3309,6 +3398,8 @@ int uwsgi_cluster_add_me() {
 	char numproc[6];
 
 #ifdef UWSGI_ZEROMQ
+	char uuid_zmq_str[37];
+	uuid_t uuid_zmq;
 	if (!uwsgi.sockets && !uwsgi.zeromq) {
 #else
 	if (!uwsgi.sockets) {
@@ -3324,6 +3415,13 @@ int uwsgi_cluster_add_me() {
 	if (uwsgi.sockets) {
 		len = 2 + strlen(key1) + 2 + strlen(uwsgi.hostname) + 2 + strlen(key2) + 2 + strlen(uwsgi.sockets->name) + 2 + strlen(key3) + 2 + strlen(numproc) + 2 + strlen(key4) + 2 + 1;
 	}
+#ifdef UWSGI_ZEROMQ
+	else if (uwsgi.zeromq) {
+                uuid_generate(uuid_zmq);
+                uuid_unparse(uuid_zmq, uuid_zmq_str);
+		len = 2 + strlen(key1) + 2 + strlen(uwsgi.hostname) + 2 + strlen(key2) + 2 + strlen(uuid_zmq_str) + 2 + strlen(key3) + 2 + strlen(numproc) + 2 + strlen(key4) + 2 + 1;
+	}
+#endif
 	else {
 		len = 2 + strlen(key1) + 2 + strlen(uwsgi.hostname) + 2 + strlen(key3) + 2 + strlen(numproc) + 2 + strlen(key4) + 2 + 1;
 	}
@@ -3344,7 +3442,7 @@ int uwsgi_cluster_add_me() {
 	ptrbuf += strlen(uwsgi.hostname);
 
 
-	if (uwsgi.sockets->name) {
+	if (uwsgi.sockets && uwsgi.sockets->name) {
 		ustrlen = strlen(key2);
 		*ptrbuf++ = (uint8_t) (ustrlen & 0xff);
 		*ptrbuf++ = (uint8_t) ((ustrlen >> 8) & 0xff);
@@ -3357,6 +3455,21 @@ int uwsgi_cluster_add_me() {
 		memcpy(ptrbuf, uwsgi.sockets->name, strlen(uwsgi.sockets->name));
 		ptrbuf += strlen(uwsgi.sockets->name);
 	}
+#ifdef UWSGI_ZEROMQ
+	else if (uwsgi.zeromq) {
+		ustrlen = strlen(key2);
+		*ptrbuf++ = (uint8_t) (ustrlen & 0xff);
+		*ptrbuf++ = (uint8_t) ((ustrlen >> 8) & 0xff);
+		memcpy(ptrbuf, key2, strlen(key2));
+		ptrbuf += strlen(key2);
+
+		ustrlen = strlen(uuid_zmq_str);
+		*ptrbuf++ = (uint8_t) (ustrlen & 0xff);
+		*ptrbuf++ = (uint8_t) ((ustrlen >> 8) & 0xff);
+		memcpy(ptrbuf, uuid_zmq_str, strlen(uuid_zmq_str));
+		ptrbuf += strlen(uuid_zmq_str);
+	}
+#endif
 
 
 	ustrlen = strlen(key3);
@@ -3388,7 +3501,9 @@ int uwsgi_cluster_add_me() {
 
 	free(buf);
 
+#ifdef UWSGI_DEBUG
 	uwsgi_log("add_me() successfull\n");
+#endif
 
 	return 0;
 }
@@ -3400,6 +3515,7 @@ int uwsgi_cluster_join(char *name) {
 	int broadcast = 0;
 
 
+	
 	if (name[0] == ':') {
 		fd = bind_to_udp(name, 0, 1);
 		broadcast = 1;

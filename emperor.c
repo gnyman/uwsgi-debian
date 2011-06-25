@@ -84,6 +84,12 @@ void emperor_del(struct uwsgi_instance *c_ui) {
 		close(c_ui->pipe_config[0]);
 	}
 
+	if (uwsgi.vassals_stop_hook) {
+                        uwsgi_log("running vassal stop-hook: %s %s\n", uwsgi.vassals_stop_hook, c_ui->name);
+                        int stop_hook_ret = uwsgi_run_command_and_wait(uwsgi.vassals_stop_hook, c_ui->name);
+                        uwsgi_log("%s stop-hook returned %d\n", c_ui->name, stop_hook_ret);
+                }
+
 	uwsgi_log("removed uwsgi instance %s\n", c_ui->name);
 
 	free(c_ui);
@@ -131,6 +137,7 @@ void emperor_add(char *name, time_t born, char *config, uint32_t config_size) {
 	char *uef;
 	char **uenvs;
 	int counter;
+	int i;
 
 	sleep(1);
 
@@ -276,6 +283,20 @@ void emperor_add(char *name, time_t born, char *config, uint32_t config_size) {
 			uct = uct->next;
 		}
 		argv[counter] = NULL;
+
+		// close all of the unneded fd
+		for(i=3;i<sysconf(_SC_OPEN_MAX);i++) {
+			if (i != n_ui->pipe[1]) {
+				close(i);
+			}
+		}
+
+		if (uwsgi.vassals_start_hook) {
+			uwsgi_log("running vassal start-hook: %s %s\n", uwsgi.vassals_start_hook, n_ui->name);
+			int start_hook_ret = uwsgi_run_command_and_wait(uwsgi.vassals_start_hook, n_ui->name);
+			uwsgi_log("%s start-hook returned %d\n", n_ui->name, start_hook_ret);
+		}
+
 		// start !!!
 		if (execvp(argv[0], argv)) {
 			uwsgi_error("execvp()");
@@ -422,6 +443,7 @@ reconnect:
 						ui_current->config = config;
 						ui_current->config_len = msgsize;
 						if (!msgsize) {
+							// SAFE
 							emperor_del(ui_current);
 						}
 						else {
@@ -480,6 +502,7 @@ reconnect:
 					char byte;
 					ssize_t rlen = read(interesting_fd, &byte, 1);
 					if (rlen <= 0) {
+						// SAFE
 						emperor_del(ui_current);
 					}
 					else {
@@ -609,12 +632,14 @@ reconnect:
 			if (amqp_fd > -1) {
 				if (!ui_current->loyal && (time(NULL)-ui_current->last_loyal) > 60) {
 					uwsgi_log("!!! no loyalty showed by instance %s !!!\n", ui_current->name);
+					// SAFE
 					emperor_del(ui_current);
 					break;
 				}
 			}
 			if (ui_current->status == 1) {
 				if (ui_current->config) free(ui_current->config);
+				// SAFE
 				emperor_del(ui_current);
 				break;
 			}
@@ -625,9 +650,11 @@ reconnect:
 				if (ui_current->status == 0) {
 					// respawn an accidentally dead instance if its exit code is not UWSGI_EXILE_CODE
 					if (WIFEXITED(waitpid_status) && WEXITSTATUS(waitpid_status) == UWSGI_EXILE_CODE) {
+						// SAFE
 						emperor_del(ui_current);
 					}
 					else {
+						// UNSAFE
 						emperor_add(ui_current->name, ui_current->last_mod, ui_current->config, ui_current->config_len);
 						emperor_del(ui_current);
 					}
@@ -636,6 +663,7 @@ reconnect:
 				else if (ui_current->status == 1) {
 					// remove 'marked for dead' instance
 					if (ui_current->config) free(ui_current->config);
+					// SAFE
 					emperor_del(ui_current);
 					break;
 				}

@@ -716,7 +716,7 @@ int wsgi_req_recv(struct wsgi_request *wsgi_req) {
 	gettimeofday(&wsgi_req->start_of_request, NULL);
 
 	if (!wsgi_req->socket->edge_trigger) {
-		if (!uwsgi_parse_response(&wsgi_req->poll, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT], (struct uwsgi_header *) wsgi_req, wsgi_req->buffer, wsgi_req->socket->proto)) {
+		if (!uwsgi_parse_packet(wsgi_req, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT])) {
 			return -1;
 		}
 	}
@@ -747,14 +747,14 @@ int wsgi_req_simple_accept(struct wsgi_request *wsgi_req, int fd) {
 	return 0;
 }
 
-int wsgi_req_accept(struct wsgi_request *wsgi_req) {
+int wsgi_req_accept(int queue, struct wsgi_request *wsgi_req) {
 
 	int ret;
 	int interesting_fd;
 	char uwsgi_signal;
 	struct uwsgi_socket *uwsgi_sock = uwsgi.sockets;
 
-	ret = event_queue_wait(uwsgi.main_queue, uwsgi.edge_triggered - 1, &interesting_fd);
+	ret = event_queue_wait(queue, uwsgi.edge_triggered - 1, &interesting_fd);
 	if (ret < 0) {
 		return -1;
 	}
@@ -775,7 +775,9 @@ int wsgi_req_accept(struct wsgi_request *wsgi_req) {
 			}
 		}
 		else {
+#ifdef UWSGI_DEBUG
 			uwsgi_log_verbose("master sent signal %d to worker %d\n", uwsgi_signal, uwsgi.mywid);
+#endif
 			if (uwsgi_signal_handler(uwsgi_signal)) {
 				uwsgi_log_verbose("error managing signal %d on worker %d\n", uwsgi_signal, uwsgi.mywid);
 			}
@@ -1233,8 +1235,10 @@ int uwsgi_get_app_id(char *script_name, int script_name_len, int modifier1) {
 	struct stat st;
 
 	for (i = 0; i < uwsgi.apps_cnt; i++) {
-		//uwsgi_log("searching for %.*s in %.*s %p\n", script_name_len, script_name, uwsgi.apps[i].mountpoint_len, uwsgi.apps[i].mountpoint, uwsgi.apps[i].callable);
-		if (!uwsgi.apps[i].mountpoint_len) {
+#ifdef UWSGI_DEBUG
+		uwsgi_log("searching for %.*s in %.*s %p\n", script_name_len, script_name, uwsgi.apps[i].mountpoint_len, uwsgi.apps[i].mountpoint, uwsgi.apps[i].callable);
+#endif
+		if (!uwsgi.apps[i].callable) {
 			continue;
 		}
 		if (!uwsgi_strncmp(uwsgi.apps[i].mountpoint, uwsgi.apps[i].mountpoint_len, script_name, script_name_len)) {
@@ -1243,7 +1247,13 @@ int uwsgi_get_app_id(char *script_name, int script_name_len, int modifier1) {
 					if (st.st_mtime != uwsgi.apps[i].touch_reload_mtime) {
 						// serve the new request and reload
 						uwsgi.workers[uwsgi.mywid].manage_next_request = 0;
-						return -1;
+						if (uwsgi.threads > 1) {
+							uwsgi.workers[uwsgi.mywid].destroy = 1;
+						}
+
+#ifdef UWSGI_DEBUG
+						uwsgi_log("mtime %d %d\n", st.st_mtime, uwsgi.apps[i].touch_reload_mtime);
+#endif
 					}
 				}
 			}
@@ -1289,7 +1299,7 @@ int uwsgi_read_whole_body_in_mem(struct wsgi_request *wsgi_req, char *buf) {
 		}
 
 		if (!ret) {
-			uwsgi_log("buffering POST data timedout !!!\n");
+			uwsgi_log("buffering POST data timed-out !!!\n");
 			return 0;
 		}
 
@@ -1564,6 +1574,11 @@ char *uwsgi_resolve_ip(char *domain) {
 	}
 
 	return inet_ntoa(*(struct in_addr *) he->h_addr_list[0]);
+}
+
+int uwsgi_file_exists(char *filename) {
+	// TODO check for http url or stdin
+	return !access(filename, R_OK);
 }
 
 char *uwsgi_open_and_read(char *url, int *size, int add_zero, char *magic_table[]) {
@@ -1867,11 +1882,7 @@ void spawn_daemon(struct uwsgi_daemon *ud) {
 	char *argv[64];
 	char *a;
 	int cnt = 1;
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, ud->pipe)) {
-		uwsgi_error("socketpair()");
-		return;
-	}
+	int devnull = -1;
 
 	pid_t pid = fork();
 	if (pid < 0) {
@@ -1880,7 +1891,6 @@ void spawn_daemon(struct uwsgi_daemon *ud) {
 	}
 
 	if (pid > 0) {
-		close(ud->pipe[1]);
 		ud->pid = pid;
 		ud->status = 1;
 		if (ud->respawns == 0) {
@@ -1892,21 +1902,25 @@ void spawn_daemon(struct uwsgi_daemon *ud) {
 
 	}
 	else {
-
 		// close uwsgi sockets
-		struct uwsgi_socket *uwsgi_sock = uwsgi.sockets;
-		while(uwsgi_sock) {
-			close(uwsgi_sock->fd);
-			uwsgi_sock = uwsgi_sock->next;
-		}
-		close(ud->pipe[0]);
+		uwsgi_close_all_sockets();
 
-		// stdin will become the pipe
-		if (ud->pipe[1] != 0) {
-			if (dup2(ud->pipe[1], 0)) {
+		// /dev/null will became stdin
+		devnull = open("/dev/null", O_RDONLY);	
+		if (devnull < 0) {
+			uwsgi_error("/dev/null open()");
+			exit(1);
+		}
+		if (devnull != 0) {
+			if (dup2(devnull, 0)) {
 				uwsgi_error("dup2()");
 				exit(1);
 			}
+		}
+
+		if (setsid() < 0) {
+			uwsgi_error("setsid()");
+			exit(1);
 		}
 
 #ifdef __linux__
@@ -2268,4 +2282,141 @@ void uwsgi_sig_pause() {
 	sigset_t mask;
         sigemptyset(&mask);
 	sigsuspend(&mask);
+}
+
+int uwsgi_run_command_and_wait(char *command, ...) {
+
+	va_list ap;
+
+	int waitpid_status = 0;
+	pid_t pid = fork();
+	if (pid < 0) {
+		return -1;
+	}
+	
+	if (pid > 0) {
+		if (waitpid(pid, &waitpid_status, 0) < 0) {
+			uwsgi_error("waitpid()");
+			return -1;
+		}
+
+		return WEXITSTATUS(waitpid_status);
+	}
+
+	va_start(ap, command);
+	execlp(command, command, ap, (char *) NULL);
+	va_end(ap);
+
+	uwsgi_error("execlp()");
+	//never here
+	exit(1);
+}
+
+int uwsgi_run_command(char *command) {
+
+	char *argv[4];
+
+        int waitpid_status = 0;
+        pid_t pid = fork();
+        if (pid < 0) {
+                return -1;
+        }
+
+        if (pid > 0) {
+                if (waitpid(pid, &waitpid_status, WNOHANG) < 0) {
+                        uwsgi_error("waitpid()");
+                        return -1;
+                }
+
+                return WEXITSTATUS(waitpid_status);
+        }
+
+	uwsgi_close_all_sockets();
+
+	if (setsid() < 0) {
+		uwsgi_error("setsid()");
+		exit(1);
+	}
+
+	argv[0] = "/bin/sh";
+	argv[1] = "-c";
+	argv[2] = command;
+	argv[3] = NULL;
+
+        execvp("/bin/sh", argv);
+
+        uwsgi_error("execvp()");
+        //never here
+        exit(1);
+}
+
+int *uwsgi_attach_fd(int fd, int count, char *code, size_t code_len) {
+
+	struct msghdr   msg;
+	ssize_t len;
+	char *id = NULL;
+
+	struct iovec iov;
+	struct cmsghdr *cmsg;
+	int *ret;
+	int i;
+
+	void *msg_control = uwsgi_malloc(CMSG_SPACE(sizeof(int) * count));
+	
+	memset( msg_control, 0, CMSG_SPACE(sizeof(int) * count));
+
+	if (code && code_len > 0) {
+		id = uwsgi_malloc(code_len);
+		memset(id, 0, code_len);
+	}
+
+	iov.iov_base = id;
+        iov.iov_len = code_len;
+        memset(&msg, 0, sizeof(msg));
+
+	msg.msg_name = NULL;
+        msg.msg_namelen = 0;
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        msg.msg_control = msg_control;
+        msg.msg_controllen = CMSG_SPACE(sizeof(int) * count);
+        msg.msg_flags = 0;
+
+        len = recvmsg(fd, &msg, 0);
+	if (len <= 0) {
+		uwsgi_error("recvmsg()");
+		return NULL;
+	}
+	
+	if (code && code_len > 0) {
+		if (strcmp(id, code)) {
+			return NULL;
+		}
+	}
+	
+	cmsg = CMSG_FIRSTHDR(&msg);
+	if (!cmsg) return NULL;
+
+	if (cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
+		return NULL;
+	}
+
+	ret = uwsgi_malloc(sizeof(int) * (count + 1));
+	for(i=0;i<count+1;i++) {
+		ret[i] = -1;
+	}
+
+	if ((size_t) (cmsg->cmsg_len - ((char *)CMSG_DATA(cmsg)- (char *)cmsg)) > (size_t) (sizeof(int) * (count + 1))) {
+		uwsgi_log("not enough space for sockets data, consider increasing it\n");
+		return NULL;	
+	}
+
+	memcpy(ret, CMSG_DATA(cmsg), cmsg->cmsg_len - ((char *)CMSG_DATA(cmsg)- (char *)cmsg));
+
+	free(msg_control);
+	if (code && code_len > 0) {
+		free(id);
+	}
+
+	return ret;
 }

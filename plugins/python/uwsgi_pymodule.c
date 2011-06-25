@@ -115,6 +115,7 @@ char *uwsgi_encode_pydict(PyObject * pydict, uint16_t * size) {
 
 		if (!key || !val) {
 			PyErr_Print();
+			continue;
 		}
 
 		if (!PyString_Check(key) || !PyString_Check(val)) {
@@ -309,15 +310,15 @@ PyObject *py_uwsgi_rpc(PyObject * self, PyObject * args) {
 	char *node, *func;
 	uint16_t size = 0;
 	PyObject *py_node, *py_func;
-	struct uwsgi_header uh;
+	struct wsgi_request rpc_req;
 	int argc = PyTuple_Size(args);
 	char *argv[0xff];
 	int i, fd;
 	uint16_t pktsize = 0, ulen;
 	char *bufptr;
 	int rlen;
+	int rpc_args = 0;
 
-	struct pollfd upoll;
 
 	// TODO better error reporting
 	if (argc < 2)
@@ -341,10 +342,16 @@ PyObject *py_uwsgi_rpc(PyObject * self, PyObject * args) {
 
 	for (i = 0; i < (argc - 2); i++) {
 		argv[i] = PyString_AsString(PyTuple_GetItem(args, i + 2));
+		rpc_args++;
 	}
 
-	if (node == (char *) "") {
-		size = uwsgi_rpc(func, 0, NULL, buffer);
+	if (!strcmp(node, "")) {
+		if (!rpc_args) {
+			size = uwsgi_rpc(func, 0, NULL, buffer);
+		}
+		else {
+			size = uwsgi_rpc(func, rpc_args, argv, buffer);
+		}
 	}
 	else {
 
@@ -361,9 +368,11 @@ PyObject *py_uwsgi_rpc(PyObject * self, PyObject * args) {
 			pktsize += 2 + strlen(argv[i]);
 		}
 
-		uh.modifier1 = 173;
-		uh.pktsize = pktsize;
-		uh.modifier2 = 0;
+		memset(&rpc_req, 0, sizeof(struct wsgi_request));
+
+		rpc_req.uh.modifier1 = 173;
+		rpc_req.uh.pktsize = pktsize;
+		rpc_req.uh.modifier2 = 0;
 
 		bufptr = buffer;
 
@@ -381,7 +390,7 @@ PyObject *py_uwsgi_rpc(PyObject * self, PyObject * args) {
 			bufptr += ulen;
 		}
 
-		if (write(fd, &uh, 4) != 4) {
+		if (write(fd, &rpc_req.uh, 4) != 4) {
 			uwsgi_error("write()");
 			close(fd);
 			goto clear;
@@ -395,10 +404,11 @@ PyObject *py_uwsgi_rpc(PyObject * self, PyObject * args) {
 
 		rlen = uwsgi_waitfd(fd, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
 		if (rlen > 0) {
-			upoll.fd = fd;
-			upoll.events = POLLIN;
-			if (uwsgi_parse_response(&upoll, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT], &uh, buffer, uwsgi_proto_uwsgi_parser)) {
-				size = uh.pktsize;
+			rpc_req.poll.fd = fd;
+			rpc_req.poll.events = POLLIN;
+			rpc_req.buffer = buffer;
+			if (uwsgi_parse_packet(&rpc_req, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT])) {
+				size = rpc_req.uh.pktsize;
 			}
 		}
 
@@ -426,8 +436,7 @@ PyObject *py_uwsgi_register_rpc(PyObject * self, PyObject * args) {
 
 
 	if (uwsgi_register_rpc(name, 0, argc, func)) {
-		Py_INCREF(Py_None);
-		return Py_None;
+		return PyErr_Format(PyExc_ValueError, "unable to register rpc function");
 	}
 
 	Py_INCREF(Py_True);
@@ -478,9 +487,11 @@ PyObject *py_uwsgi_signal(PyObject * self, PyObject * args) {
 		return NULL;
 	}
 
+#ifdef UWSGI_DEBUG
 	uwsgi_log("sending %d to master\n", uwsgi_signal);
+#endif
 
-	rlen = write(uwsgi.shared->worker_signal_pipe[1], &uwsgi_signal, 1);
+	rlen = write(uwsgi.signal_socket, &uwsgi_signal, 1);
 	if (rlen != 1) {
 		uwsgi_error("write()");
 	}
@@ -746,6 +757,7 @@ PyObject *py_uwsgi_advanced_sendfile(PyObject * self, PyObject * args) {
 	off_t pos = 0;
 	size_t filesize = 0;
 	struct stat stat_buf;
+	struct wsgi_request *wsgi_req = current_wsgi_req();
 
 	int fd = -1;
 
@@ -770,7 +782,7 @@ PyObject *py_uwsgi_advanced_sendfile(PyObject * self, PyObject * args) {
 			goto clear;
 
 		// check for mixing file_wrapper and sendfile
-		if (fd == uwsgi.wsgi_req->sendfile_fd) {
+		if (fd == wsgi_req->sendfile_fd) {
 			Py_INCREF(what);
 		}
 	}
@@ -792,7 +804,7 @@ PyObject *py_uwsgi_advanced_sendfile(PyObject * self, PyObject * args) {
 	if (!chunk)
 		chunk = 4096;
 
-	uwsgi.wsgi_req->response_size += uwsgi_do_sendfile(uwsgi.wsgi_req->poll.fd, fd, filesize, chunk, &pos, 0);
+	uwsgi.wsgi_req->response_size += uwsgi_do_sendfile(wsgi_req->poll.fd, fd, filesize, chunk, &pos, 0);
 
 	close(fd);
 	Py_INCREF(Py_True);
@@ -1234,7 +1246,7 @@ PyObject *py_uwsgi_send_multi_message(PyObject * self, PyObject * args) {
 	int managed;
 	struct pollfd *multipoll;
 	char *buffer;
-	struct uwsgi_header uh;
+
 	PyObject *arg_cluster;
 
 	PyObject *cluster_node;
@@ -1348,9 +1360,11 @@ PyObject *py_uwsgi_send_multi_message(PyObject * self, PyObject * args) {
 			goto megamulticlear;
 		}
 		else {
+			// TODO fix
+/*
 			for (i = 0; i < clen; i++) {
 				if (multipoll[i].revents & POLLIN) {
-					if (!uwsgi_parse_response(&multipoll[i], PyInt_AsLong(arg_timeout), &uh, &buffer[i], uwsgi_proto_uwsgi_parser)) {
+					if (!uwsgi_parse_packet(&multipoll[i], PyInt_AsLong(arg_timeout), &uh, &buffer[i], uwsgi_proto_uwsgi_parser)) {
 						goto megamulticlear;
 					}
 					else {
@@ -1363,6 +1377,7 @@ PyObject *py_uwsgi_send_multi_message(PyObject * self, PyObject * args) {
 					}
 				}
 			}
+*/
 		}
 	}
 
@@ -2200,6 +2215,9 @@ PyObject *py_uwsgi_grunt(PyObject * self, PyObject * args) {
 		uwsgi.workers[uwsgi.mywid].id = uwsgi.mywid;
 		// this field will be overwrite after each call
 		uwsgi.workers[uwsgi.mywid].pid = uwsgi.mypid;
+
+		// reset the random seed
+		uwsgi_python_reset_random_seed();
 		// TODO
 		// manage thread in grunt processes
 		Py_INCREF(Py_True);
@@ -2272,7 +2290,9 @@ PyObject *py_uwsgi_cluster_node_name(PyObject * self, PyObject * args) {
 	for (i = 0; i < MAX_CLUSTER_NODES; i++) {
 		ucn = &uwsgi.shared->nodes[i];
 		if (ucn->name[0] != 0) {
+#ifdef UWSGI_DEBUG
 			uwsgi_log("node_name: %s %s\n", node, ucn->name);
+#endif
 			if (!strcmp(ucn->name, node)) {
 				return PyString_FromString(ucn->nodename);
 			}
@@ -2495,6 +2515,7 @@ PyObject *py_uwsgi_cache_exists(PyObject * self, PyObject * args) {
 	}
 	
 	if (remote && strlen(remote) > 0) {
+		// TODO FIX THIS !!!
 		uwsgi_simple_message_string(remote, 111, 0, key, keylen, buffer, &valsize, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
 		if (valsize > 0) {
 			Py_INCREF(Py_True);
@@ -2657,6 +2678,7 @@ PyObject *py_uwsgi_cache_get(PyObject * self, PyObject * args) {
 
 	char *key;
 	uint64_t valsize;
+	uint16_t valsize16;
 	Py_ssize_t keylen = 0;
 	char *value = NULL;
 	char *remote = NULL;
@@ -2672,8 +2694,8 @@ PyObject *py_uwsgi_cache_get(PyObject * self, PyObject * args) {
 	}
 
 	if (remote && strlen(remote) > 0) {
-		//uwsgi_simple_message_string(remote, 111, 0, key, keylen, buffer, &valsize, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
-		if (valsize > 0) {
+		uwsgi_simple_message_string(remote, 111, 0, key, keylen, buffer, &valsize16, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
+		if (valsize16 > 0) {
 			value = buffer;
 		}
 	}
