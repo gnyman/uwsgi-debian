@@ -618,12 +618,12 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 binary-install/python-django-uwsgi-admin::
 	dh_install -p $(cdbs_curpkg) \
 		django/uwsgi_admin \
-		usr/lib/python$(PYTHON_DEFAULT_DOTTED)/dist-packages
+		$(PYTHON_DIST_PACKAGES_DIR)
 	dh_python2 -p $(cdbs_curpkg)
 
 binary-install/python-uwsgicc::
 	$(eval PYPKG_NAME := $(cdbs_curpkg:python-%=%))
-	$(eval PYPKG_DESTDIR := usr/lib/python$(PYTHON_DEFAULT_DOTTED)/dist-packages)
+	$(eval PYPKG_DESTDIR := $(PYTHON_DIST_PACKAGES_DIR))
 
 	dh_install -p $(cdbs_curpkg) -Xstatic -Xtemplates uwsgicc $(PYPKG_DESTDIR)
 	dh_install -p $(cdbs_curpkg) \
