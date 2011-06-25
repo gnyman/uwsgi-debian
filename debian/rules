@@ -112,6 +112,9 @@ clean::
 	find $(CURDIR) \
 		\! -path '$(CURDIR)/debian/*' \( -name '*.o' -o -name '*.pyc' \) -type f \
 		-delete
+	find $(CURDIR) \
+		\! -path '$(CURDIR)/debian/*' -name __pycache__ -type d \
+		-delete
 	# plugins
 	for PLUGIN_NAME in $(UWSGI_PLUGINS_NAMES); do \
 		$(RM) $(CURDIR)/$${PLUGIN_NAME}_plugin.so; \
