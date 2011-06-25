@@ -555,6 +555,30 @@ Description: uWSGI control center
  .
  This application must be served with uWSGI.
 
+Package: python-uwsgidecorators
+Architecture: all
+Section: python
+Depends: ${python:Depends}, ${misc:Depends}, uwsgi-core, uwsgi-plugin-python
+Description: module of decorators for elegant access to uWSGI API (Python)
+ uwsgidecorators is a simple Python module that exports a bunch of decorators
+ to allow a more elegant approach to uWSGI API. Provided decorators helps with
+ creating of RPC functions, timers, filemonitors.
+ .
+ This package provides uwsgidecorators module, accessible from Python 2.X
+ runtime.
+
+Package: python3-uwsgidecorators
+Architecture: all
+Section: python
+Depends: ${python3:Depends}, ${misc:Depends}, uwsgi-core, uwsgi-plugin-python3
+Description: module of decorators for elegant access to uWSGI API (Python 3)
+ uwsgidecorators is a simple Python module that exports a bunch of decorators
+ to allow a more elegant approach to uWSGI API. Provided decorators helps with
+ creating of RPC functions, timers, filemonitors.
+ .
+ This package provides uwsgidecorators module, accessible from Python 3.X
+ runtime.
+
 Package: uwsgi-extra
 Architecture: any
 Depends: ${misc:Depends}

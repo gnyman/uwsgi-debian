@@ -9,6 +9,12 @@ uwsgi (0.9.8.1-1) UNRELEASED; urgency=low
       - fix_inherit_option_behavior.patch
       - fix_usage_of_proto_write_in_echo_plugin.patch
       - support_magic_variables_for_sqlite_config.patch
+  * Add python-uwsgidecorators/python3-uwsgidecorators binary packages:
+    - uwsgidecorators is a simple Python module that exports a bunch of
+      decorators to allow a more elegant approach to uWSGI API. Provided
+      decorators helps with creating of RPC functions, timers, filemonitors.
+    - d/source.lintian-overrides has been added to override false positive
+      warning of dh_python-is-obsolete
   * d/uwsgi-plugin-greenlet-python.prerm.in:
     - correct error in name of alternatives link group
       (replace 'uwsgi-plugin-greenlet' with 'uwsgi-plugin-greenlet-python')
@@ -21,7 +27,7 @@ uwsgi (0.9.8.1-1) UNRELEASED; urgency=low
       require preserving across reboots. It has been appeared in Debian with
       initscripts upgrade to 2.88dsf-13.3.
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Sat, 25 Jun 2011 17:15:17 +0300
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Sat, 25 Jun 2011 23:57:16 +0300
 
 uwsgi (0.9.8-2) unstable; urgency=low
 

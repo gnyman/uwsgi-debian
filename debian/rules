@@ -23,6 +23,14 @@ PYTHON_DEFAULT=$(subst .,,$(PYTHON_DEFAULT_DOTTED))
 PYTHON3_VERS=$(subst .,,$(PYTHON3_VERS_DOTTED))
 PYTHON3_DEFAULT=$(subst .,,$(PYTHON3_DEFAULT_DOTTED))
 
+PYTHON_MAJOR_VER := 2
+PYTHON3_MAJOR_VER := 3
+
+# Standard directories, where dh_pythonX helper looking for Python modules.
+# Note: path is provided in debhelper format (without leading slash).
+PYTHON_DIST_PACKAGES_DIR = usr/lib/python$(PYTHON_DEFAULT_DOTTED)/dist-packages
+PYTHON3_DIST_PACKAGES_DIR = usr/lib/python3/dist-packages
+
 # Search in debian/control for packages with name $(1)% and extract % in list.
 list_pkgname_suffixes = $(strip \
 	$(shell \
@@ -665,3 +673,10 @@ binary-install/python-uwsgicc::
 	dh_link -p $(cdbs_curpkg) \
 		usr/share/$(cdbs_curpkg)/templates \
 		usr/share/pyshared/$(PYPKG_NAME)/templates
+
+binary-install/python-uwsgidecorators binary-install/python3-uwsgidecorators::
+	$(eval PYTHON_KIND = $(firstword $(subst -, ,$(notdir $@))))
+	$(eval PYPKG_DESTDIR = $($(subst python,PYTHON,$(PYTHON_KIND))_DIST_PACKAGES_DIR))
+	$(eval PYVER_MAJOR = $($(subst python,PYTHON,$(PYTHON_KIND))_MAJOR_VER))
+	dh_install -p $(cdbs_curpkg) uwsgidecorators.py $(PYPKG_DESTDIR)
+	dh_python$(PYVER_MAJOR) -p $(cdbs_curpkg)
