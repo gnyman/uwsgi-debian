@@ -192,7 +192,7 @@ extract_id()
   echo "$ID"
 }
 
-# Location of /var/run subdirectory for specific uWSGI process.
+# Location of /run subdirectory for specific uWSGI process.
 find_specific_rundir()
 {
   local CONFNAME="$@"

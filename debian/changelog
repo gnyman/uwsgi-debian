@@ -5,8 +5,14 @@ uwsgi (0.9.8-3) UNRELEASED; urgency=low
       (replace 'uwsgi-plugin-greenlet' with 'uwsgi-plugin-greenlet-python')
       so as to fix process of uwsgi-plugin-greenlet-python package
       uninstallation (and pass piuparts test)
+  * Make use of /run directory instead of /var/run:
+    - it is backward-compatible change, as /var/run is symlinked to /run
+    - /run is a new cross-distribution location for the storage of transient
+      writable files needed from system startup to shutdown, but which do not
+      require preserving across reboots. It has been appeared in Debian with
+      initscripts upgrade to 2.88dsf-13.3.
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Sat, 18 Jun 2011 14:19:38 +0300
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Sat, 25 Jun 2011 13:58:12 +0300
 
 uwsgi (0.9.8-2) unstable; urgency=low
 

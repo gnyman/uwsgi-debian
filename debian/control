@@ -40,7 +40,7 @@ Package: uwsgi
 Architecture: any
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- lsb-base
+ lsb-base, initscripts (>= 2.88dsf-13.3)
 Recommends: sqlite3
 Description: fast, self-healing application container server
  uWSGI presents a complete stack for networked/clustered web applications,

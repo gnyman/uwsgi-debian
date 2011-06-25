@@ -91,8 +91,8 @@ file, defined by option INHERITED_CONFIG in /etc/default/uwsgi.
 
 Service files of started uWSGI instance are located in directory named after
 configuration file (without extension):
-  * UNIX socket | /var/run/uwsgi/<confname>/socket
-  * pidfile     | /var/run/uwsgi/<confname>/pid
+  * UNIX socket | /run/uwsgi/<confname>/socket
+  * pidfile     | /run/uwsgi/<confname>/pid
 
 Log of started uWSGI instance is placed at /var/log/uwsgi/<confname>.log
 

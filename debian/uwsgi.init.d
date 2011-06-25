@@ -18,7 +18,7 @@ DAEMON="/usr/bin/uwsgi"
 SCRIPTNAME="/etc/init.d/${NAME}"
 
 UWSGI_CONFDIR="/etc/uwsgi/apps-enabled"
-UWSGI_RUNDIR="/var/run/uwsgi"
+UWSGI_RUNDIR="/run/uwsgi"
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
