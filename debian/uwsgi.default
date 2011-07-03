@@ -27,4 +27,4 @@ PRINT_CONFNAMES_IN_INITD_SCRIPT_OUTPUT=no
 #
 # Options from inherited configuration file are passed to each instance by
 # default. They could be overrided (or extended) by user configuration file.
-INHERITED_CONFIG=/usr/lib/uwsgi/conf/default.ini
+INHERITED_CONFIG=/usr/share/uwsgi/conf/default.ini

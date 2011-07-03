@@ -1,6 +1,11 @@
 uwsgi (0.9.8.3-1) unstable; urgency=low
 
   * New upstream version (0.9.8.3)
+  * uwsgi:
+    - move files with supplementary functions of init.d script from
+      /usr/lib/uwsgi/init to /usr/share/uwsgi/init
+    - move inherited configuration file from /usr/lib/uwsgi/conf to
+      /usr/share/uwsgi/conf
   * uwsgi-plugin-python:
     - add Suggests: python-uwsgidecorators
   * uwsgi-plugin-python3:
@@ -8,7 +13,7 @@ uwsgi (0.9.8.3-1) unstable; urgency=low
   * uwsgi-plugin-luajit:
     - build package for armel architecture
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Tue, 26 Jul 2011 03:45:41 +0300
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Tue, 26 Jul 2011 03:46:38 +0300
 
 uwsgi (0.9.8.1-1) unstable; urgency=low
 

@@ -1,6 +1,6 @@
 # This is shell script, (indirectly) sourced by uWSGI init.d script
 
-. /usr/lib/uwsgi/init/snippets
+. /usr/share/uwsgi/init/snippets
 
 # Return:
 #  0 if daemon has been started

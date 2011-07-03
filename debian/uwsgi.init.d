@@ -34,8 +34,8 @@ UWSGI_RUNDIR="/run/uwsgi"
 . /lib/lsb/init-functions
 
 # Define supplementary functions
-. /usr/lib/uwsgi/init/snippets
-. /usr/lib/uwsgi/init/do_command
+. /usr/share/uwsgi/init/snippets
+. /usr/share/uwsgi/init/do_command
 
 WHAT=$1
 shift

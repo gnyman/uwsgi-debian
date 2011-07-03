@@ -1,7 +1,7 @@
 # This is shell script, sourced by uWSGI init.d script
 
-. /usr/lib/uwsgi/init/snippets
-. /usr/lib/uwsgi/init/specific_daemon
+. /usr/share/uwsgi/init/snippets
+. /usr/share/uwsgi/init/specific_daemon
 
 do_command()
 {
