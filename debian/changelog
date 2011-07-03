@@ -1,10 +1,14 @@
 uwsgi (0.9.8.3-1) unstable; urgency=low
 
   * New upstream version (0.9.8.3)
+  * uwsgi-plugin-python:
+    - add Suggests: python-uwsgidecorators
+  * uwsgi-plugin-python3:
+    - add Suggests: python3-uwsgidecorators
   * uwsgi-plugin-luajit:
     - build package for armel architecture
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Tue, 26 Jul 2011 03:08:44 +0300
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Tue, 26 Jul 2011 03:45:41 +0300
 
 uwsgi (0.9.8.1-1) unstable; urgency=low
 
