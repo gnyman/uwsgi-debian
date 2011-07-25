@@ -1,3 +1,9 @@
+uwsgi (0.9.8.3-1) unstable; urgency=low
+
+  * New upstream version (0.9.8.3)
+
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Tue, 26 Jul 2011 02:23:06 +0300
+
 uwsgi (0.9.8.1-1) unstable; urgency=low
 
   * New upstream version (0.9.8.1)
