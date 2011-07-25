@@ -11,8 +11,16 @@ int uwsgi_signal_handler(uint8_t sig) {
 	if (!uwsgi.p[use->modifier1]->signal_handler) {
 		return -1;
 	}	
-	
+
 	return uwsgi.p[use->modifier1]->signal_handler(sig, use->handler);
+}
+
+int uwsgi_signal_registered(uint8_t sig) {
+
+	if (uwsgi.shared->signal_table[sig].handler != NULL)
+		return 1;
+
+	return 0;
 }
 
 int uwsgi_register_signal(uint8_t sig, char *receiver, void *handler, uint8_t modifier1) {
@@ -146,6 +154,7 @@ int uwsgi_signal_add_rb_timer(uint8_t sig, int secs, int iterations) {
 
 void uwsgi_route_signal(uint8_t sig) {
 
+	int i;
 	struct uwsgi_signal_entry *use = &ushared->signal_table[sig];
 	// send to first available worker
 	if (use->receiver[0] == 0 || !strcmp(use->receiver, "worker") || !strcmp(use->receiver, "worker0")) {
@@ -156,21 +165,38 @@ void uwsgi_route_signal(uint8_t sig) {
 	}
 	// send to all workers
 	else if (!strcmp(use->receiver, "workers")) {
-		if (write(ushared->worker_signal_pipe[0], &sig, 1) != 1) {
-			uwsgi_error("write()");
-			uwsgi_log("could not deliver signal %d to workers pool\n", sig);
+		for(i=1;i<=uwsgi.numproc;i++) {
+			if (write(uwsgi.signal_pipe[i][0], &sig, 1) != 1) {
+				uwsgi_error("write()");
+				uwsgi_log("could not deliver signal %d to worker %d\n", sig, i);
+			}
 		}
+	}
+	// route to specific worker
+	else if (!strncmp(use->receiver, "worker", 6)) {
+		i = atoi(use->receiver+6);
+		if (i > uwsgi.numproc) {
+			uwsgi_log("invalid signal target: %s\n", use->receiver);
+		}
+		if (write(uwsgi.signal_pipe[i][0], &sig, 1) != 1) {
+                        uwsgi_error("write()");
+                	uwsgi_log("could not deliver signal %d to worker %d\n", sig, i);
+                }
 	}
 	// route to subscribed
 	else if (!strcmp(use->receiver, "subscribed")) {
 	}
+	// route to spooler
+	else if (!strcmp(use->receiver, "spooler")) {
+		if (ushared->worker_signal_pipe[0] != -1) {
+			if (write(ushared->spooler_signal_pipe[0], &sig, 1) != 1) {
+                        	uwsgi_error("write()");
+                        	uwsgi_log("could not deliver signal %d to the spooler\n", sig);
+                	}
+		}
+	}
 	else {
 		// unregistered signal, sending it to all the workers
-		uwsgi_log("^^^ ROUTING UNREGISTERED SIGNAL ^^^\n");
-		if (write(ushared->worker_signal_pipe[0], &sig, 1) != 1) {
-                        uwsgi_error("write()");
-                        uwsgi_log("could not deliver signal %d to workers pool\n", sig);
-                }
-
+		uwsgi_log("^^^ UNSUPPORTED SIGNAL TARGET: %s ^^^\n", use->receiver);
 	}
 }

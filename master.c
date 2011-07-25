@@ -188,6 +188,18 @@ void get_linux_tcp_info(int fd) {
 		}
 
 		uwsgi.shared->options[UWSGI_OPTION_BACKLOG_STATUS] = uwsgi.shared->ti.tcpi_unacked;
+		if (uwsgi.vassal_sos_backlog > 0 && uwsgi.has_emperor) {
+			if ((int)uwsgi.shared->ti.tcpi_unacked >= uwsgi.vassal_sos_backlog) {
+				// ask emperor for help
+				char byte = 30;
+                		if (write(uwsgi.emperor_fd, &byte, 1) != 1) {
+                        		uwsgi_error("write()");
+                		}
+				else {
+					uwsgi_log("asking emperor for reinforcements (backlog: %d)...\n", (int) uwsgi.shared->ti.tcpi_unacked);
+				}
+			}
+		}
 		if (uwsgi.shared->ti.tcpi_unacked >= uwsgi.shared->ti.tcpi_sacked) {
 			uwsgi_log_verbose("*** uWSGI listen queue of socket %d full !!! (%d/%d) ***\n", fd, uwsgi.shared->ti.tcpi_unacked, uwsgi.shared->ti.tcpi_sacked);
 			uwsgi.shared->options[UWSGI_OPTION_BACKLOG_ERRORS]++;
@@ -976,7 +988,9 @@ void master_loop(char **argv, char **environ) {
 							uwsgi_error("read()");
 						}	
 						else if (rlen > 0) {
+#ifdef UWSGI_DEBUG
 							uwsgi_log_verbose("received uwsgi signal %d from a worker\n", uwsgi_signal);
+#endif
 							uwsgi_route_signal(uwsgi_signal);
 						}
 						else {
@@ -1026,6 +1040,21 @@ void master_loop(char **argv, char **environ) {
 				}
 				else if (uwsgi.current_time - last_request_timecheck > uwsgi.idle) {
 					uwsgi_log("workers have been inactive for more than %d seconds\n", uwsgi.idle);
+					uwsgi.cheap = 1;
+					master_has_children = 0;
+					if (uwsgi.die_on_idle) {
+						if (uwsgi.has_emperor) {
+							char byte = 22;
+							if (write(uwsgi.emperor_fd, &byte, 1) != 1) {
+								uwsgi_error("write()");
+								kill_them_all(0);	
+							}
+						}
+						else {
+							kill_them_all(0);	
+						}
+						continue;
+					}
 					for(i=1;i<=uwsgi.numproc;i++) {
                                			if (uwsgi.workers[i].pid == 0) continue;
                                			kill(uwsgi.workers[i].pid, SIGKILL);
@@ -1033,8 +1062,6 @@ void master_loop(char **argv, char **environ) {
                                        			uwsgi_error("waitpid()");
                                			}
 					}
-					master_has_children = 0;
-					uwsgi.cheap = 1;
 					uwsgi_add_sockets_to_queue(uwsgi.master_queue);
                 			uwsgi_log("cheap mode enabled: waiting for socket connection...\n");
 					last_request_timecheck = 0;

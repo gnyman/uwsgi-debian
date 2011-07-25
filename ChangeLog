@@ -1,3 +1,33 @@
+*** july 2011 ***
+
+ * 0.9.8.3 [20110723]
+
+- implemented uwsgi.SymZipImporter to load embedded zip files
+- OSX Lion is officially supported
+- fixed xinetd support (example file added in contrib)
+- suppot for systemd socket activation
+- added --freebind option (Linux only)
+
+ * 0.9.8.2 [20110719]
+
+- fixed an ini and yaml parsing bug spotted by Raffaele Colace
+- spooler has been extremely improved
+- new option --chown-socket
+- added uwsgidecorators for elegant uwsgi api access from python
+- the rack plugin is now stable
+- support for embedding config and generic files in the server binary
+- high-performance cache-server
+- accept() is now locked on all threads in the same workers
+- preliminary implementation of hooks in emperor
+- support for C++ in server core
+- tcp port auto-bind
+- implemented workers, workerN and spooler signal target
+- prefork/multithread uwsgi.signal_wait() implementation
+- export uwsgi.node in WSGI vars
+- new option --import (python plugin)
+- support for unlimited number of Linux cgroups
+- broodlord mode
+
 *** june 2011 ***
 
  * 0.9.8.1 [20110625]

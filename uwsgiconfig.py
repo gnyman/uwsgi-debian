@@ -1,6 +1,6 @@
 # uWSGI build system
 
-uwsgi_version = '0.9.8.1'
+uwsgi_version = '0.9.8.3'
 
 import os
 import re
@@ -25,7 +25,10 @@ GCC = os.environ.get('CC', sysconfig.get_config_var('CC'))
 if not GCC:
     GCC = 'gcc'
 
+binary_list = []
 	
+def binarize(name):
+    return name.replace('/', '_').replace('.','_').replace('-','_')
 
 def spcall(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,stderr=open('/dev/null','w'))
@@ -163,6 +166,11 @@ def build_uwsgi(uc):
 
     bin_name = uc.get('bin_name')
 
+    if uc.get('embed_config'):
+        gcc_list.append(uc.get('embed_config'))
+    for ef in binary_list:
+        gcc_list.append("build/%s" % ef)
+
     print("*** uWSGI linking ***")
     ldline = "%s -o %s %s %s %s" % (GCC, bin_name, ' '.join(ldflags),
         ' '.join(map(add_o, gcc_list)), ' '.join(libs))
@@ -224,12 +232,13 @@ class uConf(object):
             iconfig = ConfigParser.ConfigParser()
             iconfig.read(inherit)
             for opt in iconfig.options('uwsgi'):
-                if not self.get(opt):
+                if not self.config.has_option('uwsgi', opt):
                     self.set(opt, iconfig.get('uwsgi', opt))
-                elif self.get(opt).startswith('+'):
-                    self.set(opt, iconfig.get('uwsgi', opt) + self.get(opt)[1:])
-                elif self.get(opt) == 'null':
-                    self.config.remove_option('uwsgi', opt)
+                elif self.get(opt):
+                    if self.get(opt).startswith('+'):
+                        self.set(opt, iconfig.get('uwsgi', opt) + self.get(opt)[1:])
+                    elif self.get(opt) == 'null':
+                        self.config.remove_option('uwsgi', opt)
 
 
     def set(self, key, value):
@@ -432,6 +441,48 @@ class uConf(object):
                 uwsgi_version += '-'
             uwsgi_version += self.get('append_version')
 
+
+
+        if uwsgi_os == 'Linux':
+            if self.get('embed_config'):
+                binary_link_cmd = "ld -r -b binary -o %s.o %s" % (self.get('embed_config'), self.get('embed_config'))
+                print(binary_link_cmd)
+                os.system(binary_link_cmd)
+                self.cflags.append("-DUWSGI_EMBED_CONFIG=_binary_%s_start" % self.get('embed_config').replace('.','_'))
+                self.cflags.append("-DUWSGI_EMBED_CONFIG_END=_binary_%s_end" % self.get('embed_config').replace('.','_'))
+            if self.get('embed_files'):
+                for ef in self.get('embed_files').split(','):
+                    ef_parts = ef.split('=')
+                    symbase = None
+                    if len(ef_parts) > 1:
+                        ef = ef_parts[1]
+                        symbase = ef_parts[0]
+                    if os.path.isdir(ef):
+                        for directory, directories, files in os.walk(ef):
+                            for f in files:
+                                fname = "%s/%s" % (directory, f)
+                                binary_link_cmd = "ld -r -b binary -o build/%s.o %s" % (binarize(fname), fname)
+                                print(binary_link_cmd)
+                                os.system(binary_link_cmd)
+                                if symbase:
+                                    for kind in ('start','end'):
+                                        objcopy_cmd = "objcopy --redefine-sym _binary_%s_%s=_binary_%s%s_%s build/%s.o" % (binarize(fname), kind, binarize(symbase), binarize(fname[len(ef):]), kind, binarize(fname))
+                                        print(objcopy_cmd)
+                                        os.system(objcopy_cmd)
+                                binary_list.append(binarize(fname))
+                    else:
+                        binary_link_cmd = "ld -r -b binary -o build/%s.o %s" % (binarize(ef), ef)
+                        print(binary_link_cmd)
+                        os.system(binary_link_cmd)
+                        binary_list.append(binarize(ef))
+                        if symbase:
+                            for kind in ('start','end'):
+                                objcopy_cmd = "objcopy --redefine-sym _binary_%s_%s=_binary_%s_%s build/%s.o" % (binarize(ef), kind, binarize(symbase), kind, binarize(ef))
+                                print(objcopy_cmd)
+                                os.system(objcopy_cmd)
+                
+                 
+
         self.cflags.append('-DUWSGI_VERSION="\\"' + uwsgi_version + '\\""')
 
         uver_whole = uwsgi_version.split('-', 1)
@@ -627,7 +678,10 @@ def build_plugin(path, uc, cflags, ldflags, libs, name = None):
         shared_flag = '-dynamiclib -undefined dynamic_lookup'
 
     for cfile in up.GCC_LIST:
-        gcc_list.append(path + '/' + cfile + '.c')
+        if not cfile.endswith('.c') and not cfile.endswith('.cc'):
+            gcc_list.append(path + '/' + cfile + '.c')
+        else:
+            gcc_list.append(path + '/' + cfile)
 
 
     gccline = "%s -fPIC %s -o %s.so %s %s %s %s" % (GCC, shared_flag, plugin_dest, ' '.join(p_cflags), ' '.join(p_ldflags), ' '.join(gcc_list), ' '.join(p_libs) )
@@ -684,10 +738,11 @@ if __name__ == "__main__":
             name = None
         build_plugin(sys.argv[2], uc, cflags, ldflags, libs, name)
     elif cmd == '--clean':
-        os.system("rm *.o")
-        os.system("rm proto/*.o")
-        os.system("rm lib/*.o")
-        os.system("rm plugins/*/*.o")
+        os.system("rm -f *.o")
+        os.system("rm -f proto/*.o")
+        os.system("rm -f lib/*.o")
+        os.system("rm -f plugins/*/*.o")
+        os.system("rm -f build/*.o")
 
     else:
         print("unknown uwsgiconfig command")

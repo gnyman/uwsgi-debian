@@ -13,6 +13,8 @@
 #define LONG_ARGS_PYARGV                LONG_ARGS_PYTHON_BASE + 3
 #define LONG_ARGS_PYMODULE_ALIAS        LONG_ARGS_PYTHON_BASE + 4
 #define LONG_ARGS_RELOAD_OS_ENV		LONG_ARGS_PYTHON_BASE + 5
+#define LONG_ARGS_PYIMPORT		LONG_ARGS_PYTHON_BASE + 6
+#define LONG_ARGS_POST_PYMODULE_ALIAS   LONG_ARGS_PYTHON_BASE + 7
 
 #if PY_MINOR_VERSION == 4 && PY_MAJOR_VERSION == 2
 #define Py_ssize_t ssize_t
@@ -60,10 +62,14 @@ PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
 #define	PyString_Concat		PyBytes_Concat
 #define	PyString_AsString	(char *) PyBytes_AsString
 #define PyFile_FromFile(A,B,C,D) PyFile_FromFd(fileno((A)), (B), (C), -1, NULL, NULL, NULL, 0)
+#define uwsgi_py_dict_get(a, b) PyDict_GetItem(a, PyBytes_FromString(b));
+#define uwsgi_py_dict_del(a, b) PyDict_DelItem(a, PyBytes_FromString(b));
 
 #else
 #define UWSGI_PYFROMSTRING(x) PyString_FromString(x)
 #define UWSGI_PYFROMSTRINGSIZE(x, y) PyString_FromStringAndSize(x, y)
+#define uwsgi_py_dict_get(a, b) PyDict_GetItemString(a, b)
+#define uwsgi_py_dict_del(a, b) PyDict_DelItemString(a, b)
 #endif
 
 #define LOADER_DYN              0
@@ -99,6 +105,8 @@ struct uwsgi_python {
 	char *test_module;
 
 	struct uwsgi_string_list *python_path;
+	struct uwsgi_string_list *import_list;
+	struct uwsgi_string_list *post_pymodule_alias;
 
 	PyObject *loader_dict;
 	PyObject* (*loaders[LOADER_MAX]) (void *);
@@ -223,3 +231,9 @@ void simple_reset_ts(struct wsgi_request *, struct uwsgi_app *);
 int uwsgi_python_profiler_call(PyObject *, PyFrameObject *, int, PyObject *);
 
 void uwsgi_python_reset_random_seed(void);
+
+#ifdef __linux__
+#ifndef PYTHREE
+int uwsgi_init_symbol_import(void);
+#endif
+#endif

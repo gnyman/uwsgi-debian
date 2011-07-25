@@ -500,6 +500,17 @@ int bind_to_tcp(char *socket_name, int listen_queue, char *tcp_port) {
 		uwsgi_nuclear_blast();
 	}
 
+#ifdef __linux__
+#ifdef IP_FREEBIND
+	if (uwsgi.freebind) {
+		if (setsockopt(serverfd, SOL_IP, IP_FREEBIND, (const void *) &uwsgi.freebind, sizeof(int)) < 0) {
+			uwsgi_error("setsockopt()");
+			uwsgi_nuclear_blast();
+		}
+	}
+#endif
+#endif
+
 	if (uwsgi.reuse_port) {
 #ifdef SO_REUSEPORT
 		if (setsockopt(serverfd, SOL_SOCKET, SO_REUSEPORT, (const void *) &uwsgi.reuse_port, sizeof(int)) < 0) {
@@ -736,6 +747,8 @@ struct uwsgi_socket *uwsgi_new_socket(char *name) {
 	memset(uwsgi_sock, 0, sizeof(struct uwsgi_socket)); 
 	uwsgi_sock->name = name;
 
+	if (!name) return uwsgi_sock;
+
 	char *tcp_port = strchr(name, ':');
 	if (tcp_port) {
 		// INET socket, check for 0 port
@@ -756,7 +769,25 @@ struct uwsgi_socket *uwsgi_new_socket(char *name) {
 
 			char *auto_port = uwsgi_num2str(ntohs(sin.sin_port));
 			uwsgi_sock->name = uwsgi_concat3n(name, tcp_port-name, ":", 1, auto_port, strlen(auto_port));
-		}	
+		}
+		// is it fd 0 ?
+		else if (tcp_port[1] == ':') {
+			uwsgi_sock->fd = 0;
+                        uwsgi_sock->family = AF_INET;
+			uwsgi_sock->bound = 1;
+
+			socket_type_len = sizeof(struct sockaddr_in);
+
+			if (getsockname(0, (struct sockaddr *)&sin, &socket_type_len)) {
+				uwsgi_error("getsockname()");
+				exit(1);
+			}
+
+
+			char *auto_port = uwsgi_num2str(ntohs(sin.sin_port));
+			char *auto_ip = inet_ntoa(sin.sin_addr);
+			uwsgi_sock->name = uwsgi_concat3n(auto_ip, strlen(auto_ip), ":", 1, auto_port, strlen(auto_port));
+		}
 	}
 	
 	return uwsgi_sock;
@@ -768,6 +799,10 @@ void uwsgi_add_socket_from_fd(struct uwsgi_socket *uwsgi_sock, int fd) {
 	union uwsgi_sockaddr_ptr gsa, isa;
 	union uwsgi_sockaddr usa;
 	int abstract = 0;
+
+#ifdef UWSGI_DEBUG
+	uwsgi_log("creating socket from fd %d\n", fd);
+#endif
 
 	socket_type_len = sizeof(struct sockaddr_un);
 	gsa.sa = &usa.sa;
@@ -784,7 +819,12 @@ void uwsgi_add_socket_from_fd(struct uwsgi_socket *uwsgi_sock, int fd) {
 				uwsgi_sock->family = AF_UNIX;
 				uwsgi_sock->bound = 1;
 				uwsgi_sock->name = uwsgi_concat2(usa.sa_un.sun_path+abstract, "");
-				uwsgi_log("uwsgi zerg socket %d attached to UNIX address %s fd %d\n", uwsgi_get_socket_num(uwsgi_sock), usa.sa_un.sun_path+abstract, uwsgi_sock->fd);
+				if (uwsgi.zerg) {
+					uwsgi_log("uwsgi zerg socket %d attached to UNIX address %s fd %d\n", uwsgi_get_socket_num(uwsgi_sock), usa.sa_un.sun_path+abstract, uwsgi_sock->fd);
+				}
+				else {
+					uwsgi_log("uwsgi socket %d attached to UNIX address %s fd %d\n", uwsgi_get_socket_num(uwsgi_sock), usa.sa_un.sun_path+abstract, uwsgi_sock->fd);
+				}
 				return;
 			}
 			if (!strcmp(usa.sa_un.sun_path+abstract, uwsgi_sock->name+abstract)) {
@@ -819,7 +859,12 @@ void uwsgi_add_socket_from_fd(struct uwsgi_socket *uwsgi_sock, int fd) {
 						uwsgi_sock->family = AF_INET;
 						uwsgi_sock->bound = 1;
 						uwsgi_sock->name = uwsgi_concat2(computed_addr, "");
-						uwsgi_log("uwsgi zerg socket %d attached to INET address %s fd %d\n", uwsgi_get_socket_num(uwsgi_sock), computed_addr, uwsgi_sock->fd);
+						if (uwsgi.zerg) {
+							uwsgi_log("uwsgi zerg socket %d attached to INET address %s fd %d\n", uwsgi_get_socket_num(uwsgi_sock), computed_addr, uwsgi_sock->fd);
+						}
+						else {
+							uwsgi_log("uwsgi socket %d attached to INET address %s fd %d\n", uwsgi_get_socket_num(uwsgi_sock), computed_addr, uwsgi_sock->fd);
+						}
 						free(computed_addr);
 						return;
 					}

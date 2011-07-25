@@ -204,6 +204,13 @@ $(document).ready(function() {
 <b>cores:</b> {{ uwsgi.cores }}<br/>
 <b>masterpid:</b> {{uwsgi.masterpid()}}<br/>
 <b>cluster:</b> {{uwsgi.cluster()}}<br/>
+{% if uwsgi.opt['spooler'] %}
+<b>spooler pid:</b> {{uwsgi.spooler_pid()}}<br/>
+{% endif %}
+
+{% if uwsgi.has_threads == 1 %}
+<b>--- threads enabled ---</b><br/>
+{% endif %}
 
     <div class="anchor">
     <a href="#top">back to top</a>

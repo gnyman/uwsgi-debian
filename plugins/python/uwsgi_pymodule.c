@@ -2,16 +2,74 @@
 
 #include "uwsgi_python.h"
 
-char *spool_buffer = NULL;
-
 extern struct uwsgi_server uwsgi;
 extern struct uwsgi_python up;
 
 PyObject *py_uwsgi_signal_wait(PyObject * self, PyObject * args) {
 
         struct wsgi_request *wsgi_req = current_wsgi_req();
+	int wait_for_specific_signal = 0;
+	uint8_t uwsgi_signal = 0;
+	uint8_t received_signal;
+	int ret;
+	struct pollfd pfd[2];
 
-        wsgi_req->sigwait = 1;
+	wsgi_req->signal_received = -1;
+
+	if (PyTuple_Size(args) > 0) {
+		if (!PyArg_ParseTuple(args, "|B:", &uwsgi_signal)) {
+                	return NULL;
+        	}
+		wait_for_specific_signal = 1;	
+	}
+
+#ifdef UWSGI_ASYNC
+	if (uwsgi.async > 1) {
+        	wsgi_req->sigwait = 1;
+	}
+	else {
+#endif
+		pfd[0].fd = uwsgi.signal_socket;
+		pfd[0].events = POLLIN;
+		pfd[1].fd = uwsgi.my_signal_socket;
+		pfd[1].events = POLLIN;
+cycle:
+		ret = poll(pfd, 2, -1);
+		if (ret > 0) {
+			if (pfd[0].revents == POLLIN) {
+				if (read(uwsgi.signal_socket, &received_signal, 1) != 1) {
+					uwsgi_error("read()");
+				}		
+				else {
+					if (uwsgi_signal_handler(received_signal)) {
+                                		uwsgi_log_verbose("error managing signal %d on worker %d\n", received_signal, uwsgi.mywid);
+                        		}
+					wsgi_req->signal_received = received_signal;			
+					if (wait_for_specific_signal) {
+						if (received_signal != uwsgi_signal) goto cycle;
+					}
+				}
+			}
+			if (pfd[1].revents == POLLIN) {
+                                if (read(uwsgi.my_signal_socket, &received_signal, 1) != 1) {
+                                        uwsgi_error("read()");
+                                }
+                                else {
+					if (uwsgi_signal_handler(received_signal)) {
+                                		uwsgi_log_verbose("error managing signal %d on worker %d\n", received_signal, uwsgi.mywid);
+                        		}
+                                        wsgi_req->signal_received = received_signal;
+                                        if (wait_for_specific_signal) {
+                                                if (received_signal != uwsgi_signal) goto cycle;
+                                        }
+                                }
+                        }
+		}
+
+#ifdef UWSGI_ASYNC
+	}
+#endif
+
 
         return PyString_FromString("");
 }
@@ -460,6 +518,22 @@ PyObject *py_uwsgi_attach_daemon(PyObject * self, PyObject * args) {
 	return Py_True;
 }
 
+PyObject *py_uwsgi_signal_registered(PyObject * self, PyObject * args) {
+	uint8_t uwsgi_signal;
+
+	if (!PyArg_ParseTuple(args, "B:signal_registered", &uwsgi_signal)) {
+                return NULL;
+        }
+
+	if (uwsgi_signal_registered(uwsgi_signal)) {
+		Py_INCREF(Py_True);
+		return Py_True;
+	}
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
 PyObject *py_uwsgi_register_signal(PyObject * self, PyObject * args) {
 
 	uint8_t uwsgi_signal;
@@ -879,14 +953,13 @@ PyObject *py_uwsgi_log(PyObject * self, PyObject * args) {
 
 PyObject *py_uwsgi_lock(PyObject * self, PyObject * args) {
 
-	// the spooler, the master process or single process environment cannot lock resources
+	// the spooler cannot lock resources
 #ifdef UWSGI_SPOOLER
-	if (uwsgi.numproc > 1 && uwsgi.mypid != uwsgi.workers[0].pid && uwsgi.mypid != uwsgi.shared->spooler_pid) {
-#else
-	if (uwsgi.numproc > 1 && uwsgi.mypid != uwsgi.workers[0].pid) {
-#endif
-		uwsgi_lock(uwsgi.user_lock);
+	if (uwsgi.mypid == uwsgi.shared->spooler_pid) {
+		return PyErr_Format(PyExc_ValueError, "The spooler cannot lock/unlock resources");
 	}
+#endif
+	uwsgi_lock(uwsgi.user_lock);
 
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -894,10 +967,45 @@ PyObject *py_uwsgi_lock(PyObject * self, PyObject * args) {
 
 PyObject *py_uwsgi_unlock(PyObject * self, PyObject * args) {
 
+#ifdef UWSGI_SPOOLER
+	if (uwsgi.mypid == uwsgi.shared->spooler_pid) {
+		return PyErr_Format(PyExc_ValueError, "The spooler cannot lock/unlock resources");
+	}
+#endif
+
 	uwsgi_unlock(uwsgi.user_lock);
 
 	Py_INCREF(Py_None);
 	return Py_None;
+}
+
+PyObject *py_uwsgi_embedded_data(PyObject * self, PyObject * args) {
+
+	char *name;
+	char *symbol;
+	void *sym_ptr_start = NULL;
+	void *sym_ptr_end = NULL;
+
+	if (!PyArg_ParseTuple(args, "s:embedded_data", &name)) {
+		return NULL;
+	}
+
+	symbol = uwsgi_concat3("_binary_", name, "_start");
+	sym_ptr_start = dlsym(RTLD_DEFAULT, symbol);
+	free(symbol);
+	if (!sym_ptr_start)
+		return PyErr_Format(PyExc_ValueError, "unable to find symbol %s", name);
+
+
+
+	symbol = uwsgi_concat3("_binary_", name, "_end");
+	sym_ptr_end = dlsym(RTLD_DEFAULT, symbol);
+	free(symbol);
+	if (!sym_ptr_end)
+		return PyErr_Format(PyExc_ValueError, "unable to find symbol %s", name);
+
+	return PyString_FromStringAndSize(sym_ptr_start, sym_ptr_end - sym_ptr_start);
+
 }
 
 PyObject *py_uwsgi_sharedarea_inclong(PyObject * self, PyObject * args) {
@@ -1139,6 +1247,11 @@ PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args, PyObject *kw) {
 	int i;
 	char spool_filename[1024];
 	struct wsgi_request *wsgi_req = current_wsgi_req();
+	char *priority = NULL;
+	long numprio = 0;
+	time_t at = 0;
+	char *body = NULL;
+	size_t body_len= 0;
 
 	spool_dict = PyTuple_GetItem(args, 0);
 
@@ -1159,11 +1272,46 @@ PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args, PyObject *kw) {
 		return PyErr_Format(PyExc_ValueError, "The argument of spooler callable must be a dictionary");
 	}
 
+	PyObject *pyprio = uwsgi_py_dict_get(spool_dict, "priority");
+	if (pyprio) {
+		if (PyInt_Check(pyprio)) {
+			numprio = PyInt_AsLong(pyprio);
+			uwsgi_py_dict_del(spool_dict, "priority");
+		}
+	}
+
+	PyObject *pyat = uwsgi_py_dict_get(spool_dict, "at");
+	if (pyat) {
+		if (PyInt_Check(pyat)) {
+			at = (time_t) PyInt_AsLong(pyat);
+			uwsgi_py_dict_del(spool_dict, "at");
+		}
+		else if (PyLong_Check(pyat)) {
+			at = (time_t) PyLong_AsLong(pyat);
+			uwsgi_py_dict_del(spool_dict, "at");
+		}
+		else if (PyFloat_Check(pyat)) {
+			at = (time_t) PyFloat_AsDouble(pyat);
+			uwsgi_py_dict_del(spool_dict, "at");
+		}
+	}
+
+	PyObject *pybody = uwsgi_py_dict_get(spool_dict, "body");
+	if (pybody) {
+		if (PyString_Check(pybody)) {
+			body = PyString_AsString(pybody);
+			body_len = PyString_Size(pybody);
+			uwsgi_py_dict_del(spool_dict, "body");
+		}
+	}
+
 	spool_vars = PyDict_Items(spool_dict);
 	if (!spool_vars) {
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
+
+	char *spool_buffer = uwsgi_malloc(UMAX16);
 
 	cur_buf = spool_buffer;
 
@@ -1174,12 +1322,16 @@ PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args, PyObject *kw) {
 				key = PyTuple_GetItem(zero, 0);
 				val = PyTuple_GetItem(zero, 1);
 
+#ifdef UWSGI_DEBUG
+				uwsgi_log("ob_type %s %s\n", key->ob_type->tp_name, val->ob_type->tp_name);
+#endif
+
 				if (PyString_Check(key) && PyString_Check(val)) {
 
 
 					keysize = PyString_Size(key);
 					valsize = PyString_Size(val);
-					if (cur_buf + keysize + 2 + valsize + 2 <= spool_buffer + uwsgi.buffer_size) {
+					if (cur_buf + keysize + 2 + valsize + 2 <= spool_buffer + UMAX16) {
 
 #ifdef __BIG_ENDIAN__
 						keysize = uwsgi_swap16(keysize);
@@ -1204,36 +1356,54 @@ PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args, PyObject *kw) {
 					}
 					else {
 						Py_DECREF(zero);
-						return PyErr_Format(PyExc_ValueError, "spooler packet cannot be more than %d bytes", uwsgi.buffer_size);
+						free(spool_buffer);	
+						return PyErr_Format(PyExc_ValueError, "spooler packet cannot be more than %d bytes", UMAX16);
 					}
 				}
 				else {
 					Py_DECREF(zero);
+					free(spool_buffer);
 					return PyErr_Format(PyExc_ValueError, "spooler callable dictionary must contains only strings");
 				}
 			}
 			else {
+				free(spool_buffer);
 				Py_DECREF(zero);
 				Py_INCREF(Py_None);
 				return Py_None;
 			}
 		}
 		else {
+			free(spool_buffer);
 			Py_INCREF(Py_None);
 			return Py_None;
 		}
 	}
 
-	i = spool_request(spool_filename, uwsgi.workers[0].requests + 1, wsgi_req->async_id, spool_buffer, cur_buf - spool_buffer);
+	if (numprio) {
+		priority = uwsgi_num2str(numprio);
+	} 
+	i = spool_request(spool_filename, uwsgi.workers[0].requests + 1, wsgi_req->async_id, spool_buffer, cur_buf - spool_buffer, priority, at, body, body_len);
+	if (priority) {
+		free(priority);
+	}
+		
+	free(spool_buffer);
 
 	Py_DECREF(spool_vars);
 
 	if (i > 0) {
-		Py_INCREF(Py_True);
-		return Py_True;
+		char *slash = uwsgi_get_last_char(spool_filename, '/');
+		if (slash) {
+			return PyString_FromString(slash+1);
+		}
+		return PyString_FromString(spool_filename);
 	}
-	Py_INCREF(Py_None);
-	return Py_None;
+	return PyErr_Format(PyExc_ValueError, "unable to spool job");
+}
+
+PyObject *py_uwsgi_spooler_pid(PyObject * self, PyObject * args) {
+	return PyInt_FromLong(uwsgi.shared->spooler_pid ? uwsgi.shared->spooler_pid : 0);
 }
 #endif
 
@@ -2246,6 +2416,7 @@ static PyMethodDef uwsgi_spooler_methods[] = {
 #endif
 	{"set_spooler_frequency", py_uwsgi_spooler_freq, METH_VARARGS, ""},
 	{"spooler_jobs", py_uwsgi_spooler_jobs, METH_VARARGS, ""},
+	{"spooler_pid", py_uwsgi_spooler_pid, METH_VARARGS, ""},
 	{NULL, NULL},
 };
 #endif
@@ -2372,6 +2543,7 @@ static PyMethodDef uwsgi_advanced_methods[] = {
 	{"register_signal", py_uwsgi_register_signal, METH_VARARGS, ""},
 	{"signal", py_uwsgi_signal, METH_VARARGS, ""},
 	{"signal_wait", py_uwsgi_signal_wait, METH_VARARGS, ""},
+	{"signal_registered", py_uwsgi_signal_registered, METH_VARARGS, ""},
 	{"signal_received", py_uwsgi_signal_received, METH_VARARGS, ""},
 	{"add_file_monitor", py_uwsgi_add_file_monitor, METH_VARARGS, ""},
 	{"add_timer", py_uwsgi_add_timer, METH_VARARGS, ""},
@@ -2418,6 +2590,7 @@ static PyMethodDef uwsgi_advanced_methods[] = {
 	{"fcgi", py_uwsgi_fcgi, METH_VARARGS, ""},
 
 	{"parsefile", py_uwsgi_parse_file, METH_VARARGS, ""},
+	{"embedded_data", py_uwsgi_embedded_data, METH_VARARGS, ""},
 	//{"call_hook", py_uwsgi_call_hook, METH_VARARGS, ""},
 
 	{NULL, NULL},
@@ -2759,13 +2932,6 @@ void init_uwsgi_module_spooler(PyObject * current_uwsgi_module) {
 		uwsgi_log("could not get uwsgi module __dict__\n");
 		exit(1);
 	}
-
-	spool_buffer = malloc(uwsgi.buffer_size);
-	if (!spool_buffer) {
-		uwsgi_error("malloc()");
-		exit(1);
-	}
-
 
 	for (uwsgi_function = uwsgi_spooler_methods; uwsgi_function->ml_name != NULL; uwsgi_function++) {
 		PyObject *func = PyCFunction_New(uwsgi_function, NULL);
