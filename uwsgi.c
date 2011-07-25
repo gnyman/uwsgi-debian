@@ -56,6 +56,10 @@ static struct option long_base_options[] = {
 	{"cgi-mode", no_argument, 0, 'c'},
 	{"abstract-socket", no_argument, 0, 'a'},
 	{"chmod-socket", optional_argument, 0, 'C'},
+	{"chown-socket", required_argument, 0, LONG_ARGS_CHOWN_SOCKET},
+#ifdef __linux__
+	{"freebind", no_argument, &uwsgi.freebind, 1},
+#endif
 	{"map-socket", required_argument, 0, LONG_ARGS_MAP_SOCKET},
 	{"chmod", optional_argument, 0, 'C'},
 #ifdef UWSGI_THREADING
@@ -65,12 +69,14 @@ static struct option long_base_options[] = {
 	{"master", no_argument, 0, 'M'},
 	{"emperor", required_argument, 0, LONG_ARGS_EMPEROR},
 	{"early-emperor", no_argument, &uwsgi.early_emperor, 1},
+	{"emperor-broodlord", required_argument, 0, LONG_ARGS_EMPEROR_BROODLORD},
 	{"emperor-amqp-vhost", required_argument, 0, LONG_ARGS_EMPEROR_AMQP_VHOST},
 	{"emperor-amqp-username", required_argument, 0, LONG_ARGS_EMPEROR_AMQP_USERNAME},
 	{"emperor-amqp-password", required_argument, 0, LONG_ARGS_EMPEROR_AMQP_PASSWORD},
 	{"vassals-inherit", required_argument, 0, LONG_ARGS_VASSALS_INHERIT},
 	{"vassals-start-hook", required_argument, 0, LONG_ARGS_VASSALS_START_HOOK},
 	{"vassals-stop-hook", required_argument, 0, LONG_ARGS_VASSALS_STOP_HOOK},
+	{"vassal-sos-backlog", required_argument, 0, LONG_ARGS_VASSAL_SOS_BACKLOG},
 	{"auto-snapshot", optional_argument, 0, LONG_ARGS_AUTO_SNAPSHOT},
 	{"reload-mercy", required_argument, 0, LONG_ARGS_RELOAD_MERCY},
 	{"exit-on-reload", no_argument, &uwsgi.exit_on_reload, 1},
@@ -86,12 +92,15 @@ static struct option long_base_options[] = {
 	{"cache-blocksize", required_argument, 0, LONG_ARGS_CACHE_BLOCKSIZE},
 	{"cache-store", required_argument, 0, LONG_ARGS_CACHE_STORE},
 	{"cache-store-sync", required_argument, 0, LONG_ARGS_CACHE_STORE_SYNC},
+	{"cache-server", required_argument, 0, LONG_ARGS_CACHE_SERVER},
+	{"cache-server-threads", required_argument, 0, LONG_ARGS_CACHE_SERVER_THREADS},
 	{"queue", required_argument, 0, LONG_ARGS_QUEUE},
 	{"queue-blocksize", required_argument, 0, LONG_ARGS_QUEUE_BLOCKSIZE},
 	{"queue-store", required_argument, 0, LONG_ARGS_QUEUE_STORE},
 	{"queue-store-sync", required_argument, 0, LONG_ARGS_QUEUE_STORE_SYNC},
 #ifdef UWSGI_SPOOLER
 	{"spooler", required_argument, 0, 'Q'},
+	{"spooler-ordered", no_argument, &uwsgi.spooler_ordered, 1},
 #endif
 	{"disable-logging", no_argument, 0, 'L'},
 
@@ -185,6 +194,7 @@ static struct option long_base_options[] = {
 	{"lazy", no_argument, &uwsgi.lazy, 1},
 	{"cheap", no_argument, &uwsgi.cheap, 1},
 	{"idle", required_argument, 0, LONG_ARGS_IDLE},
+	{"die-on-idle", no_argument, &uwsgi.die_on_idle, 1},
 	{"mount", required_argument, 0, LONG_ARGS_MOUNT},
 	{"grunt", no_argument, &uwsgi.grunt, 1},
 	{"threads", required_argument, 0, LONG_ARGS_THREADS},
@@ -333,7 +343,9 @@ void config_magic_table_fill(char *filename, char **magic_table) {
 	magic_table['d'] = uwsgi_concat2n(magic_table['p'], magic_table['s'] - magic_table['p'], "", 0);
 	if (magic_table['d'][strlen(magic_table['d'])-1] == '/') {
 		tmp = magic_table['d'] + (strlen(magic_table['d']) -1) ;
+#ifdef UWSGI_DEBUG
 		uwsgi_log("tmp = %c\n", *tmp);
+#endif
 		*tmp = 0;
 	}
 	if (uwsgi_get_last_char(magic_table['d'], '/'))
@@ -806,6 +818,8 @@ int main(int argc, char *argv[], char *envp[]) {
 	uwsgi.master_queue = -1;
 
 	uwsgi.signal_socket = -1;
+	uwsgi.my_signal_socket = -1;
+	uwsgi.cache_server_fd = -1;
 
 	uwsgi.emperor_fd_config = -1;
 	uwsgi.emperor_pid = -1;
@@ -827,6 +841,11 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT] = 4;
 	uwsgi.shared->options[UWSGI_OPTION_LOGGING] = 1;
+
+#ifdef UWSGI_SPOOLER
+	uwsgi.shared->spooler_signal_pipe[0] = -1;
+	uwsgi.shared->spooler_signal_pipe[1] = -1;
+#endif
 
 
 	gettimeofday(&uwsgi.start_tv, NULL);
@@ -898,6 +917,7 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	plugins_requested = getenv("UWSGI_PLUGINS");
 	if (plugins_requested) {
+		plugins_requested = uwsgi_concat2(plugins_requested, "");
 		char *p = strtok(plugins_requested, ",");
 		while (p != NULL) {
 			uwsgi_load_plugin(-1, p, NULL, 0);
@@ -905,6 +925,19 @@ int main(int argc, char *argv[], char *envp[]) {
 		}
 	}
 	build_options();
+
+	if (gethostname(uwsgi.hostname, 255)) {
+		uwsgi_error("gethostname()");
+	}
+	uwsgi.hostname_len = strlen(uwsgi.hostname);
+
+
+	magic_table['v'] = uwsgi.cwd;
+	magic_table['h'] = uwsgi.hostname;
+
+#ifdef UWSGI_EMBED_CONFIG
+	uwsgi_ini_config("", magic_table);	
+#endif
 
 	uwsgi.option_index = -1;
 	while ((i = getopt_long(argc, argv, short_options, uwsgi.long_options, &uwsgi.option_index)) != -1) {
@@ -992,15 +1025,6 @@ int main(int argc, char *argv[], char *envp[]) {
 			}
 		}
 	}
-
-	if (gethostname(uwsgi.hostname, 255)) {
-		uwsgi_error("gethostname()");
-	}
-	uwsgi.hostname_len = strlen(uwsgi.hostname);
-
-
-	magic_table['v'] = uwsgi.cwd;
-	magic_table['h'] = uwsgi.hostname;
 
 #ifdef UWSGI_XML
 	if (uwsgi.xml_config != NULL) {
@@ -1349,7 +1373,7 @@ int uwsgi_start(void *v_argv) {
 	}
 #endif
 
-	if (!uwsgi.master_as_root) {
+	if (!uwsgi.master_as_root && !uwsgi.chown_socket) {
 		uwsgi_as_root();
 	}
 
@@ -1526,6 +1550,10 @@ int uwsgi_start(void *v_argv) {
 		}
 	}
 
+#ifdef UWSGI_DEBUG
+	uwsgi_log("cores allocated...\n");
+#endif
+
 
 	//by default set wsgi_req to the first slot
 	uwsgi.wsgi_req = uwsgi.wsgi_requests[0];
@@ -1538,6 +1566,11 @@ int uwsgi_start(void *v_argv) {
 		uwsgi.apps_cnt = 0;
 	}
 
+
+	// event queue lock (mitigate same event on multiple queues)
+	if (uwsgi.threads > 1) {
+		pthread_mutex_init(&uwsgi.thunder_mutex, NULL);
+	}
 
 	// application generic lock
 	uwsgi.user_lock = uwsgi_mmap_shared_lock();
@@ -1610,6 +1643,10 @@ int uwsgi_start(void *v_argv) {
 				uwsgi_log("!!! unable to attach daemon %s !!!\n", uwsgi.startup_daemons[i]);
 			}
 		}
+		// create the cache server
+		if (uwsgi.cache_server) {
+			uwsgi.cache_server_fd = uwsgi_cache_server(uwsgi.cache_server, uwsgi.cache_server_threads);
+		}
 	}
 
 	/* plugin initialization */
@@ -1622,10 +1659,36 @@ int uwsgi_start(void *v_argv) {
 
 	if (!uwsgi.no_server) {
 
+		// systemd socket activation
+		if (!uwsgi.is_a_reload) {
+			char *listen_pid = getenv("LISTEN_PID");
+			if (listen_pid) {
+				if (atoi(listen_pid) == (int) getpid()) {
+					char *listen_fds = getenv("LISTEN_FDS");
+					if (listen_fds) {
+						int systemd_fds = atoi(listen_fds);
+						if (systemd_fds > 0) {
+							for(i=3;i<3+systemd_fds;i++) {
+								uwsgi_sock = uwsgi_new_socket(NULL);
+								uwsgi_add_socket_from_fd(uwsgi_sock, i);
+							}
+						}
+						unsetenv("LISTEN_PID");
+						unsetenv("LISTEN_FDS");
+						goto skipzero;
+					}
+				}
+			}
+		}
+
+
 		//check for inherited sockets
 		if (uwsgi.is_a_reload || uwsgi.zerg) {
 
 			if (uwsgi.zerg) {
+#ifdef UWSGI_DEBUG
+				uwsgi_log("attaching zerg sockets...\n");
+#endif
 				int zerg_fd;
 				i = 0;
 				for(;;) {
@@ -1637,6 +1700,8 @@ int uwsgi_start(void *v_argv) {
 					uwsgi_add_socket_from_fd(uwsgi_sock, zerg_fd);
 					i++;
 				}
+
+				uwsgi_log("zerg sockets attached\n");
 			}
 
 			uwsgi_sock = uwsgi.sockets;
@@ -1661,6 +1726,12 @@ int uwsgi_start(void *v_argv) {
 					if (j == uwsgi.emperor_fd)
 						continue;
 				}
+
+				if (uwsgi.cache_server && uwsgi.cache_server_fd != -1) {
+					if (j == uwsgi.cache_server_fd)
+						continue;
+				}
+
 				socket_type_len = sizeof(struct sockaddr_un);
 				gsa.sa = (struct sockaddr *) &usa;
 				if (!getsockname(j, gsa.sa, &socket_type_len)) {
@@ -1685,6 +1756,9 @@ int uwsgi_start(void *v_argv) {
 				if (tcp_port == NULL) {
 					uwsgi_sock->fd = bind_to_unix(uwsgi_sock->name, uwsgi.listen_queue, uwsgi.chmod_socket, uwsgi.abstract_socket);
 					uwsgi_sock->family = AF_UNIX;
+					if (uwsgi.chown_socket) {
+						uwsgi_chown(uwsgi_sock->name, uwsgi.chown_socket);
+					}
 					uwsgi_log("uwsgi socket %d bound to UNIX address %s fd %d\n", uwsgi_get_socket_num(uwsgi_sock), uwsgi_sock->name, uwsgi_sock->fd);
 				}
 				else {
@@ -1700,6 +1774,12 @@ int uwsgi_start(void *v_argv) {
 			}
 			uwsgi_sock->bound = 1;
 			uwsgi_sock = uwsgi_sock->next;
+		}
+
+		if (uwsgi.chown_socket) {
+			if (!uwsgi.master_as_root) {
+				uwsgi_as_root();
+			}
 		}
 
 		int zero_used = 0;
@@ -1721,7 +1801,7 @@ int uwsgi_start(void *v_argv) {
 					uwsgi_log("uwsgi socket %d inherited UNIX address %s fd 0\n", uwsgi_get_socket_num(uwsgi_sock), uwsgi_sock->name);
 				}
 				else {
-					uwsgi_sock = uwsgi_new_socket(":0");
+					uwsgi_sock = uwsgi_new_socket(uwsgi_concat2("::",""));
 					uwsgi_log("uwsgi socket %d inherited INET address %s fd 0\n", uwsgi_get_socket_num(uwsgi_sock), uwsgi_sock->name);
 				}
 			}
@@ -1736,10 +1816,13 @@ int uwsgi_start(void *v_argv) {
 						uwsgi_error("dup2()");
 						exit(1);
 					}
+					close(fd);
 				}
 			}
 
 		}
+
+skipzero:
 	
 		// check for auto_port socket
 		uwsgi_sock = uwsgi.sockets;
@@ -1915,6 +1998,13 @@ int uwsgi_start(void *v_argv) {
 	}
 	memset(uwsgi.workers, 0, sizeof(struct uwsgi_worker) * uwsgi.numproc + 1);
 
+	uwsgi.signal_pipe = uwsgi_malloc( sizeof(int *) * (uwsgi.numproc + 1));
+	for(i=1;i<=uwsgi.numproc;i++) {
+		uwsgi.signal_pipe[i] = uwsgi_malloc(sizeof(int) * 2);
+		uwsgi.signal_pipe[i][0] = - 1;
+		uwsgi.signal_pipe[i][1] = - 1;
+	}
+
 	uwsgi.mypid = getpid();
 	masterpid = uwsgi.mypid;
 
@@ -2017,6 +2107,14 @@ int uwsgi_start(void *v_argv) {
 		}
 	}
 
+	// master fixup
+        for (i = 0; i < 0xFF; i++) {
+                if (uwsgi.p[i]->master_fixup) {
+                        uwsgi.p[i]->master_fixup(0);
+                }
+        }
+
+
 
 #ifdef UWSGI_SPOOLER
 	if (uwsgi.spool_dir != NULL && uwsgi.sockets) {
@@ -2028,13 +2126,7 @@ int uwsgi_start(void *v_argv) {
 	routing_setup();
 #endif
 
-	// master fixup
 
-        for (i = 0; i < 0xFF; i++) {
-                if (uwsgi.p[i]->master_fixup) {
-                        uwsgi.p[i]->master_fixup(0);
-                }
-        }
 
 
 	if (!uwsgi.master_process) {
@@ -2059,6 +2151,7 @@ int uwsgi_start(void *v_argv) {
 			exit(1);
 		}
 
+		uwsgi.signal_socket = uwsgi.shared->worker_signal_pipe[1];
 	}
 
 	// uWSGI is ready
@@ -2164,6 +2257,7 @@ int uwsgi_start(void *v_argv) {
 		uwsgi_log("\n");
 #endif
 	}
+
 
 	if (uwsgi.worker_exec) {
 		char *w_argv[2];
@@ -2298,6 +2392,8 @@ int uwsgi_start(void *v_argv) {
 		}
 
 		uwsgi.async_queue_unused_ptr = uwsgi.async - 1;
+
+		event_queue_add_fd_read(uwsgi.async_queue, uwsgi.signal_socket);
 	}
 #endif
 
@@ -2376,16 +2472,6 @@ int uwsgi_start(void *v_argv) {
 		}
 	}
 
-
-	if (uwsgi.master_process) {
-		uwsgi.signal_socket = uwsgi.shared->worker_signal_pipe[1];
-#ifdef UWSGI_ASYNC
-		// add uwsgi signal fd to async queue
-		if (uwsgi.async > 1) {
-			event_queue_add_fd_read(uwsgi.async_queue, uwsgi.signal_socket);
-		}
-#endif
-	}
 
 #ifdef UWSGI_THREADING
 	if (uwsgi.cores > 1) {
@@ -2518,7 +2604,7 @@ static int manage_base_opt(int i, char *optarg) {
 		uwsgi.allowed_modifiers = optarg;
 		return 1;
 	case LONG_ARGS_PLUGINS:
-		p = strtok(optarg, ",");
+		p = strtok(uwsgi_concat2(optarg, ""), ",");
 		while (p != NULL) {
 #ifdef UWSGI_DEBUG
 			uwsgi_debug("loading plugin %s\n", p);
@@ -2575,6 +2661,9 @@ static int manage_base_opt(int i, char *optarg) {
 		return 1;
 	case LONG_ARGS_LOGTO2:
 		uwsgi.logto2 = optarg;
+		return 1;
+	case LONG_ARGS_EMPEROR_BROODLORD:
+		uwsgi.emperor_broodlord = atoi(optarg);
 		return 1;
 	case LONG_ARGS_EMPEROR:
 		uwsgi.emperor_dir = optarg;
@@ -2697,6 +2786,10 @@ static int manage_base_opt(int i, char *optarg) {
 		return 1;
 	case LONG_ARGS_CHECK_STATIC:
 		uwsgi.check_static = realpath(optarg, NULL);
+		if (!uwsgi.check_static) {
+			uwsgi_error("check-static realpath()");
+			exit(1);
+		}
 		uwsgi.check_static_len = strlen(uwsgi.check_static);
 		return 1;
 	case LONG_ARGS_FILE_SERVE_MODE:
@@ -2739,6 +2832,9 @@ static int manage_base_opt(int i, char *optarg) {
 		uct->filename = optarg;
 		uct->next = NULL;
 
+		return 1;
+	case LONG_ARGS_VASSAL_SOS_BACKLOG:
+		uwsgi.vassal_sos_backlog = atoi(optarg);
 		return 1;
 	case LONG_ARGS_VASSALS_START_HOOK:
 		uwsgi.vassals_start_hook = optarg;
@@ -2820,6 +2916,10 @@ static int manage_base_opt(int i, char *optarg) {
 		usm->mountpoint_len = docroot - usm->mountpoint;
 
 		usm->document_root = realpath(docroot + 1, NULL);
+		if (!usm->document_root) {
+			uwsgi_error("static-map realpath()");
+			exit(1);
+		}
 		usm->document_root_len = strlen(usm->document_root);
 
 		usm->orig_document_root = usm->document_root;
@@ -2849,16 +2949,10 @@ static int manage_base_opt(int i, char *optarg) {
 		return 1;
 #ifdef __linux__
 	case LONG_ARGS_CGROUP:
-		uwsgi.cgroup = optarg;
+		uwsgi_string_new_list(&uwsgi.cgroup, optarg);
 		return 1;
 	case LONG_ARGS_CGROUP_OPT:
-		if (uwsgi.cgroup_opt_cnt < 63) {
-			uwsgi.cgroup_opt[uwsgi.cgroup_opt_cnt] = optarg;
-			uwsgi.cgroup_opt_cnt++;
-		}
-		else {
-			uwsgi_log("you can specify at most 64 --cgroup_opt options\n");
-		}
+		uwsgi_string_new_list(&uwsgi.cgroup_opt, optarg);
 		return 1;
 	case LONG_ARGS_LINUX_NS:
 		uwsgi.ns = optarg;
@@ -2927,6 +3021,12 @@ static int manage_base_opt(int i, char *optarg) {
 		return 1;
 	case LONG_ARGS_CHECK_INTERVAL:
 		uwsgi.shared->options[UWSGI_OPTION_MASTER_INTERVAL] = atoi(optarg);
+		return 1;
+	case LONG_ARGS_CACHE_SERVER:
+		uwsgi.cache_server = optarg;
+		return 1;
+	case LONG_ARGS_CACHE_SERVER_THREADS:
+		uwsgi.cache_server_threads = atoi(optarg);
 		return 1;
 	case LONG_ARGS_CACHE:
 		uwsgi.cache_max_items = atoi(optarg);
@@ -3102,6 +3202,9 @@ static int manage_base_opt(int i, char *optarg) {
 		if (optarg) {
 			uwsgi.log_strftime = optarg;
 		}
+		return 1;
+	case LONG_ARGS_CHOWN_SOCKET:
+		uwsgi.chown_socket = optarg;
 		return 1;
 	case 'C':
 		uwsgi.chmod_socket = 1;

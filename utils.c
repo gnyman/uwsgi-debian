@@ -419,37 +419,45 @@ void internal_server_error(struct wsgi_request *wsgi_req, char *message) {
 void uwsgi_set_cgroup() {
 
 	char *cgroup_taskfile;
-	int i;
 	FILE *cgroup;
 	char *cgroup_opt;
+	struct uwsgi_string_list *usl, *uslo;
 
 	if (!uwsgi.cgroup) return;
 
-			if (mkdir(uwsgi.cgroup, 0700)) {
-                                uwsgi_log("using Linux cgroup %s\n", uwsgi.cgroup);
-                        }
-                        else {
-                                uwsgi_log("created Linux cgroup %s\n", uwsgi.cgroup);
-                        }
-			uwsgi_error("mkdir()");
-                        cgroup_taskfile = uwsgi_concat2(uwsgi.cgroup, "/tasks");
-                        cgroup = fopen(cgroup_taskfile, "w");
-                        if (!cgroup) {
-                                uwsgi_error_open(cgroup_taskfile);
-                                exit(1);
-                        }
-                        if (fprintf(cgroup, "%d", (int) getpid()) <= 0) {
-                                uwsgi_log("could not set cgroup\n");
-                                exit(1);
-                        }
-			uwsgi_log("moved process %d to cgroup %s\n", (int) getpid(), cgroup_taskfile);
-                        fclose(cgroup);
-                        free(cgroup_taskfile);
+	usl = uwsgi.cgroup;
 
-                        for (i = 0; i < uwsgi.cgroup_opt_cnt; i++) {
-                                cgroup_opt = strchr(uwsgi.cgroup_opt[i], '=');
+	while(usl) {
+		if (mkdir(usl->value, 0700)) {
+                	uwsgi_log("using Linux cgroup %s\n", usl->value);
+			if (errno != EEXIST) {
+				uwsgi_error("mkdir()");
+			}
+                }
+                else {
+                	uwsgi_log("created Linux cgroup %s\n", usl->value);
+                }
+
+                cgroup_taskfile = uwsgi_concat2(usl->value, "/tasks");
+                cgroup = fopen(cgroup_taskfile, "w");
+                if (!cgroup) {
+                	uwsgi_error_open(cgroup_taskfile);
+                        exit(1);
+                }
+                if (fprintf(cgroup, "%d", (int) getpid()) <= 0) {
+                	uwsgi_log("could not set cgroup\n");
+                        exit(1);
+                }
+		uwsgi_log("assigned process %d to cgroup %s\n", (int) getpid(), cgroup_taskfile);
+                fclose(cgroup);
+                free(cgroup_taskfile);
+
+
+		uslo = uwsgi.cgroup_opt;
+		while(uslo) {
+                                cgroup_opt = strchr(uslo->value, '=');
                                 if (!cgroup_opt) {
-                                        cgroup_opt = strchr(uwsgi.cgroup_opt[i], ':');
+                                        cgroup_opt = strchr(uslo->value, ':');
                                         if (!cgroup_opt) {
                                                 uwsgi_log("invalid cgroup-opt syntax\n");
                                                 exit(1);
@@ -459,19 +467,25 @@ void uwsgi_set_cgroup() {
                                 cgroup_opt[0] = 0;
                                 cgroup_opt++;
 
-                                cgroup_taskfile = uwsgi_concat3(uwsgi.cgroup, "/", uwsgi.cgroup_opt[i]);
+                                cgroup_taskfile = uwsgi_concat3(usl->value, "/", uslo->value);
                                 cgroup = fopen(cgroup_taskfile, "w");
-                                if (!cgroup) {
-                                        uwsgi_error_open(cgroup_taskfile);
-                                        exit(1);
+                                if (cgroup) {
+                                	if (fprintf(cgroup, "%s\n", cgroup_opt) < 0) {
+                                        	uwsgi_log("could not set cgroup option %s to %s\n", uslo->value, cgroup_opt);
+                                        	exit(1);
+					}
+                                	fclose(cgroup);
+					uwsgi_log("set %s to %s\n", cgroup_opt, cgroup_taskfile);
                                 }
-                                if (fprintf(cgroup, "%s\n", cgroup_opt) < 0) {
-                                        uwsgi_log("could not set cgroup option %s to %s\n", uwsgi.cgroup_opt[i], cgroup_opt);
-                                        exit(1);
-                                }
-                                fclose(cgroup);
                                 free(cgroup_taskfile);
+
+				cgroup_opt[-1] = '=';
+
+				uslo = uslo->next;
                         }
+
+		usl = usl->next;
+	}
 
 }
 #endif
@@ -754,8 +768,10 @@ int wsgi_req_accept(int queue, struct wsgi_request *wsgi_req) {
 	char uwsgi_signal;
 	struct uwsgi_socket *uwsgi_sock = uwsgi.sockets;
 
+	thunder_lock;
 	ret = event_queue_wait(queue, uwsgi.edge_triggered - 1, &interesting_fd);
 	if (ret < 0) {
+		thunder_unlock;
 		return -1;
 	}
 
@@ -764,7 +780,10 @@ int wsgi_req_accept(int queue, struct wsgi_request *wsgi_req) {
 	if (uwsgi.threads > 1) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &ret);
 #endif
 
-	if (uwsgi.signal_socket > -1 && interesting_fd == uwsgi.signal_socket) {
+	if (uwsgi.signal_socket > -1 && (interesting_fd == uwsgi.signal_socket || interesting_fd == uwsgi.my_signal_socket)) {
+
+		thunder_unlock;
+
 		if (read(interesting_fd, &uwsgi_signal, 1) <= 0) {
 			if (uwsgi.no_orphans) {
 				uwsgi_log_verbose("uWSGI worker %d screams: UAAAAAAH my master died, i will follow him...\n", uwsgi.mywid);
@@ -794,6 +813,7 @@ int wsgi_req_accept(int queue, struct wsgi_request *wsgi_req) {
 		if (interesting_fd == uwsgi_sock->fd || (uwsgi.edge_triggered && uwsgi_sock->edge_trigger)) {
 			wsgi_req->socket = uwsgi_sock;
 			wsgi_req->poll.fd = wsgi_req->socket->proto_accept(wsgi_req, interesting_fd);
+			thunder_unlock;
 			if (wsgi_req->poll.fd < 0) {
 #ifdef UWSGI_THREADING
         			if (uwsgi.threads > 1) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &ret);
@@ -828,6 +848,7 @@ int wsgi_req_accept(int queue, struct wsgi_request *wsgi_req) {
 		uwsgi_sock = uwsgi_sock->next;
 	}
 
+	thunder_unlock;
 #ifdef UWSGI_THREADING
         if (uwsgi.threads > 1) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &ret);
 #endif
@@ -958,13 +979,26 @@ void uwsgi_log_verbose(const char *fmt, ...) {
 	int rlen = 0;
 
 	struct timeval tv;
+	char sftime[64];
+        time_t now;
 
-	gettimeofday(&tv, NULL);
+		if (uwsgi.log_strftime) {
+                        now = time(NULL);
+                        rlen = strftime(sftime, 64, uwsgi.log_strftime, localtime(&now));
+                        memcpy(logpkt, sftime, rlen);
+                        memcpy(logpkt + rlen, " - ", 3);
+                        rlen += 3;
+                }
+                else {
+                        gettimeofday(&tv, NULL);
 
-	memcpy(logpkt, ctime((const time_t *) &tv.tv_sec), 24);
-	memcpy(logpkt + 24, " - ", 3);
+                        memcpy(logpkt, ctime((const time_t *) &tv.tv_sec), 24);
+                        memcpy(logpkt + 24, " - ", 3);
 
-	rlen = 24 + 3;
+                        rlen = 24 + 3;
+                }
+	
+
 
 	va_start(ap, fmt);
 	rlen += vsnprintf(logpkt + rlen, 4096 - rlen, fmt, ap);
@@ -1746,6 +1780,42 @@ char *uwsgi_open_and_read(char *url, int *size, int add_zero, char *magic_table[
 			buffer[*size - 1] = 0;
 		}
 	}
+#ifdef UWSGI_EMBED_CONFIG
+	else if (url[0] == 0) {
+		*size = &UWSGI_EMBED_CONFIG_END-&UWSGI_EMBED_CONFIG;
+		if (add_zero) {
+			*size+=1;
+		}
+		buffer = uwsgi_malloc(*size);
+		memset(buffer, 0, *size);
+		memcpy(buffer, &UWSGI_EMBED_CONFIG, &UWSGI_EMBED_CONFIG_END-&UWSGI_EMBED_CONFIG);
+	}
+#endif
+	else if (!strncmp("sym://", url, 6)) {
+		char *symbol = uwsgi_concat3("_binary_", url+6, "_start") ;
+		void *sym_start_ptr = dlsym(RTLD_DEFAULT, symbol);
+		if (!sym_start_ptr) {
+			uwsgi_log("unable to find symbol %s\n", symbol);	
+			exit(1);
+		}
+		free(symbol);
+		symbol = uwsgi_concat3("_binary_", url+6, "_end");
+		void *sym_end_ptr = dlsym(RTLD_DEFAULT, symbol);
+                if (!sym_end_ptr) {
+                        uwsgi_log("unable to find symbol %s\n", symbol);
+                        exit(1);
+                }
+                free(symbol);
+
+		*size = sym_end_ptr - sym_start_ptr;
+		if (add_zero) {
+                        *size+=1;
+                }
+                buffer = uwsgi_malloc(*size);
+                memset(buffer, 0, *size);
+                memcpy(buffer, sym_start_ptr, sym_end_ptr - sym_start_ptr);
+
+	}
 	// fallback to file
 	else {
 		fd = open(url, O_RDONLY);
@@ -2284,10 +2354,9 @@ void uwsgi_sig_pause() {
 	sigsuspend(&mask);
 }
 
-int uwsgi_run_command_and_wait(char *command, ...) {
+int uwsgi_run_command_and_wait(char *command, char *arg) {
 
-	va_list ap;
-
+	char *argv[3];
 	int waitpid_status = 0;
 	pid_t pid = fork();
 	if (pid < 0) {
@@ -2303,11 +2372,13 @@ int uwsgi_run_command_and_wait(char *command, ...) {
 		return WEXITSTATUS(waitpid_status);
 	}
 
-	va_start(ap, command);
-	execlp(command, command, ap, (char *) NULL);
-	va_end(ap);
+	argv[0] = command;
+	argv[1] = arg;
+	argv[2] = NULL;
 
-	uwsgi_error("execlp()");
+	execvp(command, argv);
+
+	uwsgi_error("execvp()");
 	//never here
 	exit(1);
 }
@@ -2401,14 +2472,14 @@ int *uwsgi_attach_fd(int fd, int count, char *code, size_t code_len) {
 		return NULL;
 	}
 
+	if ((size_t) (cmsg->cmsg_len - ((char *)CMSG_DATA(cmsg)- (char *)cmsg)) > (size_t) (sizeof(int) * (count + 1))) {
+        	uwsgi_log("not enough space for sockets data, consider increasing it\n");
+        	return NULL;
+	}
+
 	ret = uwsgi_malloc(sizeof(int) * (count + 1));
 	for(i=0;i<count+1;i++) {
 		ret[i] = -1;
-	}
-
-	if ((size_t) (cmsg->cmsg_len - ((char *)CMSG_DATA(cmsg)- (char *)cmsg)) > (size_t) (sizeof(int) * (count + 1))) {
-		uwsgi_log("not enough space for sockets data, consider increasing it\n");
-		return NULL;	
 	}
 
 	memcpy(ret, CMSG_DATA(cmsg), cmsg->cmsg_len - ((char *)CMSG_DATA(cmsg)- (char *)cmsg));
@@ -2419,4 +2490,70 @@ int *uwsgi_attach_fd(int fd, int count, char *code, size_t code_len) {
 	}
 
 	return ret;
+}
+
+int uwsgi_endswith(char *str1, char *str2) {
+
+	size_t i;
+	size_t str1len = strlen(str1);
+	size_t str2len = strlen(str2);
+	char *ptr;
+
+	if (str2len > str1len) return 0;
+	
+	ptr = (str1 + str1len) - str2len;
+
+	for(i=0;i<str2len;i++) {
+		if (*ptr != str2[i]) return 0;
+		ptr++;
+	}
+
+	return 1;
+}
+
+void uwsgi_chown(char *filename, char *owner) {
+
+	uid_t new_uid = -1;
+	uid_t new_gid = -1;
+	struct group *new_group = NULL;
+	struct passwd *new_user = NULL;
+
+	char *colon = strchr(owner, ':');
+	if (colon) {
+		colon[0] = 0;
+	}
+
+	
+	if (is_a_number(owner)) {
+		new_uid = atoi(owner);
+	}
+	else {
+		new_user = getpwnam(owner);
+		if (!new_user) {
+			uwsgi_log("unable to find user %s\n", owner);
+			exit(1);
+		}
+		new_uid = new_user->pw_uid;
+	}
+
+	if (colon) {
+		colon[0] = ':';
+		if (is_a_number(colon+1)) {
+			new_gid = atoi(colon+1);
+		}
+		else {
+			new_group = getgrnam(colon+1);
+			if (!new_group) {
+				uwsgi_log("unable to find group %s\n", colon+1);
+				exit(1);
+			}
+			new_gid = new_group->gr_gid;
+		}
+	}
+
+	if (chown(filename, new_uid, new_gid)) {
+		uwsgi_error("chown()");
+		exit(1);
+	}
+
 }

@@ -21,6 +21,11 @@ struct option uwsgi_python_options[] = {
 	{"pythonpath", required_argument, 0, LONG_ARGS_PYTHONPATH},
 	{"python-path", required_argument, 0, LONG_ARGS_PYTHONPATH},
 	{"pymodule-alias", required_argument, 0, LONG_ARGS_PYMODULE_ALIAS},
+	{"post-pymodule-alias", required_argument, 0, LONG_ARGS_POST_PYMODULE_ALIAS},
+	{"import", required_argument, 0, LONG_ARGS_PYIMPORT},
+	{"pyimport", required_argument, 0, LONG_ARGS_PYIMPORT},
+	{"py-import", required_argument, 0, LONG_ARGS_PYIMPORT},
+	{"python-import", required_argument, 0, LONG_ARGS_PYIMPORT},
 	{"pp", required_argument, 0, LONG_ARGS_PYTHONPATH},
 	{"pyargv", required_argument, 0, LONG_ARGS_PYARGV},
 	{"optimize", required_argument, 0, 'O'},
@@ -190,7 +195,7 @@ PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
 	char *real_filename = filename;
 
 
-	if (strncmp(filename, "http://", 7)) {
+	if (strncmp(filename, "http://", 7) && strncmp(filename, "sym://", 6)) {
 
 		pyfile = fopen(filename, "r");
 		if (!pyfile) {
@@ -496,6 +501,11 @@ void init_uwsgi_embedded_module() {
 		exit(1);
 	}
 
+	if (PyDict_SetItemString(up.embedded_dict, "has_threads", PyInt_FromLong(uwsgi.has_threads))) {
+		PyErr_Print();
+		exit(1);
+	}
+
 	if (PyDict_SetItemString(up.embedded_dict, "cores", PyInt_FromLong(uwsgi.cores))) {
 		PyErr_Print();
 		exit(1);
@@ -506,39 +516,6 @@ void init_uwsgi_embedded_module() {
 			PyErr_Print();
 			exit(1);
 		}
-	}
-
-	if (PyDict_SetItemString(up.embedded_dict, "KIND_NULL", PyInt_FromLong(KIND_NULL))) {
-		PyErr_Print();
-		exit(1);
-	}
-	if (PyDict_SetItemString(up.embedded_dict, "KIND_WORKER", PyInt_FromLong(KIND_WORKER))) {
-		PyErr_Print();
-		exit(1);
-	}
-	if (PyDict_SetItemString(up.embedded_dict, "KIND_EVENT", PyInt_FromLong(KIND_EVENT))) {
-		PyErr_Print();
-		exit(1);
-	}
-	if (PyDict_SetItemString(up.embedded_dict, "KIND_SPOOLER", PyInt_FromLong(KIND_SPOOLER))) {
-		PyErr_Print();
-		exit(1);
-	}
-
-/*
-	if (PyDict_SetItemString(up.embedded_dict, "KIND_ERLANG", PyInt_FromLong(KIND_ERLANG))) {
-		PyErr_Print();
-		exit(1);
-	}
-*/
-
-	if (PyDict_SetItemString(up.embedded_dict, "KIND_PROXY", PyInt_FromLong(KIND_PROXY))) {
-		PyErr_Print();
-		exit(1);
-	}
-	if (PyDict_SetItemString(up.embedded_dict, "KIND_MASTER", PyInt_FromLong(KIND_MASTER))) {
-		PyErr_Print();
-		exit(1);
 	}
 
 	PyObject *py_opt_dict = PyDict_New();
@@ -720,6 +697,12 @@ int uwsgi_python_manage_options(int i, char *optarg) {
 			uwsgi_log("you can specify at most %d --pymodule-alias options\n", MAX_PYMODULE_ALIAS);
 		}
 		return 1;
+	case LONG_ARGS_PYIMPORT:
+		uwsgi_string_new_list(&up.import_list, optarg);
+		return 1;
+	case LONG_ARGS_POST_PYMODULE_ALIAS:
+		uwsgi_string_new_list(&up.post_pymodule_alias, optarg);
+		return 1;
 	case LONG_ARGS_PYTHONPATH:
 		if (glob(optarg, GLOB_MARK, NULL, &g)) {
 			uwsgi_string_new_list(&up.python_path, optarg);
@@ -780,7 +763,37 @@ int uwsgi_python_mount_app(char *mountpoint, char *app) {
 
 }
 
+char *uwsgi_pythonize(char *orig) {
+
+	char *name = uwsgi_concat2(orig, "");
+	size_t i;
+	size_t len = 0;
+
+	if (!strncmp(name, "sym://", 6)) {
+		name+=6;
+	}
+	else if (!strncmp(name, "http://", 7)) {
+		name+=7;
+	}
+
+	len = strlen(name);
+	for(i=0;i<len;i++) {
+		if (name[i] == '/') {
+			name[i] = '.';
+		}
+	}
+
+
+	if ((name[len-3] == '.' || name[len-3] == '_') && name[len-2] == 'p' && name[len-1] == 'y') {
+		name[len-3] = 0;
+	}
+
+	return name;
+
+}
+
 void uwsgi_python_init_apps() {
+
 
 	if (uwsgi.async > 1) {
 		up.current_recursion_depth = uwsgi_malloc(sizeof(int)*uwsgi.async);
@@ -788,8 +801,15 @@ void uwsgi_python_init_apps() {
 	}
 
 	init_pyargv();
+
 #ifdef UWSGI_MINTERPRETERS
         init_uwsgi_embedded_module();
+#endif
+
+#ifdef __linux__
+#ifndef PYTHREE
+	uwsgi_init_symbol_import();
+#endif
 #endif
 
         if (up.test_module != NULL) {
@@ -812,6 +832,56 @@ void uwsgi_python_init_apps() {
         up.loaders[LOADER_MOUNT] = uwsgi_mount_loader;
         up.loaders[LOADER_CALLABLE] = uwsgi_callable_loader;
         up.loaders[LOADER_STRING_CALLABLE] = uwsgi_string_callable_loader;
+
+
+	struct uwsgi_string_list *upli = up.import_list;
+	while(upli) {
+		if (strchr(upli->value, '/') || uwsgi_endswith(upli->value, ".py")) {
+			uwsgi_pyimport_by_filename(uwsgi_pythonize(upli->value), upli->value);
+		}
+		else {
+			if (PyImport_ImportModule(upli->value) == NULL) {
+				PyErr_Print();
+			}
+		}
+		upli = upli->next;
+	}
+
+	struct uwsgi_string_list *uppa = up.post_pymodule_alias;
+	PyObject *modules = PyImport_GetModuleDict();
+	PyObject *tmp_module;
+	while(uppa) {
+                // split key=value
+                char *value = strchr(uppa->value, '=');
+                if (!value) {
+                        uwsgi_log("invalid pymodule-alias syntax\n");
+                        continue;
+                }
+                value[0] = 0;
+                if (!strchr(value + 1, '/')) {
+                        // this is a standard pymodule
+                        tmp_module = PyImport_ImportModule(value + 1);
+                        if (!tmp_module) {
+                                PyErr_Print();
+                                exit(1);
+                        }
+
+                        PyDict_SetItemString(modules, uppa->value, tmp_module);
+                }
+                else {
+                        // this is a filepath that need to be mapped
+                        tmp_module = uwsgi_pyimport_by_filename(uppa->value, value + 1);
+                        if (!tmp_module) {
+                                PyErr_Print();
+                                exit(1);
+                        }
+                }
+                uwsgi_log("mapped virtual pymodule \"%s\" to real pymodule \"%s\"\n", uppa->value, value + 1);
+                // reset original value
+                value[0] = '=';
+
+		uppa = uppa->next;
+        }
 
 
 	if (up.wsgi_config != NULL) {
@@ -1032,9 +1102,12 @@ void uwsgi_python_add_item(char *key, uint16_t keylen, char *val, uint16_t valle
 	PyDict_SetItem(pydict, PyString_FromStringAndSize(key, keylen), PyString_FromStringAndSize(val, vallen));
 }
 
-int uwsgi_python_spooler(char *buf, uint16_t len) {
+int uwsgi_python_spooler(char *filename, char *buf, uint16_t len, char *body, size_t body_len) {
 
 	static int random_seed_reset = 0;
+
+	UWSGI_GET_GIL;
+
 	PyObject *spool_dict = PyDict_New();
 	PyObject *spool_func, *pyargs, *ret;
 
@@ -1045,37 +1118,51 @@ int uwsgi_python_spooler(char *buf, uint16_t len) {
 
 	if (!up.embedded_dict) {
 		// ignore
+		UWSGI_RELEASE_GIL;
 		return 0;
 	}
 
 	spool_func = PyDict_GetItemString(up.embedded_dict, "spooler");
 	if (!spool_func) {
 		// ignore
+		UWSGI_RELEASE_GIL;
 		return 0;
 	}
 
 	if (uwsgi_hooked_parse(buf, len, uwsgi_python_add_item, spool_dict)) {
 		// malformed packet, destroy it
+		UWSGI_RELEASE_GIL;
 		return -2;
 	}
 
 	pyargs = PyTuple_New(1);
+
+	PyDict_SetItemString(spool_dict, "spooler_task_name", PyString_FromString(filename));
+
+	if (body && body_len > 0) {
+		PyDict_SetItemString(spool_dict, "body", PyString_FromStringAndSize(body, body_len));
+	}
 	PyTuple_SetItem(pyargs, 0, spool_dict);
 	
 	ret = python_call(spool_func, pyargs, 0);
 	if (ret) {
 		if (!PyInt_Check(ret)) {
 			// error, retry
+			UWSGI_RELEASE_GIL;
 			return -1;
 		}	
 
-		return PyInt_AsLong(ret);
+		int retval = (int) PyInt_AsLong(ret);
+		UWSGI_RELEASE_GIL;
+		return retval;
+		
 	}
 	
 	if (PyErr_Occurred())
 		PyErr_Print();
 
 	// error, retry
+	UWSGI_RELEASE_GIL;
 	return -1;
 }
 

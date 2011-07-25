@@ -67,6 +67,11 @@ char *ini_get_line(char *ini, off_t size) {
 		}
 	}
 
+	// check if it is a stupid file without \n at the end
+	if (ptr > ini) {
+		return ptr;
+	}
+
 	return NULL;
 
 }
@@ -102,7 +107,9 @@ void uwsgi_ini_config(char *file, char *magic_table[]) {
 		}
 	}
 
-	uwsgi_log("[uWSGI] getting INI configuration from %s\n", file);
+	if (file[0] != 0) {
+		uwsgi_log("[uWSGI] getting INI configuration from %s\n", file);
+	}
 
 	ini = uwsgi_open_and_read(file, &len, 1, magic_table);
 
@@ -142,6 +149,11 @@ void uwsgi_ini_config(char *file, char *magic_table[]) {
 		ini += (ini_line - ini);
 
 	}
+
+	if (colon) {
+		colon[0] = ':';
+	}
+
 
 }
 
