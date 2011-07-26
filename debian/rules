@@ -104,6 +104,8 @@ $(foreach PLUGIN_PKG_NAME, $(UWSGI_PLUGIN_PKGS_NAMES), $(eval \
 	DEB_DH_STRIP_ARGS_uwsgi-plugin-$(PLUGIN_PKG_NAME) := --dbg-package=uwsgi-dbg\
 ))
 
+DEB_INSTALL_DOCS_ALL += $(DEB_SRCDIR)/CONTRIBUTORS
+
 # Rules
 # =====
 
