@@ -4,4 +4,4 @@
 # and after variable expansion it turns into dh_python2/dh_python3.
 #
 # Bug http://bugs.debian.org/631662 has been filed.
-uwsgi source: dh_python-is-obsolete line 682
+uwsgi source: dh_python-is-obsolete line 685
