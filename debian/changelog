@@ -1,19 +1,26 @@
 uwsgi (0.9.8.3-1) unstable; urgency=low
 
   * New upstream version (0.9.8.3)
+  * Install file CONTRIBUTORS into docs of all the packages
   * uwsgi:
     - move files with supplementary functions of init.d script from
       /usr/lib/uwsgi/init to /usr/share/uwsgi/init
     - move inherited configuration file from /usr/lib/uwsgi/conf to
       /usr/share/uwsgi/conf
+  * uwsgi-core:
+    - add new WSGI examples
+  * uwsgi-plugin-luajit:
+    - build package for armel architecture
   * uwsgi-plugin-python:
     - add Suggests: python-uwsgidecorators
   * uwsgi-plugin-python3:
     - add Suggests: python3-uwsgidecorators
-  * uwsgi-plugin-luajit:
-    - build package for armel architecture
+  * python3-uwsgidecorators:
+    - extend package description with note about possible improper work of
+      uwsgidecorators module on Python 3;
+      see http://lists.unbit.it/pipermail/uwsgi/2011-July/002355.html
 
- -- Leonid Borisenko <leo.borisenko@gmail.com>  Tue, 26 Jul 2011 03:46:38 +0300
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Tue, 26 Jul 2011 18:45:32 +0300
 
 uwsgi (0.9.8.1-1) unstable; urgency=low
 
