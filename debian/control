@@ -580,6 +580,9 @@ Description: module of decorators for elegant access to uWSGI API (Python 3)
  .
  This package provides uwsgidecorators module, accessible from Python 3.X
  runtime.
+ .
+ uwsgidecorators module doesn't targeted at Python 3 officially, so some
+ decorators may not work or work improperly.
 
 Package: uwsgi-extra
 Architecture: any
