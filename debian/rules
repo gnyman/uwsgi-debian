@@ -680,3 +680,7 @@ binary-install/python-uwsgidecorators binary-install/python3-uwsgidecorators::
 	$(eval PYVER_MAJOR = $($(subst python,PYTHON,$(PYTHON_KIND))_MAJOR_VER))
 	dh_install -p $(cdbs_curpkg) uwsgidecorators.py $(PYPKG_DESTDIR)
 	dh_python$(PYVER_MAJOR) -p $(cdbs_curpkg)
+
+binary-install/python3-uwsgidecorators::
+	2to3 --write --nobackups --no-diffs \
+	  $(CURDIR)/debian/$(cdbs_curpkg)/$(PYTHON3_DIST_PACKAGES_DIR)/uwsgidecorators.py
