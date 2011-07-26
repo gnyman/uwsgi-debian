@@ -14,7 +14,7 @@ Build-Depends:
  libjansson-dev,
  libldap2-dev,
  liblua5.1-0-dev,
- libluajit-5.1-dev [i386 amd64 kfreebsd-i386],
+ libluajit-5.1-dev [i386 amd64 kfreebsd-i386 armel],
  libperl-dev,
  libsqlite3-dev,
  libxml2-dev,
@@ -328,7 +328,7 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.1)
  runtime).
 
 Package: uwsgi-plugin-luajit
-Architecture: i386 amd64 kfreebsd-i386
+Architecture: i386 amd64 kfreebsd-i386 armel
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: Lua WSAPI plugin for uWSGI (LuaJIT)
  uWSGI presents a complete stack for networked/clustered web applications,
