@@ -1,3 +1,15 @@
+uwsgi (0.9.8.3-2) UNRELEASED; urgency=low
+
+  * uwsgi:
+    - change location of runtime directory of uWSGI instance
+      from: /run/uwsgi/<confname>
+      to:   /run/uwsgi/app/<confname>
+    - change location of uWSGI instance logfile
+      from: /var/log/uwsgi/<confname>.log
+      to:   /var/log/uwsgi/app/<confname>.log
+
+ -- Leonid Borisenko <leo.borisenko@gmail.com>  Wed, 27 Jul 2011 17:58:43 +0300
+
 uwsgi (0.9.8.3-1) unstable; urgency=low
 
   * New upstream version (0.9.8.3)

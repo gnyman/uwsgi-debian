@@ -8,20 +8,23 @@
 #  2 if daemon could not be started
 do_start_specific_daemon()
 {
-  local CONFNAME="$@"
+  local RELATIVE_CONFPATH="$@"
 
-  local CONFFILE="$(path_to_conffile_with_name "$CONFNAME")"
+  local CONFFILE="$(absolute_path_to_conffile "$RELATIVE_CONFPATH")"
   if [ -z "$CONFFILE" ]; then
     return 2
   fi
 
-  local UWSGI_UID="$(extract_id uid "$CONFNAME")"
-  local UWSGI_GID="$(extract_id gid "$CONFNAME")"
+  local CONFNAMESPACE="$(extract_confnamespace "$RELATIVE_CONFPATH")"
+  local CONFNAME="$(extract_confname "$RELATIVE_CONFPATH")"
 
-  local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
-  local PIDFILE="$(find_specific_pidfile "$CONFNAME")"
+  local UWSGI_UID="$(extract_id uid "$RELATIVE_CONFPATH")"
+  local UWSGI_GID="$(extract_id gid "$RELATIVE_CONFPATH")"
 
-  install -d -o root -g root -m 755 "$UWSGI_RUNDIR"
+  local SPECIFIC_RUNDIR="$(find_specific_rundir "$RELATIVE_CONFPATH")"
+  local PIDFILE="$(find_specific_pidfile "$RELATIVE_CONFPATH")"
+
+  install -d -o root -g root -m 755 "${UWSGI_RUNDIR}/${CONFNAMESPACE}"
   install -d -o "$UWSGI_UID" -g "$UWSGI_GID" -m 755 "$SPECIFIC_RUNDIR"
 
   start-stop-daemon --start --quiet \
@@ -33,11 +36,17 @@ do_start_specific_daemon()
   local CONFTYPE="$(type_of_conffile "$CONFFILE")"
   local CONFFILE_OPTION_NAME="$(conffile_option_name "$CONFTYPE")"
 
+  # Value of an environment variable of form 'UWSGI_' is recognized by uWSGI as
+  # an option value and is available in configuration files.
+  #
+  # Value of (fake) option 'deb-confnamespace' is used in default inherited
+  # configuration file.
+  UWSGI_DEB_CONFNAMESPACE="$CONFNAMESPACE" \
   start-stop-daemon --start --quiet \
     --pidfile "$PIDFILE" \
     --exec "$DAEMON" \
       -- --"${CONFFILE_OPTION_NAME}" "${CONFFILE}" \
-         --daemonize "/var/log/uwsgi/${CONFNAME}.log" \
+         --daemonize "/var/log/uwsgi/${CONFNAMESPACE}/${CONFNAME}.log" \
          --inherit "$INHERITED_CONFIG" \
     > /dev/null \
       || return 2
@@ -60,9 +69,9 @@ do_start_specific_daemon()
 #  other if a failure occurred
 do_stop_specific_daemon()
 {
-  local CONFNAME="$@"
-  local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
-  local PIDFILE="$(find_specific_pidfile "$CONFNAME")"
+  local RELATIVE_CONFPATH="$@"
+  local SPECIFIC_RUNDIR="$(find_specific_rundir "$RELATIVE_CONFPATH")"
+  local PIDFILE="$(find_specific_pidfile "$RELATIVE_CONFPATH")"
 
   start-stop-daemon --stop --quiet \
     --retry=QUIT/30/KILL/5 \
@@ -82,8 +91,8 @@ do_stop_specific_daemon()
 #  3 if daemon could not be reloaded
 do_reload_specific_daemon()
 {
-  local CONFNAME="$@"
-  local PIDFILE="$(find_specific_pidfile "$CONFNAME")"
+  local RELATIVE_CONFPATH="$@"
+  local PIDFILE="$(find_specific_pidfile "$RELATIVE_CONFPATH")"
 
   start-stop-daemon --stop --quiet \
     --signal=HUP \
@@ -103,8 +112,8 @@ do_reload_specific_daemon()
 #  3 if daemon could not be reloaded
 do_force_reload_specific_daemon()
 {
-  local CONFNAME="$@"
-  local PIDFILE="$(find_specific_pidfile "$CONFNAME")"
+  local RELATIVE_CONFPATH="$@"
+  local PIDFILE="$(find_specific_pidfile "$RELATIVE_CONFPATH")"
 
   start-stop-daemon --stop --quiet \
     --signal=TERM \

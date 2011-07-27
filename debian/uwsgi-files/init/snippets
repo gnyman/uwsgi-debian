@@ -139,21 +139,70 @@ extract_id_from_conffile()
   echo "$ID"
 }
 
-# Given a configuration file name, look for it in uWSGI configuration
-# directory.
+# Given a configuration file name specification, look for it in uWSGI
+# configuraton directory.
 #
-# Echo full path to first found configuration file, which has given name and
-# extension from list of known extensions of configuration files.
-path_to_conffile_with_name()
+# Echo relative path to first found configuration file, which conforms to given
+# specification and has extension from list of known extensions of
+# configuration files. If no such file was found echo empty string.
+#
+# Configuration file specification may consist of:
+# * configuration namespace and configuration file name delimited by slash
+#   ('app/site')
+# * configuration file name (just 'site'). Then default configuration namespace
+#   will be used
+relative_path_to_conffile_with_spec()
 {
-  local CONFNAME="$@"
+  local CONFSPEC="$@"
+
+  local CONFNAMESPACE="$(dirname "$CONFSPEC")"
+  local CONFNAME="$(basename "$CONFSPEC")"
+
+  if [ "x${CONFNAMESPACE}" = "x." ]; then
+    CONFNAMESPACE="$UWSGI_DEFAULT_CONFNAMESPACE"
+  fi
+
+  local APPS_CONFDIR="${CONFNAMESPACE}${UWSGI_APPS_CONFDIR_SUFFIX}"
   local CONFFILE_PATH=""
 
   for CONFFILE_EXT in ${UWSGI_CONFFILE_TYPES}; do
     CONFFILE_PATH="$(
       find \
-        "${UWSGI_CONFDIR}" \
+        "${UWSGI_CONFDIR}/${APPS_CONFDIR}" \
          -name "${CONFNAME}.${CONFFILE_EXT}" -a -xtype f \
+      | head -1
+    )"
+    if [ -n "$CONFFILE_PATH" ]; then break; fi
+  done
+
+  if [ -n "$CONFFILE_PATH" ]; then
+    echo "${APPS_CONFDIR}/${CONFNAME}"
+  else
+    echo ""
+  fi
+}
+
+# Given a relative configuration file path, look for it in uWSGI configuration
+# directory.
+#
+# Relative path must consist of name of apps directory and name of
+# configuration file without extension. Example: 'apps-enabled/site'.
+#
+# Echo full path to first found configuration file, which located at given
+# apps directory (or it's subdirectory) and has extension from list of known
+# extensions of configuration files.
+absolute_path_to_conffile()
+{
+  local RELATIVE_CONFPATH="$@"
+  local APPS_CONFDIR="$(dirname "$RELATIVE_CONFPATH")"
+  local CONFFILE_NAME="$(basename "$RELATIVE_CONFPATH")"
+  local CONFFILE_PATH=""
+
+  for CONFFILE_EXT in ${UWSGI_CONFFILE_TYPES}; do
+    CONFFILE_PATH="$(
+      find \
+        "${UWSGI_CONFDIR}/${APPS_CONFDIR}" \
+         -name "${CONFFILE_NAME}.${CONFFILE_EXT}" -a -xtype f \
       | head -1
     )"
     if [ -n "$CONFFILE_PATH" ]; then break; fi
@@ -176,9 +225,9 @@ extract_id()
 {
   local ID_KIND="$1"
   shift
-  local CONFNAME="$@"
+  local RELATIVE_CONFPATH="$@"
 
-  local CONFFILE="$(path_to_conffile_with_name "$CONFNAME")"
+  local CONFFILE="$(absolute_path_to_conffile "$RELATIVE_CONFPATH")"
 
   local ID="$(extract_id_from_conffile "$ID_KIND" "$CONFFILE")"
   if [ -z "$ID" -a -e "$INHERITED_CONFIG" ]; then
@@ -192,18 +241,65 @@ extract_id()
   echo "$ID"
 }
 
+# Return configuration namespace extracted from relative path of configuration
+# file. Path should be relative to common uWSGI configuration directory.
+#
+# If common uWSGI configuration directory is '/etc/uwsgi' and caller is
+# interested in namespace of configuration file
+# '/etc/uwsgi/apps-enabled/site.ini', then 'apps-enabled/site' must be
+# provided as parameter to this function.
+#
+# Namespace is the name of first directory of relative path, but with stripped
+# suffix 's-enabled'.
+extract_confnamespace()
+{
+  local RELATIVE_CONFPATH="$@"
+
+  local CONFNAMESPACE="$(
+    echo "$RELATIVE_CONFPATH" \
+    | sed "s|^\([^/]\+\)${UWSGI_APPS_CONFDIR_SUFFIX}/.\+|\1|g"
+  )"
+
+  # If relative confpath didn't match to namespace pattern, then default
+  # namespace will be used.
+  if [ "x${CONFNAMESPACE}" = "x${RELATIVE_CONFPATH}" ]; then
+    echo "$UWSGI_DEFAULT_CONFNAMESPACE"
+  else
+    echo "$CONFNAMESPACE"
+  fi
+}
+
+# Return configuration file name extracted from relative path of configuration
+# file. Path should be relative to common uWSGI configuration directory.
+#
+# If common uWSGI configuration directory is '/etc/uwsgi' and caller is
+# interested in namespace of configuration file
+# '/etc/uwsgi/apps-enabled/site.ini', then 'apps-enabled/site' must be
+# provided as parameter to this function.
+extract_confname()
+{
+  local RELATIVE_CONFPATH="$@"
+  echo "$(basename "$RELATIVE_CONFPATH")"
+}
+
 # Location of /run subdirectory for specific uWSGI process.
 find_specific_rundir()
 {
-  local CONFNAME="$@"
-  echo "${UWSGI_RUNDIR}/${CONFNAME}"
+  local RELATIVE_CONFPATH="$@"
+
+  local CONFNAMESPACE="$(extract_confnamespace "$RELATIVE_CONFPATH")"
+  local CONFNAME="$(extract_confname "$RELATIVE_CONFPATH")"
+
+  echo "${UWSGI_RUNDIR}/${CONFNAMESPACE}/${CONFNAME}"
 }
 
 # Location of pidfile for specific uWSGI process.
 find_specific_pidfile()
 {
-  local CONFNAME="$@"
-  local SPECIFIC_RUNDIR="$(find_specific_rundir "$CONFNAME")"
+  local RELATIVE_CONFPATH="$@"
+
+  local SPECIFIC_RUNDIR="$(find_specific_rundir "$RELATIVE_CONFPATH")"
+
   echo "${SPECIFIC_RUNDIR}/pid"
 }
 

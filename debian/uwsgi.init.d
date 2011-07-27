@@ -17,8 +17,19 @@ NAME="uwsgi"
 DAEMON="/usr/bin/uwsgi"
 SCRIPTNAME="/etc/init.d/${NAME}"
 
-UWSGI_CONFDIR="/etc/uwsgi/apps-enabled"
+UWSGI_CONFDIR="/etc/uwsgi"
+UWSGI_APPS_CONFDIR_SUFFIX="s-enabled"
+UWSGI_APPS_CONFDIR_GLOB="${UWSGI_CONFDIR}/app${UWSGI_APPS_CONFDIR_SUFFIX}"
+
 UWSGI_RUNDIR="/run/uwsgi"
+
+# Configuration namespace is used as name of runtime and log subdirectory.
+# uWSGI instances sharing the same app configuration directory also shares
+# the same runtime and log subdirectory.
+#
+# When init.d script cannot detect namespace for configuration file, default
+# namespace will be used.
+UWSGI_DEFAULT_CONFNAMESPACE=app
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
