@@ -69,7 +69,10 @@ case "$WHAT" in
     if [ -z "$1" ]; then
       [ "$VERBOSE" != no ] && log_failure_msg "which one?"
     else
-      status_of_proc -p "$(find_specific_pidfile "$1")" "$DAEMON" "$NAME" \
+      PIDFILE="$(
+        find_specific_pidfile "$(relative_path_to_conffile_with_spec "$1")"
+      )"
+      status_of_proc -p "$PIDFILE" "$DAEMON" "$NAME" \
         && exit 0 \
         || exit $?
     fi
