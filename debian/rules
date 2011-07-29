@@ -628,11 +628,18 @@ binary-install/python-uwsgicc::
 	$(eval PYPKG_NAME := $(cdbs_curpkg:python-%=%))
 	$(eval PYPKG_DESTDIR := $(PYTHON_DIST_PACKAGES_DIR))
 
+	# Install:
+	# * Python code of uwsgicc into Python packages directory
+	# * assets of uwsgicc (images, JavaScript files, templates) into subdirectory
+	#   of /usr/share
 	dh_install -p $(cdbs_curpkg) -Xstatic -Xtemplates uwsgicc $(PYPKG_DESTDIR)
 	dh_install -p $(cdbs_curpkg) \
 		uwsgicc/templates uwsgicc/static \
 		usr/share/$(cdbs_curpkg)
 
+	# Replace installed jQuery files with symlinks to Debian packaged jQuery
+	# (embedding of JavaScript library should be avoided; see Debian Policy 4.13
+	# and description of Lintian tag embedded-javascript-library).
 	$(RM) $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(cdbs_curpkg)/static/js/jquery*.js
 	dh_link -p $(cdbs_curpkg) \
 		usr/share/javascript/jquery/jquery.min.js \
@@ -641,41 +648,16 @@ binary-install/python-uwsgicc::
 		usr/share/javascript/jquery-ui/jquery-ui.min.js \
 		usr/share/$(cdbs_curpkg)/static/js/jquery-ui.min.js
 
-# dh_python2 (as for 2011-05-26) fails at dealing with original symlinks in
-# dist-packages.
-#
-# See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=627969
-#
-# Instead of plain simple
-#
-#   dh_link -p ... \
-#     usr/share/python-uwsgicc/static \
-#     usr/lib/pythonX.Y/dist-packages/uwsgicc/static
-#   dh_python2 -p ...
-#
-# a workaround must be used
-#
-#   dh_link -p ... \
-#     /dev/null \
-#     usr/lib/pythonX.Y/dist-packages/uwsgicc/static
-#   dh_python2 -p ..
-#   dh_link -p ... \
-#     usr/share/python-uwsgicc/static \
-#     usr/share/pyshared/uwsgicc/static
-#
-# /dev/null is chose as pre-existed empty file.
-
-	dh_link -p $(cdbs_curpkg) /dev/null $(PYPKG_DESTDIR)/$(PYPKG_NAME)/static
-	dh_link -p $(cdbs_curpkg) /dev/null $(PYPKG_DESTDIR)/$(PYPKG_NAME)/templates
-
-	dh_python2 -p $(cdbs_curpkg)
-
+	# Provide to uwsgicc Python package access to it's assets by symlinking them
+	# into package directory.
 	dh_link -p $(cdbs_curpkg) \
 		usr/share/$(cdbs_curpkg)/static \
-		usr/share/pyshared/$(PYPKG_NAME)/static
+		$(PYPKG_DESTDIR)/$(PYPKG_NAME)/static
 	dh_link -p $(cdbs_curpkg) \
 		usr/share/$(cdbs_curpkg)/templates \
-		usr/share/pyshared/$(PYPKG_NAME)/templates
+		$(PYPKG_DESTDIR)/$(PYPKG_NAME)/templates
+
+	dh_python2 -p $(cdbs_curpkg)
 
 binary-install/python-uwsgidecorators binary-install/python3-uwsgidecorators::
 	$(eval PYTHON_KIND = $(firstword $(subst -, ,$(notdir $@))))
