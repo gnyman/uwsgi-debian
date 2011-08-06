@@ -62,9 +62,13 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGIN_PYTHON_PKG_KINDS) \
 	greenlet-python \
 	jvm-openjdk-6 jwsgi-openjdk-6 \
-	lua5.1 luajit \
+	lua5.1 \
 	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)) \
 	rack-ruby1.8 rack-ruby1.9.1 fiber
+
+ifneq (,$(findstring luajit,$(DEB_BUILD_OPTIONS)))
+PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS += luajit
+endif
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
