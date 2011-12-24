@@ -303,8 +303,8 @@ debian/stamp-plugin-jvm-openjdk-6 debian/stamp-plugin-jwsgi-openjdk-6:
 	))
 	$(eval PLUGIN_SRC_SUBDIR = $(firstword $(subst _, ,$(PLUGIN_NAME))))
 	$(eval JAVA_ARCH := $(shell /usr/share/javahelper/java-arch.sh))
-	UWSGICONFIG_JVM_INCPATH='/usr/lib/jvm/java-6-openjdk/include/ -I/usr/lib/jvm/java-6-openjdk/include/linux' \
-	UWSGICONFIG_JVM_LIBPATH='/usr/lib/jvm/java-6-openjdk/jre/lib/$(JAVA_ARCH)/server/' \
+	UWSGICONFIG_JVM_INCPATH='/usr/lib/jvm/java-6-openjdk-$(JAVA_ARCH)/include/ -I/usr/lib/jvm/java-6-openjdk-$(JAVA_ARCH)/include/linux' \
+	UWSGICONFIG_JVM_LIBPATH='/usr/lib/jvm/java-6-openjdk-$(JAVA_ARCH)/jre/lib/$(JAVA_ARCH)/server/' \
 	$(PYTHON) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_SRC_SUBDIR) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
