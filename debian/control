@@ -1,7 +1,7 @@
 Source: uwsgi
 Section: web
 Priority: extra
-Maintainer: Leonid Borisenko <leo.borisenko@gmail.com>
+Maintainer: Janos Guljas <janos@resenje.org>
 Build-Depends:
  cdbs,
  debhelper (>= 8),

@@ -13,8 +13,10 @@ uwsgi (0.9.8.3-2) UNRELEASED; urgency=low
   * uwsgi-plugin-jwsgi-openjdk-6:
     - Change UWSGICONFIG_JVM_INCPATH and UWSGICONFIG_JVM_LIBPATH.
       (Closes: #640347)
+  * Add myself as maintainer. Many thanks to Leonid Borisenko who did
+    a great job of packaging and maintaining this package.
 
- -- Janos Guljas <janos@resenje.org>  Sun, 25 Dec 2011 00:37:39 +0100
+ -- Janos Guljas <janos@resenje.org>  Sun, 25 Dec 2011 15:00:41 +0100
 
 uwsgi (0.9.8.3-1) unstable; urgency=low
 
