@@ -1,4 +1,4 @@
-uwsgi (0.9.8.3-2) UNRELEASED; urgency=low
+uwsgi (0.9.8.3-2) unstable; urgency=low
 
   [ Leonid Borisenko ]
   * uwsgi:
@@ -16,7 +16,7 @@ uwsgi (0.9.8.3-2) UNRELEASED; urgency=low
   * Add myself as maintainer. Many thanks to Leonid Borisenko who did
     a great job of packaging and maintaining this package.
 
- -- Janos Guljas <janos@resenje.org>  Sun, 25 Dec 2011 15:00:41 +0100
+ -- Janos Guljas <janos@resenje.org>  Mon, 26 Dec 2011 20:45:45 +0100
 
 uwsgi (0.9.8.3-1) unstable; urgency=low
 
