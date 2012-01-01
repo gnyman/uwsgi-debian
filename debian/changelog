@@ -26,10 +26,12 @@ uwsgi (0.9.8.3-2) unstable; urgency=low
   * uwsgi-plugin-jwsgi-openjdk-6:
     - Change UWSGICONFIG_JVM_INCPATH and UWSGICONFIG_JVM_LIBPATH.
       (Closes: #640347)
+    - update lintian-overrides binary-or-shlib-defines-rpath
+      for new paths
   * Add myself as maintainer. Many thanks to Leonid Borisenko who did
     a great job of packaging and maintaining this package.
 
- -- Janos Guljas <janos@resenje.org>  Mon, 26 Dec 2011 20:45:45 +0100
+ -- Janos Guljas <janos@resenje.org>  Sun, 01 Jan 2012 21:01:34 +0100
 
 uwsgi (0.9.8.3-1) unstable; urgency=low
 
