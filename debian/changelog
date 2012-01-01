@@ -6,8 +6,10 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
   * Adjust patch for uWSGI Control Center jQuery links in templates.
   * Remove '-fno-strict-aliasing' CFLAG patch as it is implemented upstream.
   * Remove fix indentation of uwsgidecorators_py patch as implemented upstream.
+  * Adjust init scripts to use top-bottom options order, as --inherit option
+    is not working as in earlier versions. 
 
- -- Janos Guljas <janos@resenje.org>  Fri, 30 Dec 2011 15:06:13 +0100
+ -- Janos Guljas <janos@resenje.org>  Sun, 01 Jan 2012 14:43:47 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 

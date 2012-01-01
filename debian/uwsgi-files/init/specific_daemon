@@ -36,18 +36,21 @@ do_start_specific_daemon()
   local CONFTYPE="$(type_of_conffile "$CONFFILE")"
   local CONFFILE_OPTION_NAME="$(conffile_option_name "$CONFTYPE")"
 
+  local INHERITED_TYPE="$(type_of_conffile "$INHERITED_CONFIG")"
+  local INHERITED_OPTION_NAME="$(conffile_option_name "$INHERITED_TYPE")"
+
   # Value of an environment variable of form 'UWSGI_' is recognized by uWSGI as
   # an option value and is available in configuration files.
   #
-  # Value of (fake) option 'deb-confnamespace' is used in default inherited
+  # Value of (fake) option 'deb-confnamespace' is used in INHERITED inherited
   # configuration file.
   UWSGI_DEB_CONFNAMESPACE="$CONFNAMESPACE" \
   start-stop-daemon --start --quiet \
     --pidfile "$PIDFILE" \
     --exec "$DAEMON" \
-      -- --"${CONFFILE_OPTION_NAME}" "${CONFFILE}" \
+      -- --"${INHERITED_OPTION_NAME}" "$INHERITED_CONFIG" \
+         --"${CONFFILE_OPTION_NAME}" "${CONFFILE}" \
          --daemonize "/var/log/uwsgi/${CONFNAMESPACE}/${CONFNAME}.log" \
-         --inherit "$INHERITED_CONFIG" \
     > /dev/null \
       || return 2
 
