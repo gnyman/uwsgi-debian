@@ -45,10 +45,11 @@ do_start_specific_daemon()
   # Value of (fake) option 'deb-confnamespace' is used in INHERITED inherited
   # configuration file.
   UWSGI_DEB_CONFNAMESPACE="$CONFNAMESPACE" \
+  UWSGI_DEB_CONFNAME="$CONFNAME" \
   start-stop-daemon --start --quiet \
     --pidfile "$PIDFILE" \
     --exec "$DAEMON" \
-      -- --"${INHERITED_OPTION_NAME}" "$INHERITED_CONFIG" \
+      -- --"${INHERITED_OPTION_NAME}" "${INHERITED_CONFIG}" \
          --"${CONFFILE_OPTION_NAME}" "${CONFFILE}" \
          --daemonize "/var/log/uwsgi/${CONFNAMESPACE}/${CONFNAME}.log" \
     > /dev/null \
