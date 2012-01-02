@@ -8,8 +8,9 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
   * Remove fix indentation of uwsgidecorators_py patch as implemented upstream.
   * Adjust init scripts to use top-bottom options order, as --inherit option
     is not working as in earlier versions. 
+  * Update debian/copyright file.
 
- -- Janos Guljas <janos@resenje.org>  Sun, 01 Jan 2012 14:43:47 +0100
+ -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 03:01:18 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
