@@ -7,5 +7,7 @@ version=3
 #
 # uversionmangle recipe was found at
 # http://lists.debian.org/debian-devel/2009/12/msg00503.html
-opts="uversionmangle=s/-([a-z]+\d+)$/~$1/" \
+# 
+# uversionmangle is changed as upstream broke the pattern
+opts="uversionmangle=s/-/~/" \
   http://projects.unbit.it/downloads/uwsgi-(\d.+)\.tar\.gz debian uupdate
