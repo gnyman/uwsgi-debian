@@ -11,12 +11,13 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
   * Update debian/copyright file.
   * python-uwsgidecorators:
     - fix binary-install rule to call dh_python2
+    - remove debian/source.lintian-overrides
   * Add LSB Description field to debian/uwsgi.init.d.
   * Set Architecture to "all" for binary package uwsgi-extra because
     it contains no architecture dependent files.
   * Change uwsgi description. (Closes: #640698)
 
- -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 03:26:25 +0100
+ -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 03:39:52 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
