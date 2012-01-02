@@ -136,6 +136,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-fastrouter (= ${binary:Version}),
  uwsgi-plugin-graylog2 (= ${binary:Version}),
  uwsgi-plugin-http (= ${binary:Version}),
+ uwsgi-plugin-logsocket (= ${binary:Version}),
  uwsgi-plugin-nagios (= ${binary:Version}),
  uwsgi-plugin-ping (= ${binary:Version}),
  uwsgi-plugin-rpc (= ${binary:Version})
@@ -339,6 +340,19 @@ Description: JWSGI plugin for uWSGI (OpenJDK 6)
  .
  This package provides JWSGI plugin for uWSGI (linked with OpenJDK Java 6
  runtime).
+
+Package: uwsgi-plugin-logsocket
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: logsocket plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides logsocket plugin for uWSGI.
+
 
 Package: uwsgi-plugin-lua5.1
 Architecture: any

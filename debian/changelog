@@ -19,8 +19,9 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
   * New binary packages:
     - uwsgi-plugin-carbon
     - uwsgi-plugin-graylog2
+    - uwsgi-plugon-logsocket
 
- -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 15:50:17 +0100
+ -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 16:05:07 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
