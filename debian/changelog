@@ -16,8 +16,10 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
   * Set Architecture to "all" for binary package uwsgi-extra because
     it contains no architecture dependent files.
   * Change uwsgi description. (Closes: #640698)
+  * New uwsgi-plugin packages:
+    - carbon
 
- -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 03:39:52 +0100
+ -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 15:18:38 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
