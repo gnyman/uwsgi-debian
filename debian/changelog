@@ -20,6 +20,8 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
     - uwsgi-plugin-carbon
     - uwsgi-plugin-graylog2
     - uwsgi-plugon-logsocket
+    - uwsgi-plugin-probeconnect
+    - uwsgi-plugin-probepg
     - uwsgi-plugin-rrdtool
     - uwsgi-plugin-rsyslog
     - uwsgi-plugin-signal
@@ -29,7 +31,7 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
     - fix FTBFS on armel and powerpc
   * Adjust debian/watch uversionmangle option.
 
- -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 19:17:20 +0100
+ -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 23:23:30 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 

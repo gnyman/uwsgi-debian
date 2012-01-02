@@ -16,6 +16,7 @@ Build-Depends:
  liblua5.1-0-dev,
  libluajit-5.1-dev [i386 amd64 kfreebsd-i386 armel],
  libperl-dev,
+ libpq-dev,
  libsqlite3-dev,
  libxml2-dev,
  libyaml-dev,
@@ -107,11 +108,16 @@ Architecture: any
 Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
+ uwsgi-plugin-carbon (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version})
    [amd64 i386 mips powerpc s390],
+ uwsgi-plugin-probeconnect (= ${binary:Version}),
+ uwsgi-plugin-probepg (= ${binary:Version}),
  uwsgi-plugin-pyerl-python (= ${binary:Version}),
  uwsgi-plugin-pyerl-python3 (= ${binary:Version}),
+ uwsgi-plugin-signal (= ${binary:Version}),
+ uwsgi-plugin-symcall (= ${binary:Version}),
  uwsgi-plugin-ugreen (= ${binary:Version})
 Description: all available plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
@@ -124,13 +130,13 @@ Description: all available plugins for uWSGI
    * infrastructure plugins (fastrouter, HTTP serving, RPC, etc.)
    * plugins for integration of uWSGI and application (CGI, PSGI, Rack, WSGI,
      etc.)
-   * fiber loop engine, greenlet (Python), pyerl (Python/Python 3), uGreen
+   * carbon, fiber loop engine, greenlet (Python), probeconnect, probepg,
+     pyerl (Python/Python 3), uGreen
 
 Package: uwsgi-infrastructure-plugins
 Architecture: any
 Depends: ${misc:Depends},
  uwsgi-plugin-admin (= ${binary:Version}),
- uwsgi-plugin-carbon (= ${binary:Version}),
  uwsgi-plugin-cache (= ${binary:Version}),
  uwsgi-plugin-echo (= ${binary:Version}),
  uwsgi-plugin-fastrouter (= ${binary:Version}),
@@ -142,8 +148,6 @@ Depends: ${misc:Depends},
  uwsgi-plugin-rpc (= ${binary:Version}),
  uwsgi-plugin-rrdtool (= ${binary:Version}),
  uwsgi-plugin-rsyslog (= ${binary:Version}),
- uwsgi-plugin-signal (= ${binary:Version}),
- uwsgi-plugin-symcall (= ${binary:Version}),
  uwsgi-plugin-syslog (= ${binary:Version})
 Description: infrastructure plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
@@ -153,7 +157,8 @@ Description: infrastructure plugins for uWSGI
  the same core.
  .
  This dependency package provides infrastructure plugins for uWSGI:
-   * admin, cache, echo, fastrouter, HTTP serving, Nagios, ping, RPC
+   * admin, cache, echo, fastrouter, graylog2, HTTP serving, logsocket, Nagios,
+     ping, RPC, RRDTool, rsyslog, syslog
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -407,6 +412,30 @@ Description: ping plugin for uWSGI
  the same core.
  .
  This package provides ping plugin for uWSGI.
+
+Package: uwsgi-plugin-probeconnect
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: probeconnect plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides probeconnect plugin for uWSGI.
+
+Package: uwsgi-plugin-probepg
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: probepg plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides probepg plugin for uWSGI.
 
 Package: uwsgi-plugin-psgi
 Architecture: any
