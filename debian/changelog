@@ -20,10 +20,15 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
     - uwsgi-plugin-carbon
     - uwsgi-plugin-graylog2
     - uwsgi-plugon-logsocket
+    - uwsgi-plugin-rrdtool
+    - uwsgi-plugin-rsyslog
+    - uwsgi-plugin-signal
+    - uwsgi-plugin-symcall
+    - uwsgi-plugin-syslog
   * uwsgi-plugin-jvm-openjdk-6:
     - fix FTBFS on armel and powerpc
 
- -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 18:33:16 +0100
+ -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 18:46:11 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
