@@ -9,8 +9,10 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
   * Adjust init scripts to use top-bottom options order, as --inherit option
     is not working as in earlier versions. 
   * Update debian/copyright file.
+  * python-uwsgidecorators:
+    - fix binary-install rule to call dh_python2
 
- -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 03:01:18 +0100
+ -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 03:06:05 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 

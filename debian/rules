@@ -662,9 +662,8 @@ binary-install/python-uwsgicc::
 binary-install/python-uwsgidecorators binary-install/python3-uwsgidecorators::
 	$(eval PYTHON_KIND = $(firstword $(subst -, ,$(notdir $@))))
 	$(eval PYPKG_DESTDIR = $($(subst python,PYTHON,$(PYTHON_KIND))_DIST_PACKAGES_DIR))
-	$(eval PYVER_MAJOR = $($(subst python,PYTHON,$(PYTHON_KIND))_MAJOR_VER))
 	dh_install -p $(cdbs_curpkg) uwsgidecorators.py $(PYPKG_DESTDIR)
-	dh_python$(PYVER_MAJOR) -p $(cdbs_curpkg)
+	dh_python2 -p $(cdbs_curpkg)
 
 binary-install/python3-uwsgidecorators::
 	2to3 --write --nobackups --no-diffs \
