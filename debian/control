@@ -585,7 +585,7 @@ Description: module of decorators for elegant access to uWSGI API (Python 3)
  decorators may not work or work improperly.
 
 Package: uwsgi-extra
-Architecture: any
+Architecture: all
 Depends: ${misc:Depends}
 Description: fast, self-healing application container server (extra files)
  uWSGI presents a complete stack for networked/clustered web applications,
