@@ -57,7 +57,7 @@ Description: fast, self-healing application container server
  different plugins can be used in order to add compatibility with tons of
  different technology on top of the same core.
  .
- This package installs uWSGI core binary and:
+ This package depends on uWSGI core binary and installs:
    * init.d script for running uWSGI daemon(s) with options defined in custom
      user-created configuration files
    * infrastructure for running daemons (like common locations of communication
