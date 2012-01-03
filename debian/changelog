@@ -1,7 +1,6 @@
 uwsgi (1.0.1-1) UNRELEASED; urgency=low
 
   * New upstream version.
-  * Imported Upstream version 1.0
   * Adjust rack plugin LD_RUN_PATH patch.
   * Adjust patch for uWSGI Control Center jQuery links in templates.
   * Remove '-fno-strict-aliasing' CFLAG patch as it is implemented upstream.
@@ -9,9 +8,6 @@ uwsgi (1.0.1-1) UNRELEASED; urgency=low
   * Adjust init scripts to use top-bottom options order, as --inherit option
     is not working as in earlier versions. 
   * Update debian/copyright file.
-  * python-uwsgidecorators:
-    - fix binary-install rule to call dh_python2
-    - remove debian/source.lintian-overrides
   * Add LSB Description field to debian/uwsgi.init.d.
   * Set Architecture to "all" for binary package uwsgi-extra because
     it contains no architecture dependent files.
@@ -27,6 +23,9 @@ uwsgi (1.0.1-1) UNRELEASED; urgency=low
     - uwsgi-plugin-signal
     - uwsgi-plugin-symcall
     - uwsgi-plugin-syslog
+  * python-uwsgidecorators:
+    - fix binary-install rule to call dh_python2
+    - remove debian/source.lintian-overrides
   * uwsgi-plugin-jvm-openjdk-6:
     - fix FTBFS on armel and powerpc
   * uwsgi-plugin-python:
@@ -34,7 +33,7 @@ uwsgi (1.0.1-1) UNRELEASED; urgency=low
       virtualenv with Python 2.6 in README.Debian (Closes: #654333)
   * Adjust debian/watch uversionmangle option.
 
- -- Janos Guljas <janos@resenje.org>  Tue, 03 Jan 2012 18:56:28 +0100
+ -- Janos Guljas <janos@resenje.org>  Tue, 03 Jan 2012 19:40:21 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
