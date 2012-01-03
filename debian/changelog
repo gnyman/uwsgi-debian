@@ -29,9 +29,12 @@ uwsgi (1.0-1) UNRELEASED; urgency=low
     - uwsgi-plugin-syslog
   * uwsgi-plugin-jvm-openjdk-6:
     - fix FTBFS on armel and powerpc
+  * uwsgi-plugin-python:
+    - document issue "ImportError: No module named site" when using
+      virtualenv with Python 2.6 in README.Debian (Closes: #654333)
   * Adjust debian/watch uversionmangle option.
 
- -- Janos Guljas <janos@resenje.org>  Mon, 02 Jan 2012 23:23:30 +0100
+ -- Janos Guljas <janos@resenje.org>  Tue, 03 Jan 2012 03:34:00 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
