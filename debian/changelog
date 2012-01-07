@@ -15,7 +15,7 @@ uwsgi (1.0.1-1) UNRELEASED; urgency=low
   * New binary packages:
     - uwsgi-plugin-carbon
     - uwsgi-plugin-graylog2
-    - uwsgi-plugon-logsocket
+    - uwsgi-plugin-logsocket
     - uwsgi-plugin-probeconnect
     - uwsgi-plugin-probepg
     - uwsgi-plugin-rrdtool
@@ -33,7 +33,7 @@ uwsgi (1.0.1-1) UNRELEASED; urgency=low
       virtualenv with Python 2.6 in README.Debian (Closes: #654333)
   * Adjust debian/watch uversionmangle option.
 
- -- Janos Guljas <janos@resenje.org>  Tue, 03 Jan 2012 19:40:21 +0100
+ -- Janos Guljas <janos@resenje.org>  Sat, 07 Jan 2012 23:06:11 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
