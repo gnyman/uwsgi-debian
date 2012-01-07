@@ -9,5 +9,5 @@ version=3
 # http://lists.debian.org/debian-devel/2009/12/msg00503.html
 # 
 # uversionmangle is changed as upstream broke the pattern
-opts="uversionmangle=s/-/~/" \
-  http://projects.unbit.it/downloads/uwsgi-(\d.+)\.tar\.gz debian uupdate
+opts=dversionmangle=s/\+dfsg// \
+  http://projects.unbit.it/downloads/uwsgi-(\d[\d\.]+)\.tar\.gz debian uupdate
