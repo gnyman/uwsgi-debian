@@ -429,7 +429,7 @@ int http_parse(struct http_session *h_session) {
 	
 }
 
-void http_loop() {
+void http_loop(int id) {
 
 	int uhttp_queue;
 	int uhttp_subserver = -1;
@@ -888,7 +888,12 @@ int http_init() {
 			uwsgi_new_socket(uwsgi_concat2("127.0.0.1:0", ""));
 		}
 
-		uhttp.server = bind_to_tcp(uhttp.socket_name, uwsgi.listen_queue, strchr(uhttp.socket_name,':'));
+		char *port = strchr(uhttp.socket_name,':');
+		if (!port) {
+			uwsgi_log("invalid HTTP ip:port syntax\n");
+			exit(1);
+		}
+		uhttp.server = bind_to_tcp(uhttp.socket_name, uwsgi.listen_queue, port);
 
 		if (register_gateway("uWSGI http", http_loop) == NULL) {
 			uwsgi_log("unable to register the http gateway\n");
