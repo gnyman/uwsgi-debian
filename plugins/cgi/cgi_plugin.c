@@ -223,6 +223,7 @@ int uwsgi_cgi_parse(struct wsgi_request *wsgi_req, char *buf, size_t len) {
 		if (buf[i] == '\n') {
 			// end of headers
 			if (key == NULL) {
+				i++;
 				goto send_body;
 			}
 			// invalid header
@@ -365,8 +366,9 @@ char *uwsgi_cgi_get_docroot(char *path_info, uint16_t path_info_len, int *need_f
 	}
 
 	if (choosen_udd->status == 0) {
-		char *tmp_udd = realpath(path, NULL);
-		if (!tmp_udd) {
+		char *tmp_udd = uwsgi_malloc(PATH_MAX+1);
+		if (!realpath(path, tmp_udd)) {
+			free(tmp_udd);
 			return NULL;
 		}
 
@@ -449,10 +451,12 @@ int uwsgi_cgi_request(struct wsgi_request *wsgi_req) {
 	int i;
 	pid_t cgi_pid;
 	int waitpid_status;
-	char *argv[3];
+	char **argv;
+	int nargs = 0;
 	char full_path[PATH_MAX];
 	char tmp_path[PATH_MAX];
 	int cgi_pipe[2];
+	int post_pipe[2];
 	ssize_t len;
 	struct stat cgi_stat;
 	int need_free = 0;
@@ -548,6 +552,7 @@ int uwsgi_cgi_request(struct wsgi_request *wsgi_req) {
 				// add + 1 to ensure null byte
 				memcpy(full_path+full_path_len, ci->value, ci->len + 1);
 				if (!access(full_path, R_OK)) {
+					
 					found = 1;
 					break;
 				}
@@ -563,9 +568,8 @@ int uwsgi_cgi_request(struct wsgi_request *wsgi_req) {
 		}
 
 	}
-	else {
-		full_path_len = strlen(full_path);
-	}
+
+	full_path_len = strlen(full_path);
 
 	int cgi_allowed = 1;
 	struct uwsgi_string_list *allowed = uc.allowed_ext;
@@ -612,13 +616,32 @@ int uwsgi_cgi_request(struct wsgi_request *wsgi_req) {
 		return UWSGI_OK;
 	}
 
+	int send_post_data = 0;
+	if (uwsgi.post_buffering > 0 && wsgi_req->post_cl && !wsgi_req->async_post) {
+		send_post_data = 1;
+		if (pipe(post_pipe)) {
+			if (need_free)
+				free(docroot);
+			close(cgi_pipe[0]);
+			close(cgi_pipe[1]);
+			uwsgi_error("pipe()");
+			return UWSGI_OK;
+		}
+	}
+
 	cgi_pid = fork();
 
 	if (cgi_pid < 0) {
 		uwsgi_error("fork()");
 		if (need_free)
 			free(docroot);
-		return -1;
+		close(cgi_pipe[0]);
+		close(cgi_pipe[1]);
+		if (send_post_data) {
+			close(post_pipe[0]);
+			close(post_pipe[1]);
+		}
+		return UWSGI_OK;
 	}
 
 	if (cgi_pid > 0) {
@@ -627,6 +650,16 @@ int uwsgi_cgi_request(struct wsgi_request *wsgi_req) {
 			free(docroot);
 
 		close(cgi_pipe[1]);
+
+		if (send_post_data) {
+			close(post_pipe[0]);
+			if (write(post_pipe[1], wsgi_req->post_buffering_buf, wsgi_req->post_cl) != (ssize_t) wsgi_req->post_cl) {
+				uwsgi_error("write()");
+				close(post_pipe[1]);
+				goto clear2;			
+			}
+			close(post_pipe[1]);
+		}
 		// wait for data
 		char *headers_buf = uwsgi_malloc(uc.buffer_size);
 		char *ptr = headers_buf;
@@ -688,6 +721,7 @@ int uwsgi_cgi_request(struct wsgi_request *wsgi_req) {
 
 clear:
 		free(headers_buf);
+clear2:
 		close(cgi_pipe[0]);
 
 		// now wait for process exit/death
@@ -701,13 +735,35 @@ clear:
 	// close all the fd except wsgi_req->poll.fd and 2;
 
 	for(i=0;i< (int)uwsgi.max_fd;i++) {
+		if (send_post_data) {
+			if (post_pipe[0] == i) {
+				continue;
+			}
+		}
+		if (wsgi_req->async_post) {
+			if (fileno(wsgi_req->async_post) == i) {
+				continue;
+			}
+		}
 		if (i != wsgi_req->poll.fd && i != 2 && i != cgi_pipe[1]) {
 			close(i);
 		}
 	}
 
-	// now map wsgi_req->poll.fd to 0 & cgi_pipe[1] to 1
-	if (wsgi_req->poll.fd != 0) {
+	// now map wsgi_req->poll.fd (or async_post) to 0 & cgi_pipe[1] to 1
+	if (send_post_data) {
+		if (post_pipe[0] != 0) {
+			dup2(post_pipe[0], 0);
+			close(post_pipe[0]);
+		}
+	}
+	else if (wsgi_req->async_post) {
+		if (fileno(wsgi_req->async_post) != 0) {
+			dup2(fileno(wsgi_req->async_post), 0);
+			fclose(wsgi_req->async_post);
+		}
+	}
+	else if (wsgi_req->poll.fd != 0) {
 		dup2(wsgi_req->poll.fd, 0);
 		close(wsgi_req->poll.fd);
 	}
@@ -741,14 +797,21 @@ clear:
 		uwsgi_error("setenv()");
 	}
 
-	if (path_info && wsgi_req->path_info_len-discard_base > 0) {
-		if (setenv("PATH_INFO", uwsgi_concat2n(path_info, wsgi_req->path_info_len-discard_base, "", 0), 1)) {
+
+
+	if (path_info) {
+
+		size_t pi_len = wsgi_req->path_info_len - (path_info - wsgi_req->path_info);
+
+		if (setenv("PATH_INFO", uwsgi_concat2n(path_info, pi_len, "", 0), 1)) {
 			uwsgi_error("setenv()");
 		}
 
-		if (setenv("PATH_TRANSLATED", uwsgi_concat4n(docroot, docroot_len, "/", 1, path_info, wsgi_req->path_info_len-discard_base, "", 0) , 1)) {
+		
+		if (setenv("PATH_TRANSLATED", uwsgi_concat3n(docroot, docroot_len, path_info, pi_len, "", 0) , 1)) {
 			uwsgi_error("setenv()");
 		}
+
 	}
 	else {
 		unsetenv("PATH_INFO");
@@ -779,7 +842,7 @@ clear:
 			uwsgi_error("setenv()");
 		}
 
-		if (setenv("SCRIPT_NAME", full_path+(docroot_len-discard_base), 1)) {
+		if (setenv("SCRIPT_NAME", uwsgi_concat2n(wsgi_req->path_info, discard_base, full_path+docroot_len, strlen(full_path+docroot_len)), 1)) {
 			uwsgi_error("setenv()");
 		}
 
@@ -805,6 +868,41 @@ clear:
 		drop_env = drop_env->next;
 	}
 
+	argv = uwsgi_malloc(sizeof(char *) * 3);
+
+	// check if we need to parse indexed QUERY_STRING
+	if (wsgi_req->query_string_len > 0) {
+		if (!memchr(wsgi_req->query_string, '=', wsgi_req->query_string_len)) {
+			nargs = 1;
+			for(i=0;i<wsgi_req->query_string_len;i++) {
+				if (wsgi_req->query_string[i] == '+')
+					nargs++;
+			}
+
+			
+			// reallocate argv and qs
+			argv = uwsgi_malloc(sizeof(char *) * (3+nargs));
+			char *qs = uwsgi_concat2n(wsgi_req->query_string, wsgi_req->query_string_len, "", 0);
+			// set the start position of args in argv
+			i = 1;
+			if (helper) i = 2;
+			char *p = strtok(qs, "+");
+			while(p) {
+				// create a copy for the url_decoded string
+				char *arg_copy = uwsgi_str(p);
+				uint16_t arg_copy_len = strlen(p);
+				http_url_decode(p, &arg_copy_len, arg_copy);
+				// and a final copy for shell escaped arg
+				argv[i] = uwsgi_malloc( (arg_copy_len * 2) +1);
+				escape_shell_arg(arg_copy, arg_copy_len, argv[i]);	
+				i++;
+				p = strtok(NULL, "+");
+			}	
+		}
+		else {
+		}
+	}
+
 	if (helper) {
 		if (!uwsgi_starts_with(helper, strlen(helper), "sym://", 6)) {
 			void (*cgi_func)(char *) = dlsym(RTLD_DEFAULT, helper+6);
@@ -818,11 +916,11 @@ clear:
 		}
 		argv[0] = helper;
 		argv[1] = command;
-		argv[2] = NULL;
+		argv[nargs+2] = NULL;
 	}
 	else {
 		argv[0] = command;
-		argv[1] = NULL;
+		argv[nargs+1] = NULL;
 	}
 
 	if (execvp(argv[0], argv)) {
