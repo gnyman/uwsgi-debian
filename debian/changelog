@@ -1,4 +1,4 @@
-uwsgi (1.0.2.1+dfsg-1) UNRELEASED; urgency=low
+uwsgi (1.0.3+dfsg-1) UNRELEASED; urgency=low
 
   * New upstream version.
   * Adjust rack plugin LD_RUN_PATH patch.
@@ -38,7 +38,7 @@ uwsgi (1.0.2.1+dfsg-1) UNRELEASED; urgency=low
     - append +dfsg to upstream version
     - update debian/watch with dversionmangle option
 
- -- Janos Guljas <janos@resenje.org>  Wed, 18 Jan 2012 15:10:07 +0100
+ -- Janos Guljas <janos@resenje.org>  Thu, 09 Feb 2012 23:22:50 +0100
 
 uwsgi (0.9.8.3-2) unstable; urgency=low
 
