@@ -325,6 +325,10 @@ int master_loop(char **argv, char **environ) {
 	}
 #endif
 
+	if (uwsgi.mules_cnt > 0) {
+		event_queue_add_fd_read(uwsgi.master_queue, uwsgi.shared->mule_signal_pipe[0]);
+	}
+
 	if (uwsgi.log_master) {
 		if (!uwsgi.threaded_logger) {
 #ifdef UWSGI_DEBUG
@@ -982,6 +986,8 @@ int master_loop(char **argv, char **environ) {
 							}
 							// reload me
 							else if (byte == 1) {
+								// disable lazy mode for emperor reload
+								uwsgi.lazy = 0;
 								grace_them_all(0);
 							}
 						}
@@ -1215,6 +1221,20 @@ int master_loop(char **argv, char **environ) {
 					}
 				}
 #endif
+
+				if (uwsgi.mules_cnt > 0 && interesting_fd == uwsgi.shared->mule_signal_pipe[0]) {
+					rlen = read(interesting_fd, &uwsgi_signal, 1);
+					if (rlen < 0) {
+						uwsgi_error("read()");
+					}
+					else if (rlen > 0) {
+						uwsgi_route_signal(uwsgi_signal);
+					}
+					else {
+						uwsgi_log_verbose("lost connection with mules\n");
+					}
+					goto health_cycle;
+				}
 
 
 			}
