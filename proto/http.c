@@ -40,8 +40,6 @@ static uint16_t http_add_uwsgi_header(struct wsgi_request *wsgi_req, char *hh, i
 		return 0;
 
 	if (uwsgi_strncmp("CONTENT_TYPE", 12, hh, keylen) && uwsgi_strncmp("CONTENT_LENGTH", 14, hh, keylen)) {
-		keylen += 5;
-		prefix = 1;
 		if (!uwsgi_strncmp("IF_MODIFIED_SINCE", 17, hh, keylen)) {
         		wsgi_req->if_modified_since = val;
                 	wsgi_req->if_modified_since_len = vallen;
@@ -56,6 +54,8 @@ static uint16_t http_add_uwsgi_header(struct wsgi_request *wsgi_req, char *hh, i
         		wsgi_req->host = val;
                 	wsgi_req->host_len = vallen;
         	}
+		keylen += 5;
+		prefix = 1;
 	}
 	else if (!uwsgi_strncmp("CONTENT_LENGTH", 14, hh, keylen)) {
 		wsgi_req->post_cl = uwsgi_str_num(val, vallen);

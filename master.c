@@ -1415,10 +1415,12 @@ int master_loop(char **argv, char **environ) {
 
 #endif
 						}
-						kill(uwsgi.workers[i].pid, SIGUSR2);
-						// allow SIGUSR2 to be delivered
-						sleep(1);
-						kill(uwsgi.workers[i].pid, SIGKILL);
+						if (uwsgi.workers[i].pid > 0) {
+							kill(uwsgi.workers[i].pid, SIGUSR2);
+							// allow SIGUSR2 to be delivered
+							sleep(1);
+							kill(uwsgi.workers[i].pid, SIGKILL);
+						}
 						// to avoid races
 						uwsgi.workers[i].harakiri = 0;
 					}
@@ -1689,6 +1691,7 @@ int master_loop(char **argv, char **environ) {
 			if (uwsgi.workers[uwsgi.mywid].cheaped == 1) {
 				uwsgi.workers[uwsgi.mywid].pid = 0;
 				uwsgi_log("uWSGI worker %d cheaped.\n", uwsgi.mywid);
+				uwsgi.workers[uwsgi.mywid].harakiri = 0;
 				continue;
 			}
 			gettimeofday(&last_respawn, NULL);
