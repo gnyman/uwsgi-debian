@@ -52,7 +52,7 @@ do_start_specific_daemon()
       -- --"${INHERITED_OPTION_NAME}" "${INHERITED_CONFIG}" \
          --"${CONFFILE_OPTION_NAME}" "${CONFFILE}" \
          --daemonize "/var/log/uwsgi/${CONFNAMESPACE}/${CONFNAME}.log" \
-    > /dev/null \
+    1> /dev/null 2>&1 \
       || return 2
 
   chown_and_chmod_pidfile "$PIDFILE"

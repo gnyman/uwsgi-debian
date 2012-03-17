@@ -334,8 +334,9 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
 	for PYTHON_VERSION in $(PYVERS); do \
 		$(PYTHON) $(UWSGI_BUILDER) \
-			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/python$${PYTHON_VERSION} \
-			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini; \
+			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/python \
+			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini\
+			         python$${PYTHON_VERSION}; \
 	done
 	sed -e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.dirs.in \

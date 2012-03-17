@@ -1,4 +1,4 @@
-Format: http://anonscm.debian.org/viewvc/dep/web/deps/dep5/index.html?revision=240
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: uWSGI
 Upstream-Contact: uWSGI developers and users list <uwsgi@lists.unbit.it>
                   Roberto De Ioris <roberto@unbit.it>

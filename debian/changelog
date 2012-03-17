@@ -1,8 +1,16 @@
-uwsgi (1.0.4+dfsg-1) unstable; urgency=low
+uwsgi (1.1+dfsg-1) unstable; urgency=low
 
   * New upstream release.
+  * debian/uwsgi-files/init/specific_daemon
+     - suppress stderr on do_start_specific_daemon()
+  * debian/rules
+     - adjust building python2x_plugin.so and python3x_plugin.so
+  * Add debian/patches/python-3.x-fix.patch to fix regression introduced
+    in 1.1 release.
+  * Update debian/copyright Format value. 
+  * Bump standards to 3.9.3.
 
- -- Janos Guljas <janos@resenje.org>  Fri, 17 Feb 2012 05:00:57 +0100
+ -- Janos Guljas <janos@resenje.org>  Sat, 17 Mar 2012 21:39:16 +0100
 
 uwsgi (1.0.3+dfsg-1) unstable; urgency=low
 
