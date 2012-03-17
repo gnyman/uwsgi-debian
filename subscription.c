@@ -99,7 +99,7 @@ struct uwsgi_subscribe_node *uwsgi_get_subscribe_node(struct uwsgi_subscribe_slo
 			// is the node alive ?
 			if (current - node->last_check > uwsgi.subscription_tolerance) {
 				if (node->death_mark == 0)
-					uwsgi_log("[uwsgi-subscription] %.*s => marking %.*s as failed (no announce received in %d seconds)\n", (int) keylen, key, (int) node->len, node->name, uwsgi.subscription_tolerance);
+					uwsgi_log("[uwsgi-subscription for pid %d] %.*s => marking %.*s as failed (no announce received in %d seconds)\n", (int) uwsgi.mypid, (int) keylen, key, (int) node->len, node->name, uwsgi.subscription_tolerance);
 				node->failcnt++;
 				node->death_mark = 1;
 			}
@@ -113,9 +113,20 @@ struct uwsgi_subscribe_node *uwsgi_get_subscribe_node(struct uwsgi_subscribe_slo
 				}
 				continue;
 			}
-			// only unmarked nodes can respond
-			if (node->death_mark == 0 && rr_pos == current_slot->rr) {
-				current_slot->rr++;
+
+			if (node->death_mark == 0 && rr_pos == current_slot->rr && node->wrr > 0) {
+				node->wrr--;
+				if (node->wrr == 0) {
+					current_slot->rr++;
+					// if this is the last node, recalculate wrr
+					if (node->next == NULL) {
+						struct uwsgi_subscribe_node *r_node = current_slot->nodes;
+						while(r_node) {
+							r_node->wrr = r_node->weight;
+							r_node = r_node->next;
+						}
+					}
+				}
 				node->reference++;
 				return node;
 			}
@@ -126,6 +137,12 @@ struct uwsgi_subscribe_node *uwsgi_get_subscribe_node(struct uwsgi_subscribe_slo
 		if (current_slot->nodes) {
 			if (current_slot->nodes->death_mark)
 				return NULL;
+			if (current_slot->nodes->wrr == 0) current_slot->nodes->wrr = current_slot->nodes->weight;
+			current_slot->nodes->wrr--;
+			if (current_slot->nodes->wrr > 0) {
+				// reset rr counter
+				current_slot->rr = 0;
+			}
 			current_slot->nodes->reference++;
 		}
 		return current_slot->nodes;
@@ -235,6 +252,8 @@ struct uwsgi_subscribe_node *uwsgi_add_subscribe_node(struct uwsgi_subscribe_slo
                                 node->last_check = time(NULL);
 				node->cores = usr->cores;
 				node->load = usr->load;
+				node->weight = usr->weight;
+				if (!node->weight) node->weight = 1;
                                 return node;
                         }
 			old_node = node;
@@ -252,6 +271,9 @@ struct uwsgi_subscribe_node *uwsgi_add_subscribe_node(struct uwsgi_subscribe_slo
 		node->failcnt = 0;
 		node->cores = usr->cores;
 		node->load = usr->load;
+		node->weight = usr->weight;
+		if (!node->weight) node->weight = 1;
+		node->wrr = node->weight;
 		node->last_check = time(NULL);
 		node->slot = current_slot;
                 memcpy(node->name, usr->address, usr->address_len);
@@ -259,7 +281,7 @@ struct uwsgi_subscribe_node *uwsgi_add_subscribe_node(struct uwsgi_subscribe_slo
 			old_node->next = node;
 		}
 		node->next = NULL;
-                uwsgi_log("[uwsgi-subscription] %.*s => new node: %.*s\n", usr->keylen, usr->key, usr->address_len, usr->address);
+                uwsgi_log("[uwsgi-subscription for pid %d] %.*s => new node: %.*s\n",(int) uwsgi.mypid, usr->keylen, usr->key, usr->address_len, usr->address);
                 return node;
         }
         else {
@@ -294,6 +316,9 @@ struct uwsgi_subscribe_node *uwsgi_add_subscribe_node(struct uwsgi_subscribe_slo
 		current_slot->nodes->modifier2 = usr->modifier2;
 		current_slot->nodes->cores = usr->cores;
 		current_slot->nodes->load = usr->load;
+		current_slot->nodes->weight = usr->weight;
+		if (!current_slot->nodes->weight) current_slot->nodes->weight = 1;
+		current_slot->nodes->wrr = current_slot->nodes->weight;
 		memcpy(current_slot->nodes->name, usr->address, usr->address_len);
 		current_slot->nodes->last_check = time(NULL);
 
@@ -361,8 +386,8 @@ struct uwsgi_subscribe_node *uwsgi_add_subscribe_node(struct uwsgi_subscribe_slo
 			*slot = current_slot;
 		}
 
-		uwsgi_log("[uwsgi-subscription] new pool: %.*s\n", usr->keylen, usr->key);
-		uwsgi_log("[uwsgi-subscription] %.*s => new node: %.*s\n", usr->keylen, usr->key, usr->address_len, usr->address);
+		uwsgi_log("[uwsgi-subscription for pid %d] new pool: %.*s\n",(int) uwsgi.mypid, usr->keylen, usr->key);
+		uwsgi_log("[uwsgi-subscription for pid %d] %.*s => new node: %.*s\n",(int) uwsgi.mypid, usr->keylen, usr->key, usr->address_len, usr->address);
                 return current_slot->nodes;
         }
 
@@ -373,17 +398,30 @@ void uwsgi_send_subscription(char *udp_address, char *key, size_t keysize, uint8
 
 	char value_cores[sizeof(UMAX64_STR)+1];
 	char value_load[sizeof(UMAX64_STR)+1];
-	char value_modifier1[4];
-	char value_modifier2[4];
+	char value_weight[sizeof(UMAX64_STR)+1];
+
+
 	int value_cores_size = uwsgi_long2str2n(uwsgi.numproc*uwsgi.cores, value_cores, sizeof(UMAX64_STR));
 	int value_load_size = uwsgi_long2str2n(uwsgi.shared->load, value_load, sizeof(UMAX64_STR));
+
+	int value_weight_size = 0;
+	
+	if (uwsgi.auto_weight) {
+		value_weight_size = uwsgi_long2str2n(uwsgi.numproc*uwsgi.cores, value_weight, sizeof(UMAX64_STR));
+	}
+	else {
+		value_weight_size = uwsgi_long2str2n(uwsgi.weight, value_weight, sizeof(UMAX64_STR));
+	}
+
+	char value_modifier1[4];
+	char value_modifier2[4];
 	int value_modifier1_size = uwsgi_long2str2n(modifier1, value_modifier1, 3);
 	int value_modifier2_size = uwsgi_long2str2n(modifier2, value_modifier2, 3);
 
 	if (!uwsgi.sockets) return;
 
 	size_t ssb_size = 4 + (2 + 3) + (2 + keysize) + (2 + 7) + (2 + strlen(uwsgi.sockets->name)) + (2+9 + 2+value_modifier1_size) +
-		(2+9 + 2+value_modifier2_size) + (2+5 + 2+value_cores_size) + (2+4 + 2+value_load_size);
+		(2+9 + 2+value_modifier2_size) + (2+5 + 2+value_cores_size) + (2+4 + 2+value_load_size) + (2+5 + 2+value_weight_size);
 
         char *subscrbuf = uwsgi_malloc(ssb_size);
 	// leave space for uwsgi header
@@ -465,6 +503,19 @@ void uwsgi_send_subscription(char *udp_address, char *key, size_t keysize, uint8
         *ssb++ = (uint8_t) (ustrlen  & 0xff);
         *ssb++ = (uint8_t) ((ustrlen >>8) & 0xff);
         memcpy(ssb, value_load, value_load_size);
+        ssb+=ustrlen;
+
+	// weight
+        ustrlen = 5;
+        *ssb++ = (uint8_t) (ustrlen  & 0xff);
+        *ssb++ = (uint8_t) ((ustrlen >>8) & 0xff);
+        memcpy(ssb, "weight", ustrlen);
+        ssb+=ustrlen;
+
+        ustrlen = value_weight_size;
+        *ssb++ = (uint8_t) (ustrlen  & 0xff);
+        *ssb++ = (uint8_t) ((ustrlen >>8) & 0xff);
+        memcpy(ssb, value_weight, value_weight_size);
         ssb+=ustrlen;
 	
 

@@ -44,6 +44,10 @@ static uint16_t http_add_uwsgi_header(struct wsgi_request *wsgi_req, char *hh, i
         		wsgi_req->if_modified_since = val;
                 	wsgi_req->if_modified_since_len = vallen;
         	}
+		else if (!uwsgi_strncmp("AUTHORIZATION", 13, hh, keylen)) {
+        		wsgi_req->authorization = val;
+                	wsgi_req->authorization_len = vallen;
+		}
 		else if (!uwsgi_strncmp("X_FORWARDED_SSL", 15, hh, keylen)) {
 			if (vallen == 2 && val[0] == 'o' && val[1] == 'n') {
 				wsgi_req->scheme = "https";
@@ -59,6 +63,10 @@ static uint16_t http_add_uwsgi_header(struct wsgi_request *wsgi_req, char *hh, i
 	}
 	else if (!uwsgi_strncmp("CONTENT_LENGTH", 14, hh, keylen)) {
 		wsgi_req->post_cl = uwsgi_str_num(val, vallen);
+	}
+	else if (!uwsgi_strncmp("CONTENT_TYPE", 12, hh, keylen)) {
+		wsgi_req->content_type = val;
+		wsgi_req->content_type_len = vallen;
 	}
 
 	if (buffer + keylen + vallen + 2 + 2 >= watermark) {

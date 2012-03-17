@@ -4,20 +4,27 @@ extern struct uwsgi_server uwsgi;
 
 struct uwsgi_rack ur;
 
-struct option uwsgi_rack_options[] = {
+struct uwsgi_option uwsgi_rack_options[] = {
 
-        {"rails", required_argument, 0, LONG_ARGS_RAILS},
-        {"rack", required_argument, 0, LONG_ARGS_RACK},
-        {"ruby-gc-freq", required_argument, 0, LONG_ARGS_RUBY_GC_FREQ},
-        {"rb-gc-freq", required_argument, 0, LONG_ARGS_RUBY_GC_FREQ},
-        {"rb-require", required_argument, 0, LONG_ARGS_RUBY_REQUIRE},
-        {"ruby-require", required_argument, 0, LONG_ARGS_RUBY_REQUIRE},
-        {"rbrequire", required_argument, 0, LONG_ARGS_RUBY_REQUIRE},
-        {"rubyrequire", required_argument, 0, LONG_ARGS_RUBY_REQUIRE},
-        {"require", required_argument, 0, LONG_ARGS_RUBY_REQUIRE},
-        {"rbshell", optional_argument, 0, LONG_ARGS_RUBY_SHELL},
+        {"rails", required_argument, 0, "load a rails <= 2.x app", uwsgi_opt_set_str, &ur.rails, UWSGI_OPT_POST_BUFFERING},
+        {"rack", required_argument, 0, "load a rack app", uwsgi_opt_set_str, &ur.rack, UWSGI_OPT_POST_BUFFERING},
+        {"ruby-gc-freq", required_argument, 0, "set ruby GC frequency", uwsgi_opt_set_int, &ur.gc_freq, 0},
+        {"rb-gc-freq", required_argument, 0, "set ruby GC frequency", uwsgi_opt_set_int, &ur.gc_freq, 0},
 
-        {0, 0, 0, 0},
+        {"rb-require", required_argument, 0, "import/require a ruby module/script", uwsgi_opt_add_string_list, &ur.rbrequire, 0},
+        {"ruby-require", required_argument, 0, "import/require a ruby module/script", uwsgi_opt_add_string_list, &ur.rbrequire, 0},
+        {"rbrequire", required_argument, 0, "import/require a ruby module/script", uwsgi_opt_add_string_list, &ur.rbrequire, 0},
+        {"rubyrequire", required_argument, 0, "import/require a ruby module/script", uwsgi_opt_add_string_list, &ur.rbrequire, 0},
+        {"require", required_argument, 0, "import/require a ruby module/script", uwsgi_opt_add_string_list, &ur.rbrequire, 0},
+
+        {"gemset", required_argument, 0, "load the specified gemset (rvm)", uwsgi_opt_set_str, &ur.gemset, 0},
+        {"rvm", required_argument, 0, "load the specified gemset (rvm)", uwsgi_opt_set_str, &ur.gemset, 0},
+
+        {"rvm-path", required_argument, 0, "search for rvm in the specifiied directory", uwsgi_opt_add_string_list, &ur.rvm_path, 0},
+
+        {"rbshell", optional_argument, 0, "run  a ruby/irb shell", uwsgi_opt_true, &ur.rb_shell, 0},
+
+        {0, 0, 0, 0, 0, 0 ,0},
 
 };
 
@@ -62,27 +69,26 @@ VALUE rb_uwsgi_io_init(int argc, VALUE *argv, VALUE self) {
 VALUE rb_uwsgi_io_gets(VALUE obj, VALUE args) {
 
 	size_t i;
-        struct wsgi_request *wsgi_req;
-        VALUE line;
-        Data_Get_Struct(obj, struct wsgi_request, wsgi_req);
+	struct wsgi_request *wsgi_req;
+	VALUE line;
+	Data_Get_Struct(obj, struct wsgi_request, wsgi_req);
 
-        // return a line of body
-        for(i=wsgi_req->buf_pos;i<wsgi_req->post_cl;i++) {
-                if (wsgi_req->post_buffering_buf[i] == '\n') {
-                        line = rb_str_new(wsgi_req->post_buffering_buf+wsgi_req->buf_pos, (i+1)-wsgi_req->buf_pos);
-                        wsgi_req->buf_pos = i+1;
-                        return line;
-                }
-        }
+	// return a line of body
+	for(i=wsgi_req->buf_pos;i<wsgi_req->post_cl;i++) {
+		if (wsgi_req->post_buffering_buf[i] == '\n') {
+			line = rb_str_new(wsgi_req->post_buffering_buf+wsgi_req->buf_pos, (i+1)-wsgi_req->buf_pos);
+			wsgi_req->buf_pos = i+1;
+			return line;
+		}
+	}
 
-        if (wsgi_req->buf_pos < wsgi_req->post_cl) {
-                line = rb_str_new(wsgi_req->post_buffering_buf+wsgi_req->buf_pos, wsgi_req->post_cl-wsgi_req->buf_pos);
+	if (wsgi_req->buf_pos < wsgi_req->post_cl) {
+		line = rb_str_new(wsgi_req->post_buffering_buf+wsgi_req->buf_pos, wsgi_req->post_cl-wsgi_req->buf_pos);
                 wsgi_req->buf_pos = wsgi_req->post_cl;
                 return line;
-        }
-
-        return Qnil;
-
+	}
+	
+	return Qnil;
 }
 
 VALUE rb_uwsgi_io_each(VALUE obj, VALUE args) {
@@ -214,6 +220,99 @@ uint16_t uwsgi_ruby_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[],
 
 }
 
+void uwsgi_ruby_gem_set_apply(char *gemset) {
+
+	int in_pipe[2];
+	int out_pipe[2];
+	int size;
+	int waitpid_status;
+	int i;
+
+        if (pipe(in_pipe)) {
+        	uwsgi_error("pipe()");
+                exit(1);
+        }
+
+        if (pipe(out_pipe)) {
+        	uwsgi_error("pipe()");
+                exit(1);
+        }
+
+        pid_t pid = uwsgi_run_command("bash", in_pipe, out_pipe[1] );
+
+	char *gemset_code = uwsgi_open_and_read(gemset, &size, 0, NULL);
+
+	if (write(in_pipe[1], gemset_code, size) != size ) {
+		uwsgi_error("write()");
+	}
+
+	free(gemset_code);
+
+	if (write(in_pipe[1], "printenv\n", 9) != 9 ) {
+		uwsgi_error("write()");
+	}
+
+        close(in_pipe[1]);
+
+	size = 0;
+        char *buffer = uwsgi_read_fd(out_pipe[0], &size, 0);
+
+        close(out_pipe[0]);
+
+	char *ptr = buffer;
+
+	for(i=0;i<size;i++) {
+		if (buffer[i] == '\n') {
+			buffer[i] = 0;
+			if (putenv(ptr)) {
+				uwsgi_error("putenv()");
+			}
+			ptr = buffer + i + 1;
+		}
+	}
+
+	free(buffer);
+
+	if (waitpid(pid, &waitpid_status, 0) <0) {
+		uwsgi_error("waitpid()");
+	}
+}
+
+void uwsgi_ruby_gemset(char *gemset) {
+
+	char *home = getenv("HOME");
+
+	if (home) {
+		char *filename = uwsgi_concat3(home, "/.rvm/environments/", gemset);
+		if (uwsgi_file_exists(filename)) {
+			uwsgi_ruby_gem_set_apply(filename);
+			free(filename);
+			return;
+		}
+		free(filename);
+	}
+
+	char *filename = uwsgi_concat2("/usr/local/rvm/environments/", gemset);
+	if (uwsgi_file_exists(filename)) {
+		uwsgi_ruby_gem_set_apply(filename);
+                free(filename);
+                return;
+        }
+        free(filename);
+
+	struct uwsgi_string_list *rvm_paths = ur.rvm_path;
+	while(rvm_paths) {
+		char *filename = uwsgi_concat3(rvm_paths->value, "/environments/", gemset);
+                if (uwsgi_file_exists(filename)) {
+			uwsgi_ruby_gem_set_apply(filename);
+                        free(filename);
+                        return;
+                }
+                free(filename);
+		rvm_paths = rvm_paths->next;
+	}
+	
+}
 
 int uwsgi_rack_init(){
 
@@ -229,6 +328,10 @@ int uwsgi_rack_init(){
         for (http_sc = hsc; http_sc->message != NULL; http_sc++) {
                 http_sc->message_size = (int) strlen(http_sc->message);
         }
+
+	if (ur.gemset) {
+		uwsgi_ruby_gemset(ur.gemset);
+	}
 
 #ifdef RUBY19
 	ruby_sysinit(&argc, &argv);
@@ -248,6 +351,7 @@ int uwsgi_rack_init(){
 	rb_gc_register_address(&ur.signals_protector);
 	rb_gc_register_address(&ur.rpc_protector);
 
+
 #ifdef UWSGI_EMBEDDED
 	uwsgi_rack_init_api();	
 #endif
@@ -264,6 +368,8 @@ void uwsgi_rack_init_apps(void) {
 	int error;
 	ur.app_id = uwsgi_apps_cnt;
 	struct uwsgi_string_list *usl = ur.rbrequire;
+
+	time_t now = uwsgi_now();
 
 	while(usl) {
 		error = 0;
@@ -379,12 +485,17 @@ ready:
 	rb_define_method(ur.rb_uwsgi_io_class, "read", rb_uwsgi_io_read, -2);
 	rb_define_method(ur.rb_uwsgi_io_class, "rewind", rb_uwsgi_io_rewind, 0);
 
-	uwsgi_add_app(ur.app_id, 7, (char*)"", 0);
+	struct uwsgi_app *ua = uwsgi_add_app(ur.app_id, 7, (char*)"", 0, NULL, NULL);
+	ua->started_at = now;
+	ua->startup_time = uwsgi_now() - now;
+
+	uwsgi_emulate_cow_for_apps(ur.app_id);
+	
 	if (ur.gc_freq <= 1) {
-        	uwsgi_log("RACK app %d loaded at %p (GC frequency: AGGRESSIVE)\n", ur.app_id, ur.call);
+        	uwsgi_log("RACK app %d loaded in %d seconds at %p (GC frequency: AGGRESSIVE)\n", ur.app_id, (int) ua->startup_time, ur.call);
 	}
 	else {
-        	uwsgi_log("RACK app %d loaded at %p (GC frequency: %d)\n", ur.app_id, ur.call, ur.gc_freq);
+        	uwsgi_log("RACK app %d loaded in %d seconds at %p (GC frequency: %d)\n", ur.app_id, (int) ua->startup_time, ur.call, ur.gc_freq);
 	}
 
 }
@@ -435,9 +546,7 @@ VALUE send_header(VALUE obj, VALUE headers) {
 
 	struct wsgi_request *wsgi_req = current_wsgi_req();
 
-	size_t len;
 	VALUE hkey, hval;
-
 	
 	//uwsgi_log("HEADERS %d\n", TYPE(obj));
 	if (TYPE(obj) == T_ARRAY) {
@@ -470,18 +579,16 @@ VALUE send_header(VALUE obj, VALUE headers) {
 	size_t header_value_len = RSTRING_LEN(hval);
 	size_t i,cnt=0;
 	char *this_header = header_value;
+	struct iovec iov[4];
 
 	for(i=0;i<header_value_len;i++) {
 		// multiline header, send it !!!
 		if (header_value[i] == '\n') {
-			len = wsgi_req->socket->proto_write_header( wsgi_req, RSTRING_PTR(hkey), RSTRING_LEN(hkey));
-			wsgi_req->headers_size += len;
-                        len = wsgi_req->socket->proto_write_header( wsgi_req, (char *)": ", 2);
-                        wsgi_req->headers_size += len;
-			len = wsgi_req->socket->proto_write_header( wsgi_req, this_header, cnt);
-			wsgi_req->headers_size += len;
-			len = wsgi_req->socket->proto_write_header( wsgi_req, (char *)"\r\n", 2);
-                	wsgi_req->headers_size += len;
+			iov[0].iov_base = RSTRING_PTR(hkey); iov[0].iov_len = RSTRING_LEN(hkey);
+			iov[1].iov_base = (char *)": "; iov[1].iov_len = 2;
+			iov[2].iov_base = this_header; iov[2].iov_len = cnt;
+			iov[3].iov_base = (char *)"\r\n"; iov[3].iov_len = 2;
+                	wsgi_req->headers_size += wsgi_req->socket->proto_writev_header( wsgi_req, iov, 4);
 
 			//uwsgi_log("(multi) --%.*s: %.*s--\n", RSTRING_LEN(hkey), RSTRING_PTR(hkey), cnt, this_header);
 
@@ -495,14 +602,11 @@ VALUE send_header(VALUE obj, VALUE headers) {
 	}
 
 	if (cnt > 0) {
-		len = wsgi_req->socket->proto_write_header( wsgi_req, RSTRING_PTR(hkey), RSTRING_LEN(hkey));
-		wsgi_req->headers_size += len;
-                len = wsgi_req->socket->proto_write_header( wsgi_req, (char *)": ", 2);
-                wsgi_req->headers_size += len;
-		len = wsgi_req->socket->proto_write_header( wsgi_req, this_header, cnt);
-		wsgi_req->headers_size += len;
-		len = wsgi_req->socket->proto_write_header( wsgi_req, (char *)"\r\n", 2);
-                wsgi_req->headers_size += len;
+		iov[0].iov_base = RSTRING_PTR(hkey); iov[0].iov_len = RSTRING_LEN(hkey);
+		iov[1].iov_base = (char *)": "; iov[1].iov_len = 2;
+		iov[2].iov_base = this_header; iov[2].iov_len = cnt;
+		iov[3].iov_base = (char *)"\r\n"; iov[3].iov_len = 2;
+                wsgi_req->headers_size += wsgi_req->socket->proto_writev_header( wsgi_req, iov, 4);
 		wsgi_req->header_cnt++;
 		//uwsgi_log("--%.*s: %.*s--\n", RSTRING_LEN(hkey), RSTRING_PTR(hkey), cnt, this_header);
 	}
@@ -734,31 +838,6 @@ void uwsgi_rack_after_request(struct wsgi_request *wsgi_req) {
 		log_request(wsgi_req);
 }
 
-int uwsgi_rack_manage_options(int i, char *optarg) {
-
-
-	switch(i) {
-		case LONG_ARGS_RAILS:
-			// HACK: can be overridden with --post-buffering
-			if (!uwsgi.post_buffering) uwsgi.post_buffering = 4096;
-			ur.rails = optarg;
-			return 1;
-		case LONG_ARGS_RACK:
-			// HACK: can be overridden with --post-buffering
-			if (!uwsgi.post_buffering) uwsgi.post_buffering = 4096;
-			ur.rack = optarg;
-			return 1;
-		case LONG_ARGS_RUBY_GC_FREQ:
-			ur.gc_freq = atoi(optarg);
-			return 1;
-		case LONG_ARGS_RUBY_REQUIRE:
-			uwsgi_string_new_list(&ur.rbrequire, optarg);
-			return 1;
-	}
-
-	return 0;
-}
-
 void uwsgi_rack_suspend(struct wsgi_request *wsgi_req) {
 
 	uwsgi_log("SUSPENDING RUBY\n");
@@ -843,22 +922,6 @@ VALUE init_rack_app( VALUE script ) {
         return RARRAY_PTR(rackup)[0] ;
 }
 
-int uwsgi_rack_xml(char *node, char *content) {
-
-	int error;
-
-	if (!strcmp("rack", node)) {
-		ur.dispatcher = rb_protect(init_rack_app, rb_str_new2(content), &error);
-		if (ur.dispatcher != Qnil) {
-			rb_gc_register_address(&ur.dispatcher);
-			uwsgi_log("Rack application ready\n");
-			return 1;
-		}
-        }
-
-	return 0;
-}
-
 int uwsgi_rack_magic(char *mountpoint, char *lazy) {
 
 	if (!strcmp(lazy+strlen(lazy)-3, ".ru")) {
@@ -874,17 +937,17 @@ int uwsgi_rack_magic(char *mountpoint, char *lazy) {
 	return 0;
 }
 
-/*
-int uwsgi_rack_mount_app(char *mountpoint, char *app) {
+int uwsgi_rack_mount_app(char *mountpoint, char *app, int regexp) {
 
 	
-        if ( !strcmp(what+strlen(what)-3, ".ru") || !strcmp(what+strlen(what)-3, ".rb")) {
-                return = uwsgi_rack_load(mountpoint, what);
+	if (uwsgi_endswith(app, ".ru") || uwsgi_endswith(app, ".rb")) {
+                ur.rack = app;
+		uwsgi_rack_init_apps();
+		return 0;
         }
 
         return -1;
 }
-*/
 
 void uwsgi_rack_hijack(void) {
 }
@@ -1037,7 +1100,7 @@ struct uwsgi_plugin rack_plugin = {
 	.modifier1 = 7,
 	.init = uwsgi_rack_init,
 	.options = uwsgi_rack_options,
-	.manage_opt = uwsgi_rack_manage_options,
+
 	.request = uwsgi_rack_request,
 	.after_request = uwsgi_rack_after_request,
 
@@ -1049,8 +1112,7 @@ struct uwsgi_plugin rack_plugin = {
 	.spooler = uwsgi_rack_spooler,
 
 	.init_apps = uwsgi_rack_init_apps,
-	//.mount_app = uwsgi_rack_mount_app,
-	.manage_xml = uwsgi_rack_xml,
+	.mount_app = uwsgi_rack_mount_app,
 
 	.magic = uwsgi_rack_magic,
 

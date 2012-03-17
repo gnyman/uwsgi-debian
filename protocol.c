@@ -122,7 +122,6 @@ time_t parse_http_date(char *date, uint16_t len) {
 	
 }
 
-#ifdef UWSGI_UDP
 ssize_t send_udp_message(uint8_t modifier1, uint8_t modifier2, char *host, char *message, uint16_t message_size) {
 
 	int fd;
@@ -180,7 +179,6 @@ ssize_t send_udp_message(uint8_t modifier1, uint8_t modifier2, char *host, char 
 	return ret;
 	
 }
-#endif
 
 int uwsgi_enqueue_message(char *host, int port, uint8_t modifier1, uint8_t modifier2, char *message, int size, int timeout) {
 
@@ -564,14 +562,19 @@ int uwsgi_parse_vars(struct wsgi_request *wsgi_req) {
 
 	/* set an HTTP 500 status as default */
 	wsgi_req->status = 500;
-	
+
+	// skip if already parsed
+	if (wsgi_req->parsed) return 0;
+
 	// has the protocol already parsed the request ?
 	if (wsgi_req->uri_len > 0) {
+		wsgi_req->parsed = 1;
 		i = uwsgi_simple_parse_vars(wsgi_req, ptrbuf, bufferend);
 		if (i == 0) goto next;
 		return i;
 	}
 
+	wsgi_req->parsed = 1;
 	wsgi_req->path_info_pos = -1;
 
 	while (ptrbuf < bufferend) {
@@ -677,6 +680,15 @@ int uwsgi_parse_vars(struct wsgi_request *wsgi_req) {
 							wsgi_req->file_len = strsize;
 							wsgi_req->dynamic = 1;
 						}
+						else if (!uwsgi_strncmp("UWSGI_POSTFILE", 14, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
+							char *postfile = uwsgi_concat2n(ptrbuf, strsize, "", 0);
+							wsgi_req->async_post = fopen(postfile, "r");
+							if (!wsgi_req->async_post) {
+								uwsgi_error_open(postfile);
+							}
+							free(postfile);
+							wsgi_req->body_as_file = 1;
+						}
 						else if (!uwsgi_strncmp("UWSGI_TOUCH_RELOAD", 18, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
 							wsgi_req->touch_reload = ptrbuf;
 							wsgi_req->touch_reload_len = strsize;
@@ -696,14 +708,14 @@ int uwsgi_parse_vars(struct wsgi_request *wsgi_req) {
 								free(env_value);
 							}
 						}
-						else if (!uwsgi_strncmp("SERVER_NAME", 11, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len) && !uwsgi.vhost_host) {
+						else if (!uwsgi_strncmp("SERVER_NAME", 11, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len) && !wsgi_req->host_len) {
 							wsgi_req->host = ptrbuf;
 							wsgi_req->host_len = strsize;
 #ifdef UWSGI_DEBUG
 							uwsgi_debug("SERVER_NAME=%.*s\n", wsgi_req->host_len, wsgi_req->host);
 #endif
 						}
-						else if (!uwsgi_strncmp("HTTP_HOST", 9, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len) && uwsgi.vhost_host) {
+						else if (!uwsgi_strncmp("HTTP_HOST", 9, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
 							wsgi_req->host = ptrbuf;
 							wsgi_req->host_len = strsize;
 #ifdef UWSGI_DEBUG
@@ -717,6 +729,14 @@ int uwsgi_parse_vars(struct wsgi_request *wsgi_req) {
 						else if (!uwsgi_strncmp("HTTP_IF_MODIFIED_SINCE", 22, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
 							wsgi_req->if_modified_since = ptrbuf;
 							wsgi_req->if_modified_since_len = strsize;
+						}
+						else if (!uwsgi_strncmp("HTTP_AUTHORIZATION", 18, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
+							wsgi_req->authorization = ptrbuf;
+							wsgi_req->authorization_len = strsize;
+						}
+						else if (!uwsgi_strncmp("DOCUMENT_ROOT", 13, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
+							wsgi_req->document_root = ptrbuf;
+							wsgi_req->document_root_len = strsize;
 						}
 						else if (uwsgi.log_x_forwarded_for && !uwsgi_strncmp("HTTP_X_FORWARDED_FOR", 20, wsgi_req->hvec[wsgi_req->var_cnt].iov_base, wsgi_req->hvec[wsgi_req->var_cnt].iov_len)) {
 							wsgi_req->remote_addr = ptrbuf;
@@ -934,6 +954,13 @@ nextcs:
 		}
 nextsm:
 		udd = udd->next;
+	}
+
+	// finally check for docroot
+	if (uwsgi.check_static_docroot && wsgi_req->document_root_len > 0) {
+		if (!uwsgi_file_serve(wsgi_req, wsgi_req->document_root, wsgi_req->document_root_len, wsgi_req->path_info, wsgi_req->path_info_len)) {
+                        return -1;
+                }
 	}
 
 	return 0;
@@ -1410,6 +1437,30 @@ int uwsgi_simple_send_string2(char *socket_name, uint8_t modifier1, uint8_t modi
 	return 0;
 }
 
+char *uwsgi_req_append(struct wsgi_request *wsgi_req, char *key, uint16_t keylen, char *val, uint16_t vallen) {
+
+	if (wsgi_req->uh.pktsize + (2+keylen+2+vallen) > uwsgi.buffer_size) {
+		uwsgi_log("not enough buffer space to add %.*s variable, consider increasing it with the --buffer-size option\n", keylen, key);
+		return NULL;
+	}
+
+	char *ptr = wsgi_req->buffer + wsgi_req->uh.pktsize;
+
+	*ptr++= (uint8_t) (keylen & 0xff);
+        *ptr++= (uint8_t) ((keylen >> 8) & 0xff);
+
+	memcpy(ptr, key, keylen); ptr+=keylen;
+
+        *ptr++= (uint8_t) (vallen & 0xff);
+        *ptr++= (uint8_t) ((vallen >> 8) & 0xff);
+
+	memcpy(ptr, val, vallen);
+
+	wsgi_req->uh.pktsize += (2+keylen+2+vallen);
+
+	return ptr;
+}
+
 int uwsgi_simple_send_string(char *socket_name, uint8_t modifier1, uint8_t modifier2, char *item1, uint16_t item1_len, int timeout) {
 
         struct uwsgi_header uh;
@@ -1571,9 +1622,25 @@ int uwsgi_file_serve(struct wsgi_request *wsgi_req, char *document_root, uint16_
         }
 
         if (!uwsgi_static_stat(real_filename, &st)) {
+
+		real_filename_len = strlen(real_filename);
+
+		// check for skippable ext
+		struct uwsgi_string_list *sse = uwsgi.static_skip_ext;
+        	while(sse) {
+                	if (real_filename_len >= sse->len) {
+                        	if (!uwsgi_strncmp(real_filename+(real_filename_len - sse->len), sse->len, sse->value, sse->len)) {
+#ifdef UWSGI_ROUTING
+					if (uwsgi_apply_routes_fast(wsgi_req, real_filename, real_filename_len) == UWSGI_ROUTE_BREAK) return 0;
+#endif
+					return -1;
+                        	}
+                	}
+                	sse = sse->next;
+        	}
+
 		int mime_type_size = 0;
                 char http_last_modified[49];
-		real_filename_len = strlen(real_filename);
 		char *mime_type = uwsgi_get_mime_type(real_filename, real_filename_len, &mime_type_size);
                 if (wsgi_req->if_modified_since_len) {
                         time_t ims = parse_http_date(wsgi_req->if_modified_since, wsgi_req->if_modified_since_len);

@@ -64,24 +64,51 @@ void init_pyargv() {
 
 	char *ap;
 
+	char *argv0 = "uwsgi";
+
+	if (up.pyrun) {
+		argv0 = up.pyrun;
+	}
+
 #ifdef PYTHREE
-	wchar_t pname[6];
-	mbstowcs(pname, "uwsgi", 6);
-	up.py_argv[0] = pname;
+	wchar_t *pname = uwsgi_calloc(strlen(argv0)+1);
+	mbstowcs(pname, argv0, strlen(argv0)+1);
 #else
-	up.py_argv[0] = "uwsgi";
+	char *pname = argv0;
 #endif
 
 	up.argc = 1;
-
-	if (up.argv != NULL) {
-#ifdef PYTHREE
-		wchar_t *wcargv = malloc( sizeof( wchar_t ) * (strlen(up.argv)+1));
-		if (!wcargv) {
-			uwsgi_error("malloc()");
-			exit(1);
+	if (up.argv) {
+		char *tmp_ptr = uwsgi_str(up.argv);
+#ifdef __sun__
+                // FIX THIS !!!
+                ap = strtok(tmp_ptr, " ");
+                while ((ap = strtok(NULL, " ")) != NULL) {
+#else
+                while ((ap = strsep(&tmp_ptr, " \t")) != NULL) {
+#endif
+			if (*ap != '\0') {
+				up.argc++;
+			}
 		}
-		memset(wcargv, 0, sizeof( wchar_t ) * (strlen(up.argv)+1));
+
+		free(tmp_ptr);
+	}
+
+#ifdef PYTHREE
+	up.py_argv = uwsgi_calloc(sizeof(wchar_t *) * up.argc+1);
+#else
+	up.py_argv = uwsgi_calloc(sizeof(char *) * up.argc+1);
+#endif
+
+	up.py_argv[0] = pname;
+
+
+	if (up.argv) {
+
+		up.argc = 1;
+#ifdef PYTHREE
+		wchar_t *wcargv = uwsgi_calloc( sizeof( wchar_t ) * (strlen(up.argv)+1));
 #endif
 
 #ifdef __sun__
@@ -89,7 +116,7 @@ void init_pyargv() {
 		ap = strtok(up.argv, " ");
 		while ((ap = strtok(NULL, " ")) != NULL) {
 #else
-			while ((ap = strsep(&up.argv, " \t")) != NULL) {
+		while ((ap = strsep(&up.argv, " \t")) != NULL) {
 #endif
 				if (*ap != '\0') {
 #ifdef PYTHREE
@@ -100,14 +127,11 @@ void init_pyargv() {
 #endif
 					up.argc++;
 				}
-				if (up.argc + 1 > MAX_PYARGV)
-					break;
-			}
 		}
 
-#ifndef UWSGI_PYPY
-		PySys_SetArgv(up.argc, up.py_argv);
-#endif
+	}
+
+	PySys_SetArgv(up.argc, up.py_argv);
 
 	PyObject *sys_dict = get_uwsgi_pydict("sys");
 	if (!sys_dict) {

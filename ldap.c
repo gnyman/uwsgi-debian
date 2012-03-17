@@ -108,56 +108,37 @@ struct uwsgi_ldap_entry *search_ldap_cache(struct uwsgi_ldap_entry *root, char *
 
 struct uwsgi_ldap_entry *get_ldap_names(int *count) {
 
-	struct option *aopt, *lopt;
+	struct uwsgi_option *op = uwsgi.options;
 	struct uwsgi_ldap_entry *ule, *entry;
 	char ldap_name[1024];
-	static int counter = 30000000;
 
 	*count = 0;
-	lopt = uwsgi.long_options;
 
-	ule = uwsgi_malloc(sizeof(struct uwsgi_ldap_entry)*count_options(lopt));
+	ule = uwsgi_malloc(sizeof(struct uwsgi_ldap_entry)*uwsgi_count_options(op));
 
-	while( (aopt = lopt) ) {
-                if (!aopt->name)
-                        break;
+	while( op && op->name ) {
 
-		uwsgi_name_to_ldap((char *)aopt->name, ldap_name);
+		uwsgi_name_to_ldap((char *)op->name, ldap_name);
 
 		entry = search_ldap_cache(ule, ldap_name, *count);
 
 		if (entry) goto next;
 
-		if (aopt->flag) {
-			entry = &ule[*count] ;
-			entry->num = counter;
-			strcpy(entry->names, ldap_name);
-			counter++;
-			*count = *count+1;
-		}
-		else {
-			entry = get_ldap_by_num(ule, aopt->val, *count);
-			if (entry) {
-				strcat(entry->names, ldap_name);
-			}
-			else {
-				entry = &ule[*count] ;
-				entry->num = aopt->val;
-				strcpy(entry->names, ldap_name);
-				*count = *count+1;
-			}
-		}
+		entry = &ule[*count] ;
+		entry->num = *count;
+		strcpy(entry->names, ldap_name);
+		*count = *count+1;
 
-		entry->has_arg = aopt->has_arg;
+		entry->has_arg = op->type;
 		
 next:
-		lopt++;
+		op++;
 	}
 
 	return ule;
 }
 
-void uwsgi_ldap_schema_dump_ldif() {
+void uwsgi_opt_ldap_dump_ldif(char *opt, char *foo, void *bar) {
 
 	int i;
 	int items;
@@ -210,7 +191,7 @@ void uwsgi_ldap_schema_dump_ldif() {
 	exit(0);
 }
 
-void uwsgi_ldap_schema_dump() {
+void uwsgi_opt_ldap_dump(char *opt, char *foo, void *bar) {
 
 	int i;
 	int items;
@@ -258,7 +239,7 @@ void uwsgi_ldap_schema_dump() {
 	exit(0);
 }
 
-void uwsgi_ldap_config() {
+void uwsgi_ldap_config(char *url) {
 
 	LDAP *ldp;
 	LDAPMessage *results, *entry;
@@ -267,17 +248,12 @@ void uwsgi_ldap_config() {
 	char *attr;
 	char *uwsgi_attr;
 
-	char *url = "ldap:///";
 	char *url_slash;
 
 	int desired_version = LDAP_VERSION3;
 	int ret;
 
 	LDAPURLDesc *ldap_url;
-
-	if (uwsgi.ldap) {
-		url = uwsgi.ldap;
-	}
 
 	if (!ldap_is_ldap_url(url)) {
 		uwsgi_log("invalid LDAP url.\n");

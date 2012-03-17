@@ -11,26 +11,31 @@
 
 struct uwsgi_perl {
 
-        int fd;
-        char *psgibuffer;
+	// path of the statically loaded main app
         char *psgi;
+	// locallib path
 	char *locallib;
+
+	// perl argv for initialization
 	char *embedding[3];
-        PerlInterpreter *main;
-        pthread_key_t u_interpreter;
-        PerlInterpreter **interp;
-        SV *psgi_main;
-        SV **psgi_func;
-        CV *stream_responder;
-	HV *streaming_stash;
-	HV *input_stash;
-	HV *error_stash;
 
+	// check for Devel::StackTrace
+	int stacktrace_available;
+
+	// this is a pointer to the main list of interpreters (required for signals, rpc....);
+        PerlInterpreter **main;
+
+	// a lock for dynamic apps
+	pthread_mutex_t lock_loader;
+
+	// this fields must be heavy protected in threaded modes
+	int tmp_current_i;
+	HV **tmp_streaming_stash;
+	HV **tmp_input_stash;
+	HV **tmp_error_stash;
+
+	CV **tmp_stream_responder;
 };
-
-#define LONG_ARGS_PERL_BASE      	17000 + ((5 + 1) * 1000)
-#define LONG_ARGS_PSGI           	LONG_ARGS_PERL_BASE + 1
-#define LONG_ARGS_PERL_LOCAL_LIB	LONG_ARGS_PERL_BASE + 2
 
 void init_perl_embedded_module(void);
 void uwsgi_psgi_app(void);
@@ -41,3 +46,5 @@ int psgi_response(struct wsgi_request *, AV*);
 
 SV *uwsgi_perl_obj_call(SV *, char *);
 int uwsgi_perl_obj_can(SV *, char *, size_t);
+int init_psgi_app(struct wsgi_request *, char *, uint16_t, PerlInterpreter **);
+PerlInterpreter *uwsgi_perl_new_interpreter(void);

@@ -27,22 +27,6 @@ struct amqp_frame_method {
 static char *amqp_simple_get_frame(int, struct amqp_frame_header *);
 static char *amqp_get_method(int, uint16_t, uint16_t, uint32_t *);
 
-/*
-static char *amqp_get_longstr(char *ptr, char *watermark) {
-
-        uint32_t longstr_size;
-
-	if (ptr+4 > watermark) return NULL;
-
-        memcpy(&longstr_size, ptr, 4);
-        longstr_size = ntohl(longstr_size);
-
-	if (ptr+4+longstr_size > watermark) return NULL;
-
-        return ptr+4+longstr_size;
-}
-*/
-
 static char *amqp_get_str(char *ptr, char *watermark) {
 
         uint8_t str_size;
@@ -57,23 +41,6 @@ static char *amqp_get_str(char *ptr, char *watermark) {
         return ptr+1+str_size;
 }
 
-
-/*
-static char *amqp_get_table(char *ptr, char *watermark) {
-
-	uint32_t table_size;
-
-	if (ptr+4 > watermark) return NULL;
-
-	memcpy(&table_size, ptr, 4);
-
-	table_size = ntohl(table_size);
-
-	if (ptr+4+table_size > watermark) return NULL;
-
-	return ptr+4+table_size;
-}
-*/
 
 static char *amqp_get_short(char *ptr, char *watermark, uint16_t *sv) {
 
@@ -197,7 +164,9 @@ char *uwsgi_amqp_consume(int fd, uint64_t *msgsize, char **routing_key) {
         ptr = amqp_get_longlong(ptr, watermark, msgsize); if (!ptr) goto clear2;
 
 	free(frame);
+	frame = NULL;
 	free(header);
+	header = NULL;
 
 	char *fullbody = uwsgi_malloc(*msgsize);
 	char *message;
@@ -501,7 +470,7 @@ static char *amqp_simple_get_frame(int fd, struct amqp_frame_header *fh) {
 
         len = 0;
 
-        char *frame = malloc(fh->size+1);
+        char *frame = uwsgi_malloc(fh->size+1);
         ptr = frame;
 
         while(len < fh->size+1) {

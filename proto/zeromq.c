@@ -66,11 +66,13 @@ static int uwsgi_mongrel2_json_parse(json_t * root, struct wsgi_request *wsgi_re
 
 	wsgi_req->uh.pktsize += uwsgi_mongrel2_json_add(wsgi_req, root, "VERSION", "SERVER_PROTOCOL", 15, NULL, NULL);
 	wsgi_req->uh.pktsize += uwsgi_mongrel2_json_add(wsgi_req, root, "QUERY", "QUERY_STRING", 12, &query_string, &query_string_len);
-
-	if ((json_val = uwsgi_mongrel2_json_get_string(root, "PATTERN"))) {
-		wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "SCRIPT_NAME", 11, json_val, strlen(json_val) - 1);
-		script_name_len = strlen(json_val) - 1;
+	if (query_string == NULL) {
+		// always set QUERY_STRING
+		wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "QUERY_STRING", 12, "", 0);
 	}
+
+	// set SCRIPT_NAME to an empty value
+	wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "SCRIPT_NAME", 11, "", 0);
 
 	if ((json_val = uwsgi_mongrel2_json_get_string(root, "PATH"))) {
 		wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "PATH_INFO", 9, json_val + script_name_len, strlen(json_val + script_name_len));
@@ -135,6 +137,9 @@ static int uwsgi_mongrel2_tnetstring_parse(struct wsgi_request *wsgi_req, char *
 	uint16_t query_string_len = 0;
 	int async_upload = 0;
 
+	// set an empty SCRIPT_NAME
+	wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "SCRIPT_NAME", 11, "", 0);
+
 	while (ptr < watermark) {
 
 		ptr = uwsgi_netstring(ptr, len - (ptr - buf), &key, &keylen);
@@ -151,6 +156,7 @@ static int uwsgi_mongrel2_tnetstring_parse(struct wsgi_request *wsgi_req, char *
 		if (ptr == NULL)
 			break;
 
+
 		if (key[0] < 97) {
 			if (!uwsgi_strncmp("METHOD", 6, key, keylen)) {
 				wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "REQUEST_METHOD", 14, val, vallen);
@@ -162,10 +168,6 @@ static int uwsgi_mongrel2_tnetstring_parse(struct wsgi_request *wsgi_req, char *
 				wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "QUERY_STRING", 12, val, vallen);
 				query_string = val;
 				query_string_len = vallen;
-			}
-			else if (!uwsgi_strncmp("PATTERN", 7, key, keylen)) {
-				wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "SCRIPT_NAME", 11, val, vallen - 1);
-				script_name_len = vallen - 1;
 			}
 			else if (!uwsgi_strncmp("PATH", 4, key, keylen)) {
 				wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "PATH_INFO", 9, val + script_name_len, vallen - script_name_len);
@@ -198,7 +200,6 @@ static int uwsgi_mongrel2_tnetstring_parse(struct wsgi_request *wsgi_req, char *
 				wsgi_req->async_post = fopen(post_filename, "r");
 				if (!wsgi_req->async_post) {
 					uwsgi_error_open(post_filename);
-					free(post_filename);
 					wsgi_req->do_not_log = 1;
 				}
 				async_upload += 2;
@@ -212,6 +213,11 @@ static int uwsgi_mongrel2_tnetstring_parse(struct wsgi_request *wsgi_req, char *
 	}
 
 	wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "SERVER_NAME", 11, uwsgi.hostname, uwsgi.hostname_len);
+
+	if (query_string == NULL) {
+                // always set QUERY_STRING
+                wsgi_req->uh.pktsize += proto_base_add_uwsgi_var(wsgi_req, "QUERY_STRING", 12, "", 0);
+        }
 
 	// reject uncomplete upload
 	if (async_upload == 1) {
@@ -333,7 +339,7 @@ int uwsgi_proto_zeromq_accept(struct wsgi_request *wsgi_req, int fd) {
 
 			json_decref(root);
 #else
-			uwsgi_log("JSON support not enabled. skip request\n");
+			uwsgi_log("JSON support not enabled (recompile uWSGI with libjansson support, or re-configure mongrel2 with \"protocol='tnetstring'\". skip request\n");
 #endif
 		}
 
