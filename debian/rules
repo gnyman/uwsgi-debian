@@ -331,12 +331,12 @@ $(patsubst %,debian/stamp-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 # Build python2x_plugin.so/python3x_plugin.so
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
+	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS_DOTTED))
 	for PYTHON_VERSION in $(PYVERS); do \
-		$(PYTHON) $(UWSGI_BUILDER) \
+		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/python \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini\
-			         python$${PYTHON_VERSION}; \
+			         python$$(echo $${PYTHON_VERSION} | tr -d .); \
 	done
 	sed -e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.dirs.in \
