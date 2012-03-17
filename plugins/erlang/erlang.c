@@ -4,10 +4,10 @@
 extern struct uwsgi_server uwsgi;
 struct uwsgi_erlang uerl;
 
-struct option erlang_options[] = {
-	{"erlang", required_argument, 0, LONG_ARGS_ERLANG},
-        {"erlang-cookie", required_argument, 0, LONG_ARGS_ERLANG_COOKIE},
-	{0, 0, 0, 0},
+struct uwsgi_option erlang_options[] = {
+	{"erlang", required_argument, 0, "spawn an erlang c-node", uwsgi_opt_set_str, &uerl.name, UWSGI_OPT_MASTER},
+        {"erlang-cookie", required_argument, 0, "set erlang cookie", uwsgi_opt_set_str, &uerl.cookie, 0},
+	{0, 0, 0, 0, 0, 0, 0},
 };
 
 
@@ -363,8 +363,7 @@ int erlang_init() {
 	char *nodename;
 	struct in_addr addr;
 
-	uerl.lock = uwsgi_mmap_shared_lock();
-        uwsgi_lock_init(uerl.lock);
+        uerl.lock = uwsgi_lock_init("erlang");
 
         if (uerl.name) {
 
@@ -423,7 +422,7 @@ int erlang_init() {
 		uwsgi_log("Erlang C-Node %s registered on port %d\n", ei_thisnodename(&uerl.cnode), ntohs(sin.sin_port));
 
 	
-                if (register_fat_gateway("uWSGI erlang c-node", erlang_loop) == NULL) {
+                if (register_gateway("uWSGI erlang c-node", erlang_loop) == NULL) {
                         uwsgi_log("unable to register the erlang gateway\n");
                         exit(1);
                 }
@@ -433,26 +432,10 @@ int erlang_init() {
         return 0;
 }
 
-int erlang_opt(int i, char *optarg) {
-
-        switch(i) {
-                case LONG_ARGS_ERLANG:
-			uwsgi.master_process = 1;
-			uerl.name = optarg;
-                        return 1;
-                case LONG_ARGS_ERLANG_COOKIE:
-			uerl.cookie = optarg;
-                        return 1;
-        }
-        return 0;
-}
-
-
 struct uwsgi_plugin erlang_plugin = {
 
 	.name = "erlang",
         .options = erlang_options,
-        .manage_opt = erlang_opt,
         .init = erlang_init,
 };
 

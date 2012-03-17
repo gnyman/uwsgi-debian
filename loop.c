@@ -40,9 +40,9 @@ void *simple_loop(void *arg1) {
 	long core_id = (long) arg1;
 
 	struct wsgi_request *wsgi_req = uwsgi.wsgi_requests[core_id];
-	int i;
 
 #ifdef UWSGI_THREADING
+	int i;
 	//PyThreadState *pts;
 	sigset_t smask;
 
@@ -55,8 +55,11 @@ void *simple_loop(void *arg1) {
 		if (core_id > 0) {
 			// block all signals on new threads
 			sigfillset(&smask);
+#ifdef UWSGI_DEBUG
+			sigdelset(&smask, SIGSEGV);
+#endif
 			pthread_sigmask(SIG_BLOCK, &smask, NULL);
-			for (i = 0; i < 0xFF; i++) {
+			for (i = 0; i < 256; i++) {
 				if (uwsgi.p[i]->init_thread) {
 					uwsgi.p[i]->init_thread(core_id);
 				}
@@ -128,8 +131,11 @@ void *zeromq_loop(void *arg1) {
 		if (core_id > 0) {
 			// block all signals on new threads
 			sigfillset(&smask);
+#ifdef UWSGI_DEBUG
+			sigdelset(&smask, SIGSEGV);
+#endif
 			pthread_sigmask(SIG_BLOCK, &smask, NULL);
-			for (i = 0; i < 0xFF; i++) {
+			for (i = 0; i < 256; i++) {
 				if (uwsgi.p[i]->init_thread) {
 					uwsgi.p[i]->init_thread(core_id);
 				}

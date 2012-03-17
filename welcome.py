@@ -19,9 +19,20 @@ except:
 
 
 def after_request_hook():
-    print "request finished"
+    print("request finished")
 
 uwsgi.after_req_hook = after_request_hook
+
+@rpc('hello')
+def hello_rpc(one, two, three):
+    arg0 = one[::-1]
+    arg1 = two[::-1]
+    arg2 = three[::-1]
+    return "!%s-%s-%s!" % (arg1, arg2, arg0)
+
+@signal(17)
+def ciao_mondo(signum):
+    print("Hello World")
 
 def xsendfile(e, sr):
     sr('200 OK', [('Content-Type', 'image/png'), ('X-Sendfile', os.path.abspath('logo_uWSGI.png'))])
@@ -33,7 +44,7 @@ def serve_logo(e, sr):
 
 def serve_options(e, sr):
     sr('200 OK', [('Content-Type', 'text/html')])
-    for opt in xrange(0,256):
+    for opt in range(0,256):
         yield "<b>%d</b> = %d<br/>" % (opt, uwsgi.get_option(opt))
 
 def serve_config(e, sr):
@@ -70,7 +81,7 @@ def application(env, start_response):
     if DEBUG:
         print(env['wsgi.input'].fileno())
 
-    if routes.has_key(env['PATH_INFO']):
+    if env['PATH_INFO'] in routes:
         return routes[env['PATH_INFO']](env, start_response)
 
     start_response('200 OK', [('Content-Type', 'text/html')])
@@ -88,9 +99,9 @@ def application(env, start_response):
 
     workers = ''
     for w in uwsgi.workers():
-        apps = '<table border="1"><tr><th>id</th><th>mountpoint</th><th>requests</th></tr>'
+        apps = '<table border="1"><tr><th>id</th><th>mountpoint</th><th>startup time</th><th>requests</th></tr>'
         for app in w['apps']:
-            apps += '<tr><td>%d</td><td>%s</td><td>%d</td></tr>' % (app['id'], app['mountpoint'], app['requests']) 
+            apps += '<tr><td>%d</td><td>%s</td><td>%d</td><td>%d</td></tr>' % (app['id'], app['mountpoint'], app['startup_time'], app['requests']) 
         apps += '</table>'
         workers += """
 <tr>
@@ -98,8 +109,8 @@ def application(env, start_response):
 </tr>
         """ % (w['id'], w['pid'], w['status'], w['running_time']/1000, w['avg_rt']/1000, w['tx'], apps)
 
-    return """
-<img src="/logo"/> version %s running on %s<br/>
+    output = """
+<img src="/logo"/> version %s running on %s (remote user: %s)<br/>
 <hr size="1"/>
 
 Configuration<br/>
@@ -119,8 +130,10 @@ Workers and applications<br/>
 %s
 </table>
 
-    """ % (uwsgi.version, uwsgi.hostname, workers)
+    """ % (uwsgi.version, uwsgi.hostname, env.get('REMOTE_USER','None'), workers)
 
+    #return bytes(output.encode('latin1'))
+    return output
 
 
 

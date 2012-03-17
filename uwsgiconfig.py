@@ -1,6 +1,6 @@
 # uWSGI build system
 
-uwsgi_version = '1.0.4'
+uwsgi_version = '1.1'
 
 import os
 import re
@@ -180,6 +180,16 @@ def build_uwsgi(uc, print_only=False):
 
                 try:
                     p_cflags.remove('-Werror=declaration-after-statement')
+                except:
+                    pass
+
+                try:
+                    p_cflags.remove('-Wwrite-strings')
+                except:
+                    pass
+
+                try:
+                    p_cflags.remove('-Werror=write-strings')
                 except:
                     pass
 
@@ -404,19 +414,19 @@ class uConf(object):
         if locking_mode == 'auto':
             if uwsgi_os == 'Linux' or uwsgi_os == 'SunOS':
                 locking_mode = 'pthread_mutex'
-            elif uwsgi_os == 'FreeBSD':
-                locking_mode = 'umtx'
+            # FreeBSD umtx is still not ready for process shared locking
+            #elif uwsgi_os == 'FreeBSD':
+            #    locking_mode = 'umtx'
             elif uwsgi_os == 'Darwin':
                 locking_mode = 'osx_spinlock'
 
         if locking_mode == 'pthread_mutex':
             self.cflags.append('-DUWSGI_LOCK_USE_MUTEX')
-        elif locking_mode == 'umtx':
-            self.cflags.append('-DUWSGI_LOCK_USE_UMTX')
+        # FreeBSD umtx is still not ready for process shared locking
+        #elif locking_mode == 'umtx':
+        #    self.cflags.append('-DUWSGI_LOCK_USE_UMTX')
         elif locking_mode == 'osx_spinlock':
             self.cflags.append('-DUWSGI_LOCK_USE_OSX_SPINLOCK')
-        else:
-            self.cflags.append('-DUWSGI_LOCK_USE_FLOCK')
 
         # set event subsystem
         event_mode = self.get('event','auto')
@@ -525,6 +535,14 @@ class uConf(object):
         if self.get('udp'):
             self.cflags.append("-DUWSGI_UDP")
 
+        if self.get('blacklist'):
+            self.cflags.append('-DUWSGI_BLACKLIST="\\"%s\\""' % self.get('blacklist'))
+
+        if self.get('whitelist'):
+            self.cflags.append('-DUWSGI_WHITELIST="\\"%s\\""' % self.get('whitelist'))
+
+        has_pcre = False
+
         # re-enable after pcre fix
         if self.get('pcre'):
             if self.get('pcre') == 'auto':
@@ -535,6 +553,7 @@ class uConf(object):
                     self.cflags.append(pcreconf)
                     self.gcc_list.append('regexp')
                     self.cflags.append("-DUWSGI_PCRE")
+                    has_pcre = True
 
             else:
                 pcreconf = spcall('pcre-config --libs')
@@ -547,6 +566,17 @@ class uConf(object):
                     self.cflags.append(pcreconf)
                     self.gcc_list.append('regexp')
                     self.cflags.append("-DUWSGI_PCRE")
+                    has_pcre = True
+
+        if self.get('routing'):
+            if self.get('pcre') == 'auto':
+                if has_pcre:
+                    self.gcc_list.append('routing')
+                    self.cflags.append("-DUWSGI_ROUTING") 
+            else:
+                self.gcc_list.append('routing')
+                self.cflags.append("-DUWSGI_ROUTING")
+
 
         if self.has_include('sys/capability.h') and uwsgi_os == 'Linux':
             self.cflags.append("-DUWSGI_CAP")
@@ -695,6 +725,18 @@ class uConf(object):
                 self.gcc_list.append('ldap')
                 self.libs.append('-lldap')
 
+        if self.get('sctp'):
+            if self.get('sctp') == 'auto':
+                if self.has_include('netinet/sctp.h'):
+                    if os.path.exists('/usr/lib/libsctp.so') or os.path.exists('/usr/local/lib/libsctp.so') or os.path.exists('/usr/lib64/libsctp.so') or os.path.exists('/usr/local/lib64/libsctp.so'):
+                        self.gcc_list.append('proto/sctp')
+                        self.cflags.append("-DUWSGI_SCTP")
+                        self.libs.append('-lsctp')
+            else:
+                self.gcc_list.append('proto/sctp')
+                self.cflags.append("-DUWSGI_SCTP")
+                self.libs.append('-lsctp')
+
         if has_uuid and self.get('zeromq'):
             if self.get('zeromq') == 'auto':
                 if self.has_include('zmq.h'):
@@ -723,7 +765,19 @@ class uConf(object):
             self.gcc_list.append('sendfile')
 
         if self.get('xml'):
-            if self.get('xml_implementation') == 'libxml2':
+            if self.get('xml') == 'auto':
+                xmlconf = spcall('xml2-config --libs')
+                if xmlconf:
+                    self.libs.append(xmlconf)
+                    xmlconf = spcall("xml2-config --cflags")
+                    self.cflags.append(xmlconf)
+                    self.cflags.append("-DUWSGI_XML -DUWSGI_XML_LIBXML2")
+                    self.gcc_list.append('xmlconf')
+                elif self.has_include('expat.h'):
+                    self.cflags.append("-DUWSGI_XML -DUWSGI_XML_EXPAT")
+                    self.libs.append('-lexpat')
+                    self.gcc_list.append('xmlconf')
+            elif self.get('xml_implementation') == 'libxml2':
                 xmlconf = spcall('xml2-config --libs')
                 if xmlconf is None:
                     print("*** libxml2 headers unavailable. uWSGI build is interrupted. You have to install libxml2 development package or use libexpat or disable XML")
@@ -822,6 +876,16 @@ def build_plugin(path, uc, cflags, ldflags, libs, name = None):
         pass
 
     try:
+        p_cflags.remove('-Wwrite-strings')
+    except:
+        pass
+
+    try:
+        p_cflags.remove('-Werror=write-strings')
+    except:
+        pass
+
+    try:
         p_cflags.remove('-Wdeclaration-after-statement')
     except:
         pass
@@ -836,10 +900,11 @@ def build_plugin(path, uc, cflags, ldflags, libs, name = None):
     except:
         pass
 
+
     #for ofile in up.OBJ_LIST:
     #    gcc_list.insert(0,ofile)
 
-    gccline = "%s -fPIC %s -o %s.so %s %s %s %s" % (GCC, shared_flag, plugin_dest, ' '.join(uniq_warnings(p_cflags)), ' '.join(uniq_warnings(p_ldflags)), ' '.join(gcc_list), ' '.join(uniq_warnings(p_libs)) )
+    gccline = "%s -fPIC %s -o %s.so %s %s %s %s" % (GCC, shared_flag, plugin_dest, ' '.join(uniq_warnings(p_cflags)), ' '.join(gcc_list), ' '.join(uniq_warnings(p_ldflags)), ' '.join(uniq_warnings(p_libs)) )
     print("[%s] %s.so" % (GCC, plugin_dest))
 
     ret = os.system(gccline)
@@ -881,7 +946,7 @@ if __name__ == "__main__":
     elif cmd == '--unbit':
         build_uwsgi(uConf('buildconf/unbit.ini'))
     elif cmd == '--plugin':
-        bconf = 'default.ini'
+        bconf = os.environ.get('UWSGI_PROFILE','default.ini')
         try:
             bconf = sys.argv[3]
             if not bconf.endswith('.ini'):

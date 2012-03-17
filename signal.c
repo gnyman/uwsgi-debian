@@ -53,7 +53,7 @@ int uwsgi_signal_handler(uint8_t sig) {
 		}
 	}
 #ifdef UWSGI_SPOOLER
-        else if (uwsgi.spool_dir && uwsgi.shared->spooler_pid > 0 && (getpid() == uwsgi.shared->spooler_pid)) {
+        else if (uwsgi.i_am_a_spooler && (getpid() == uwsgi.i_am_a_spooler->pid)) {
 		if(uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI] > 0) {
                         set_spooler_harakiri(uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI]);
                 }
@@ -75,7 +75,7 @@ int uwsgi_signal_handler(uint8_t sig) {
 		}
         }
 #ifdef UWSGI_SPOOLER
-        else if (uwsgi.spool_dir && uwsgi.shared->spooler_pid > 0 && (getpid() == uwsgi.shared->spooler_pid)) {
+	else if (uwsgi.i_am_a_spooler && (getpid() == uwsgi.i_am_a_spooler->pid)) {
 		if(uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI] > 0) {
                         set_spooler_harakiri(0);
                 }
@@ -109,7 +109,7 @@ int uwsgi_register_signal(uint8_t sig, char *receiver, void *handler, uint8_t mo
 		return -1;
 	}
 
-	strcpy(use->receiver, receiver);
+	strncpy(use->receiver, receiver, strlen(receiver)+1);
 	use->handler = handler;
 	use->modifier1 = modifier1;
 	use->wid = uwsgi.mywid;
@@ -262,7 +262,38 @@ int uwsgi_add_timer(uint8_t sig, int secs) {
 
 }
 
+void uwsgi_opt_add_cron(char *opt, char *value, void *foobar) {
+
+	int i;
+
+	struct uwsgi_cron *old_uc, *uc = uwsgi.crons;
+                if (!uc) {
+                        uc = uwsgi_malloc(sizeof(struct uwsgi_cron));
+                        uwsgi.crons = uc;
+                }
+                else {
+                        old_uc = uc;
+                        while(uc->next) {
+                                uc = uc->next;
+                                old_uc = uc;
+                        }
+
+                        old_uc->next = uwsgi_malloc(sizeof(struct uwsgi_cron));
+                        uc = old_uc->next;
+                }
+
+                memset(uc, 0, sizeof(struct uwsgi_cron));
+
+                if (sscanf(value, "%d %d %d %d %d %n", &uc->minute, &uc->hour, &uc->day, &uc->month, &uc->week, &i) != 5) {
+                        uwsgi_log("invalid cron syntax\n");
+                        exit(1);
+                }
+                uc->command = value+i;
+}
+
 int uwsgi_signal_add_cron(uint8_t sig, int minute, int hour, int day, int month, int week) {
+
+	if (!uwsgi.master_process) return -1;
 
 	uwsgi_lock(uwsgi.cron_table_lock);
 
@@ -288,6 +319,8 @@ int uwsgi_signal_add_cron(uint8_t sig, int minute, int hour, int day, int month,
 }
 
 int uwsgi_signal_add_rb_timer(uint8_t sig, int secs, int iterations) {
+
+	if (!uwsgi.master_process) return -1;
 
         uwsgi_lock(uwsgi.rb_timer_table_lock);
 

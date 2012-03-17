@@ -5,56 +5,77 @@ extern struct uwsgi_server uwsgi;
 struct uwsgi_cgi {
 	struct uwsgi_dyn_dict *mountpoint;
 	struct uwsgi_dyn_dict *helpers;
-	int buffer_size;
+	size_t buffer_size;
 	int timeout;
 	struct uwsgi_string_list *index;
 	struct uwsgi_string_list *allowed_ext;
 	struct uwsgi_string_list *unset;
 	struct uwsgi_string_list *loadlib;
 	int optimize;
+	int from_docroot;
 	int has_mountpoints;
 	struct uwsgi_dyn_dict *default_cgi;
 	int path_info;
 } uc ;
 
-#define LONG_ARGS_CGI_BASE		17000 + ((9 + 1) * 1000)
-#define LONG_ARGS_CGI			LONG_ARGS_CGI_BASE + 1
-#define LONG_ARGS_CGI_MAP_HELPER	LONG_ARGS_CGI_BASE + 2
-#define LONG_ARGS_CGI_BUFFER_SIZE	LONG_ARGS_CGI_BASE + 3
-#define LONG_ARGS_CGI_TIMEOUT		LONG_ARGS_CGI_BASE + 4
-#define LONG_ARGS_CGI_INDEX		LONG_ARGS_CGI_BASE + 5
-#define LONG_ARGS_CGI_ALLOWED_EXT	LONG_ARGS_CGI_BASE + 6
-#define LONG_ARGS_CGI_UNSET		LONG_ARGS_CGI_BASE + 7
-#define LONG_ARGS_CGI_LOADLIB		LONG_ARGS_CGI_BASE + 8
+void uwsgi_opt_add_cgi(char *opt, char *value, void *foobar) {
 
-struct option uwsgi_cgi_options[] = {
+	char *val = strchr(value, '=');
+        if (!val) {
+        	uwsgi_dyn_dict_new(&uc.mountpoint, value, strlen(value), NULL, 0);
+        }
+        else {
+        	uwsgi_dyn_dict_new(&uc.mountpoint, value, val-value, val+1, strlen(val+1));
+        }
 
-        {"cgi", required_argument, 0, LONG_ARGS_CGI},
-        {"cgi-map-helper", required_argument, 0, LONG_ARGS_CGI_MAP_HELPER},
-        {"cgi-helper", required_argument, 0, LONG_ARGS_CGI_MAP_HELPER},
-        {"cgi-buffer-size", required_argument, 0, LONG_ARGS_CGI_BUFFER_SIZE},
-        {"cgi-timeout", required_argument, 0, LONG_ARGS_CGI_TIMEOUT},
-        {"cgi-index", required_argument, 0, LONG_ARGS_CGI_INDEX},
-        {"cgi-allowed-ext", required_argument, 0, LONG_ARGS_CGI_ALLOWED_EXT},
-        {"cgi-unset", required_argument, 0, LONG_ARGS_CGI_UNSET},
-        {"cgi-loadlib", required_argument, 0, LONG_ARGS_CGI_LOADLIB},
-        {"cgi-optimize", no_argument, &uc.optimize, 1},
-        {"cgi-optimized", no_argument, &uc.optimize, 1},
-        {"cgi-path-info", no_argument, &uc.path_info, 1},
-        {0, 0, 0, 0},
+}
+
+void uwsgi_opt_add_cgi_maphelper(char *opt, char *value, void *foobar) {
+	char *val = strchr(value, '=');
+        if (!val) {
+        	uwsgi_log("invalid CGI helper syntax, must be ext=command\n");
+                exit(1);
+        }
+        uwsgi_dyn_dict_new(&uc.helpers, value, val-value, val+1, strlen(val+1));
+}
+
+struct uwsgi_option uwsgi_cgi_options[] = {
+
+        {"cgi", required_argument, 0, "add a cgi mountpoint/directory/script", uwsgi_opt_add_cgi, NULL, 0},
+
+        {"cgi-map-helper", required_argument, 0, "add a cgi map-helper", uwsgi_opt_add_cgi_maphelper, NULL, 0},
+        {"cgi-helper", required_argument, 0, "add a cgi map-helper", uwsgi_opt_add_cgi_maphelper, NULL, 0},
+
+        {"cgi-from-docroot", no_argument, 0, "blindly enable cgi in DOCUMENT_ROOT", uwsgi_opt_true, &uc.from_docroot, 0},
+
+        {"cgi-buffer-size", required_argument, 0, "set cgi buffer size", uwsgi_opt_set_64bit, &uc.buffer_size, 0},
+        {"cgi-timeout", required_argument, 0, "set cgi script timeout", uwsgi_opt_set_int, &uc.timeout, 0},
+
+        {"cgi-index", required_argument, 0, "add a cgi index file", uwsgi_opt_add_string_list, &uc.index, 0},
+        {"cgi-allowed-ext", required_argument, 0, "cgi allowed extension", uwsgi_opt_add_string_list, &uc.allowed_ext, 0},
+
+        {"cgi-unset", required_argument, 0, "unset specified environment variables", uwsgi_opt_add_string_list, &uc.unset, 0},
+
+        {"cgi-loadlib", required_argument, 0, "load a cgi shared library/optimizer", uwsgi_opt_add_string_list, &uc.loadlib, 0},
+        {"cgi-optimize", no_argument, 0, "enable cgi realpath() optimizer", uwsgi_opt_true, &uc.optimize, 0},
+        {"cgi-optimized", no_argument, 0, "enable cgi realpath() optimizer", uwsgi_opt_true, &uc.optimize, 0},
+
+        {"cgi-path-info", no_argument, 0, "disable PATH_INFO management in cgi scripts", uwsgi_opt_true, &uc.path_info, 0},
+
+        {0, 0, 0, 0, 0, 0, 0},
 
 };
 
 void uwsgi_cgi_404(struct wsgi_request *wsgi_req) {
 
 	wsgi_req->status = 404;
-	wsgi_req->headers_size += wsgi_req->socket->proto_write(wsgi_req, "HTTP/1.0 404 Not Found\r\n\r\nNot Found", 35);
+	wsgi_req->headers_size += wsgi_req->socket->proto_write(wsgi_req, "HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot Found", 61);
 }
 
 void uwsgi_cgi_403(struct wsgi_request *wsgi_req) {
 
 	wsgi_req->status = 403;
-	wsgi_req->headers_size += wsgi_req->socket->proto_write(wsgi_req, "HTTP/1.0 403 Forbidden\r\n\r\nForbidden", 35);
+	wsgi_req->headers_size += wsgi_req->socket->proto_write(wsgi_req, "HTTP/1.0 403 Forbidden\r\nContent-Type: text/plain\r\n\r\nForbidden", 61);
 
 }
 
@@ -401,6 +422,8 @@ int uwsgi_cgi_walk(struct wsgi_request *wsgi_req, char *full_path, char *docroot
         int part_size = 0;
 	struct stat st;
 
+	if (wsgi_req->path_info_len == 0) return 0;
+
         if (ptr[0] == '/') part_size++;
 
         for(i=0;i<wsgi_req->path_info_len-discard_base;i++) {
@@ -480,16 +503,23 @@ int uwsgi_cgi_request(struct wsgi_request *wsgi_req) {
 		return -1;
 	}
 
+	char *docroot = NULL;
+
 	// check for file availability (and 'runnability')
+	if (uc.from_docroot) {
+		docroot = wsgi_req->document_root;	
+		docroot_len = wsgi_req->document_root_len;	
+	}
+	else {
+		docroot = uwsgi_cgi_get_docroot(wsgi_req->path_info, wsgi_req->path_info_len, &need_free, &is_a_file, &discard_base, &script_name);
+		docroot_len = strlen(docroot);
+	}
 
-	char *docroot = uwsgi_cgi_get_docroot(wsgi_req->path_info, wsgi_req->path_info_len, &need_free, &is_a_file, &discard_base, &script_name);
-
-	if (docroot == NULL) {
+	if (docroot == NULL || docroot_len == 0) {
 		uwsgi_cgi_404(wsgi_req);
 		return UWSGI_OK;
 	}
 
-	docroot_len = strlen(docroot);
 	memcpy(full_path, docroot, docroot_len);
 
 	if (!is_a_file) {
@@ -537,7 +567,7 @@ int uwsgi_cgi_request(struct wsgi_request *wsgi_req) {
 	if (S_ISDIR(cgi_stat.st_mode)) {
 
 		// add / to directories
-		if (wsgi_req->path_info_len == 0 || wsgi_req->path_info[wsgi_req->path_info_len-1] != '/') {
+		if (wsgi_req->path_info_len == 0 || (wsgi_req->path_info_len > 0 && wsgi_req->path_info[wsgi_req->path_info_len-1] != '/')) {
 			uwsgi_cgi_redirect_to_slash(wsgi_req);
 			if (need_free)
                         	free(docroot);
@@ -741,7 +771,7 @@ clear2:
 			}
 		}
 		if (wsgi_req->async_post) {
-			if (fileno(wsgi_req->async_post) == i) {
+			if (fileno((FILE*)wsgi_req->async_post) == i) {
 				continue;
 			}
 		}
@@ -758,8 +788,8 @@ clear2:
 		}
 	}
 	else if (wsgi_req->async_post) {
-		if (fileno(wsgi_req->async_post) != 0) {
-			dup2(fileno(wsgi_req->async_post), 0);
+		if (fileno((FILE*)wsgi_req->async_post) != 0) {
+			dup2(fileno((FILE*)wsgi_req->async_post), 0);
 			fclose(wsgi_req->async_post);
 		}
 	}
@@ -938,51 +968,6 @@ void uwsgi_cgi_after_request(struct wsgi_request *wsgi_req) {
 		log_request(wsgi_req);
 }
 
-int uwsgi_cgi_manage_options(int i, char *optarg) {
-
-	char *value;
-
-        switch(i) {
-                case LONG_ARGS_CGI:
-			value = strchr(optarg, '=');
-			if (!value) {
-				uwsgi_dyn_dict_new(&uc.mountpoint, optarg, strlen(optarg), NULL, 0);
-			}
-			else {
-				uwsgi_dyn_dict_new(&uc.mountpoint, optarg, value-optarg, value+1, strlen(value+1));
-			}
-                        return 1;
-                case LONG_ARGS_CGI_BUFFER_SIZE:
-                        uc.buffer_size = atoi(optarg);
-                        return 1;
-                case LONG_ARGS_CGI_TIMEOUT:
-                        uc.timeout = atoi(optarg);
-                        return 1;
-                case LONG_ARGS_CGI_INDEX:
-			uwsgi_string_new_list(&uc.index, optarg);
-                        return 1;
-                case LONG_ARGS_CGI_ALLOWED_EXT:
-			uwsgi_string_new_list(&uc.allowed_ext, optarg);
-                        return 1;
-                case LONG_ARGS_CGI_LOADLIB:
-			uwsgi_string_new_list(&uc.loadlib, uwsgi_str(optarg));
-                        return 1;
-                case LONG_ARGS_CGI_UNSET:
-			uwsgi_string_new_list(&uc.unset, optarg);
-                        return 1;
-		case LONG_ARGS_CGI_MAP_HELPER:
-			value = strchr(optarg, '=');
-			if (!value) {
-				uwsgi_log("invalid CGI helper syntax, must be ext=command\n");
-				exit(1);
-			}
-			uwsgi_dyn_dict_new(&uc.helpers, optarg, value-optarg, value+1, strlen(value+1));
-			return 1;
-        }
-
-        return 0;
-}
-
 
 struct uwsgi_plugin cgi_plugin = {
 
@@ -991,7 +976,6 @@ struct uwsgi_plugin cgi_plugin = {
 	.init = uwsgi_cgi_init,
 	.init_apps = uwsgi_cgi_apps,
 	.options = uwsgi_cgi_options,
-	.manage_opt = uwsgi_cgi_manage_options,
 	.request = uwsgi_cgi_request,
 	.after_request = uwsgi_cgi_after_request,
 

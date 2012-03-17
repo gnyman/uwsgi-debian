@@ -336,7 +336,7 @@ void emperor_add(char *name, time_t born, char *config, uint32_t config_size, ui
 		}
 
 		counter = 4;
-		struct uwsgi_config_template *uct = uwsgi.vassals_templates;
+		struct uwsgi_string_list *uct = uwsgi.vassals_templates;
                 while(uct) {
 			counter+=2;
 			uct = uct->next;
@@ -373,14 +373,32 @@ void emperor_add(char *name, time_t born, char *config, uint32_t config_size, ui
 		uct = uwsgi.vassals_templates;
         	while(uct) {
 			vassal_argv[counter] = "--inherit";
-			vassal_argv[counter+1] = uct->filename;
+			vassal_argv[counter+1] = uct->value;
 			counter+=2;
 			uct = uct->next;
 		}
 		vassal_argv[counter] = NULL;
 
+		// disable stdin
+		int stdin_fd = open("/dev/null", O_RDONLY);
+                if (stdin_fd < 0) {
+                	uwsgi_error_open("/dev/null");
+                        exit(1);
+                }
+                if (stdin_fd != 0) {
+                	if (dup2(stdin_fd, 0)) {
+                        	uwsgi_error("dup2()");
+                                exit(1);
+                        }
+                        close(stdin_fd);
+                }
+
 		// close all of the unneded fd
-		for(i=3;i<sysconf(_SC_OPEN_MAX);i++) {
+		for(i=3;i<(int)uwsgi.max_fd;i++) {
+			if (n_ui->use_config) {
+				if (i == n_ui->pipe_config[1])
+					continue;
+			}
 			if (i != n_ui->pipe[1]) {
 				close(i);
 			}
@@ -435,6 +453,7 @@ void emperor_loop() {
 	int nevents;
 	int interesting_fd;
 	char notification_message[64];
+	struct rlimit rl;
 
 	uwsgi.emperor_stats_fd = -1;
 
@@ -445,6 +464,13 @@ void emperor_loop() {
         uwsgi_unix_signal(SIGUSR1, emperor_stats);
 
 	memset(&ui_base, 0, sizeof(struct uwsgi_instance));
+
+	if (getrlimit(RLIMIT_NOFILE, &rl)) {
+		uwsgi_error("getrlimit()");
+		exit(1);
+	}
+
+	uwsgi.max_fd = rl.rlim_cur;
 
 
 	emperor_queue = event_queue_init();
@@ -631,7 +657,9 @@ reconnect:
 					ssize_t rlen = read(interesting_fd, &byte, 1);
 					if (rlen <= 0) {
 						// SAFE
-						emperor_del(ui_current);
+						if (!ui_current->config_len) {
+							emperor_del(ui_current);
+						}
 					}
 					else {
 						if (byte == 17) {

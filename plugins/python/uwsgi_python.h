@@ -3,26 +3,6 @@
 
 #include <frameobject.h>
 
-#define MAX_PYMODULE_ALIAS 64
-#define MAX_PYARGV 10
-
-#define LONG_ARGS_PYTHON_BASE      17000 + ((0 + 1) * 1000)
-
-#define LONG_ARGS_PYTHONPATH            LONG_ARGS_PYTHON_BASE + 1
-#define LONG_ARGS_PASTE                 LONG_ARGS_PYTHON_BASE + 2
-#define LONG_ARGS_PYARGV                LONG_ARGS_PYTHON_BASE + 3
-#define LONG_ARGS_PYMODULE_ALIAS        LONG_ARGS_PYTHON_BASE + 4
-#define LONG_ARGS_RELOAD_OS_ENV		LONG_ARGS_PYTHON_BASE + 5
-#define LONG_ARGS_PYIMPORT		LONG_ARGS_PYTHON_BASE + 6
-#define LONG_ARGS_POST_PYMODULE_ALIAS   LONG_ARGS_PYTHON_BASE + 7
-#define LONG_ARGS_WEB3			LONG_ARGS_PYTHON_BASE + 8
-#define LONG_ARGS_PUMP			LONG_ARGS_PYTHON_BASE + 9
-#define LONG_ARGS_WSGI_LITE		LONG_ARGS_PYTHON_BASE + 10
-#define LONG_ARGS_PYSHELL		LONG_ARGS_PYTHON_BASE + 11
-#define LONG_ARGS_SPOOLER_PYIMPORT	LONG_ARGS_PYTHON_BASE + 12
-#define LONG_ARGS_PYTHON_RUN		LONG_ARGS_PYTHON_BASE + 13
-#define LONG_ARGS_SHARED_PYIMPORT	LONG_ARGS_PYTHON_BASE + 14
-
 #define PYTHON_APP_TYPE_WSGI		0
 #define PYTHON_APP_TYPE_WEB3		1
 #define PYTHON_APP_TYPE_WSGI2		2
@@ -118,9 +98,9 @@ struct uwsgi_python {
 	int argc;
 
 #ifdef PYTHREE
-	wchar_t *py_argv[MAX_PYARGV];
+	wchar_t **py_argv;
 #else
-	char *py_argv[MAX_PYARGV];
+	char **py_argv;
 #endif
 
 	PyObject *wsgi_spitout;
@@ -131,12 +111,15 @@ struct uwsgi_python {
 	char *test_module;
 
 	int pyshell;
+	int pyshell_oneshot;
 
+	
 	struct uwsgi_string_list *python_path;
 	struct uwsgi_string_list *import_list;
 	struct uwsgi_string_list *shared_import_list;
 	struct uwsgi_string_list *spooler_import_list;
 	struct uwsgi_string_list *post_pymodule_alias;
+	struct uwsgi_string_list *pymodule_alias;
 
 	PyObject *loader_dict;
 	PyObject* (*loaders[LOADER_MAX]) (void *);
@@ -144,6 +127,7 @@ struct uwsgi_python {
 	char *wsgi_config;
 	char *file_config;
 	char *paste;
+	int paste_logger;
 	char *eval;
 
 	char *web3;
@@ -175,10 +159,7 @@ struct uwsgi_python {
 	PyObject *workers_tuple;
 	PyObject *embedded_dict;
 	PyObject *embedded_args;
-	PyObject *fastfuncslist;
 
-	char *pymodule_alias[MAX_PYMODULE_ALIAS];
-	int pymodule_alias_cnt;
 
 	int pep3333_input;
 
@@ -188,6 +169,8 @@ struct uwsgi_python {
 
 	PyObject *after_req_hook;
 	PyObject *after_req_hook_args;
+
+	char *pyrun;
 
 };
 

@@ -41,20 +41,20 @@ void uwsgi_mule(int id) {
 		uwsgi.mules[id-1].id = id;
 		uwsgi.mules[id-1].pid = getpid();
 
-		uwsgi_fixup_fds(0, id);
+		uwsgi_fixup_fds(0, id, NULL);
 
 		uwsgi.my_signal_socket = uwsgi.mules[id-1].signal_pipe[1];
 		uwsgi.signal_socket = uwsgi.shared->mule_signal_pipe[1];
 
 		uwsgi_close_all_sockets();
 
-		for (i = 0; i < 0xFF; i++) {
+		for (i = 0; i < 256; i++) {
                 	if (uwsgi.p[i]->master_fixup) {
                 		uwsgi.p[i]->master_fixup(1);
                 	}
                 }
 
-		for (i = 0; i < 0xFF; i++) {
+		for (i = 0; i < 256; i++) {
                         if (uwsgi.p[i]->post_fork) {
                                 uwsgi.p[i]->post_fork();
                         }
@@ -62,7 +62,7 @@ void uwsgi_mule(int id) {
 
 
 		if (uwsgi.mules[id-1].patch) {
-			for (i = 0; i < 0xFF; i++) {
+			for (i = 0; i < 256; i++) {
                         	if (uwsgi.p[i]->mule) {
                                 	if (uwsgi.p[i]->mule(uwsgi.mules[id-1].patch) == 1) {
 						// never here
@@ -184,7 +184,7 @@ void uwsgi_mule_handler() {
 			}	
 			else {
 				int i,found = 0;
-				for(i=0;i<0xff;i++) {
+				for(i=0;i<256;i++) {
                                 	if (uwsgi.p[i]->mule_msg) {
                                         	if (uwsgi.p[i]->mule_msg(message, len)) {
 							found = 1;
@@ -356,3 +356,24 @@ clear:
         return len;
 }
 
+
+void uwsgi_opt_add_mule(char *opt, char *value, void *foobar) {
+
+	uwsgi.mules_cnt++;
+        uwsgi_string_new_list(&uwsgi.mules_patches, value);
+}
+
+void uwsgi_opt_add_mules(char *opt, char *value, void *foobar) {
+	int i;
+
+	for(i=0;i<atoi(value);i++) {
+                        uwsgi.mules_cnt++;
+                        uwsgi_string_new_list(&uwsgi.mules_patches, NULL);
+                }
+}
+
+void uwsgi_opt_add_farm(char *opt, char *value, void *foobar) {
+	uwsgi.farms_cnt++;
+                uwsgi_string_new_list(&uwsgi.farms_list, value);
+
+}

@@ -7,10 +7,10 @@ struct uwsgi_ping {
 	int ping_timeout;
 } uping;
 
-struct option uwsgi_ping_options[] = {
-	{"ping", required_argument, 0, LONG_ARGS_PING},
-	{"ping-timeout", required_argument, 0, LONG_ARGS_PING_TIMEOUT},
-	{ 0, 0, 0, 0 }
+struct uwsgi_option uwsgi_ping_options[] = {
+	{"ping", required_argument, 0, "ping specified uwsgi host", uwsgi_opt_set_str, &uping.ping, UWSGI_OPT_NO_INITIAL | UWSGI_OPT_NO_SERVER},
+	{"ping-timeout", required_argument, 0, "set ping timeout", uwsgi_opt_set_int, &uping.ping_timeout, 0},
+	{ 0, 0, 0, 0, 0, 0, 0 }
 };
 
 static void ping() {
@@ -91,28 +91,11 @@ int uwsgi_request_ping(struct wsgi_request *wsgi_req) {
 	return UWSGI_OK;
 }
 
-int uwsgi_ping_manage_options(int i, char *optarg) {
-
-	switch(i) {
-		case LONG_ARGS_PING:
-			uwsgi.no_initial_output = 1;
-			uwsgi.no_server = 1;
-			uping.ping = optarg;
-			return 1;
-		case LONG_ARGS_PING_TIMEOUT:
-			uping.ping_timeout = atoi(optarg);
-			return 1;
-	}
-
-	return 0;
-}
-
 struct uwsgi_plugin ping_plugin = {
 
 	.name = "ping",
 	.modifier1 = 100,
 	.options = uwsgi_ping_options,
-	.manage_opt = uwsgi_ping_manage_options,
 	.request = uwsgi_request_ping,
 	.init = ping_init,
 };
