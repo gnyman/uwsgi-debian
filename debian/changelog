@@ -2,8 +2,9 @@ uwsgi (1.1.1+dfsg-1) unstable; urgency=low
 
   * New upstream release (Closes: #664890).
   * Add DM-Upload-Allowed control field.
+  * Remove debian/patches/python-3.x-fix.patch as applied upstream.
 
- -- Janos Guljas <janos@resenje.org>  Thu, 22 Mar 2012 17:22:35 +0100
+ -- Janos Guljas <janos@resenje.org>  Thu, 22 Mar 2012 17:32:15 +0100
 
 uwsgi (1.1+dfsg-1) unstable; urgency=low
 
