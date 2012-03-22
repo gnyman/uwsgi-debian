@@ -4161,3 +4161,80 @@ void uwsgi_write_pidfile(char *pidfile_name) {
         }
         fclose(pidfile);
 }
+
+int uwsgi_manage_exception(char *type, char *value, char *repr) {
+
+	struct uwsgi_string_list *list = NULL;
+
+	// first manage non fatal case (like signals and alarm)....
+
+	if (uwsgi.reload_on_exception) {
+		return -1;
+	}
+
+	if (type) {
+		list = uwsgi.reload_on_exception_type;
+		while(list) {
+			if (!strcmp(list->value, type)) {
+				return -1;
+			}
+			list = list->next;
+		}
+	}
+
+	if (value) {
+		list = uwsgi.reload_on_exception_value;
+		while(list) {
+			if (!strcmp(list->value, value)) {
+				return -1;
+			}
+			list = list->next;
+		}
+	}
+
+	if (repr) {
+		list = uwsgi.reload_on_exception_repr;
+		while(list) {
+			if (!strcmp(list->value, repr)) {
+				return -1;
+			}
+			list = list->next;
+		}
+	}
+
+	return 0;
+}
+
+void uwsgi_protected_close(int fd) {
+
+	sigset_t mask, oset;
+	sigfillset(&mask);
+	if (sigprocmask(SIG_BLOCK, &mask, &oset)) {
+		uwsgi_error("sigprocmask()");
+		exit(1);
+	}
+	close(fd);
+	if (sigprocmask(SIG_SETMASK, &oset, NULL)) {
+		uwsgi_error("sigprocmask()");
+		exit(1);
+	}
+}
+
+ssize_t uwsgi_protected_read(int fd, void *buf, size_t len) {
+
+        sigset_t mask, oset;
+        sigfillset(&mask);
+        if (sigprocmask(SIG_BLOCK, &mask, &oset)) {
+                uwsgi_error("sigprocmask()");
+                exit(1);
+        }
+
+	ssize_t ret = read(fd, buf, len);
+
+        if (sigprocmask(SIG_SETMASK, &oset, NULL)) {
+                uwsgi_error("sigprocmask()");
+                exit(1);
+        }
+	return ret;
+}
+
