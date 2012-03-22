@@ -2,6 +2,7 @@ Source: uwsgi
 Section: web
 Priority: extra
 Maintainer: Janos Guljas <janos@resenje.org>
+DM-Upload-Allowed: yes
 Build-Depends:
  cdbs,
  debhelper (>= 8),
