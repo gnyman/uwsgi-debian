@@ -258,6 +258,12 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"upload-progress", required_argument, 0, "enable creation of .json files in the specified directory during a file upload", uwsgi_opt_set_str, &uwsgi.upload_progress,0},
 	{"no-default-app", no_argument, 0, "do not fallback to default app", uwsgi_opt_true, &uwsgi.no_default_app, 0},
 	{"manage-script-name", no_argument, 0, "automatically rewrite SCRIPT_NAME and PATH_INFO", uwsgi_opt_true, &uwsgi.manage_script_name, 0},
+        {"ignore-script-name", no_argument, 0, "ignore SCRIPT_NAME", uwsgi_opt_true, &uwsgi.ignore_script_name, 0},
+	{"catch-exceptions", no_argument, 0, "report exception has http output (discouraged)", uwsgi_opt_true, &uwsgi.catch_exceptions, 0},
+	{"reload-on-exception", no_argument, 0, "reload a worker when an exception is raised", uwsgi_opt_true, &uwsgi.reload_on_exception, 0},
+	{"reload-on-exception-type", required_argument, 0, "reload a worker when a specific exception type is raised", uwsgi_opt_add_string_list, &uwsgi.reload_on_exception_type, 0},
+	{"reload-on-exception-value", required_argument, 0, "reload a worker when a specific exception value is raised", uwsgi_opt_add_string_list, &uwsgi.reload_on_exception_value, 0},
+	{"reload-on-exception-repr", required_argument, 0, "reload a worker when a specific exception type+value (language-specific) is raised", uwsgi_opt_add_string_list, &uwsgi.reload_on_exception_repr, 0},
 #ifdef UWSGI_UDP
 	{"udp", required_argument, 0, "run the udp server on the specified address", uwsgi_opt_set_str, &uwsgi.udp_socket, UWSGI_OPT_MASTER},
 #endif
@@ -2046,19 +2052,18 @@ int uwsgi_start(void *v_argv) {
 			}
 		}
 
-		struct uwsgi_string_list *zn = uwsgi.zerg_node;
-		while (zn) {
-			if (uwsgi_zerg_attach(zn->value)) {
-				if (!uwsgi.zerg_fallback) {
-					exit(1);
+		if (!uwsgi.is_a_reload) {
+			struct uwsgi_string_list *zn = uwsgi.zerg_node;
+			while (zn) {
+				if (uwsgi_zerg_attach(zn->value)) {
+					if (!uwsgi.zerg_fallback) {
+						exit(1);
+					}
 				}
+				zn = zn->next;
 			}
-			zn = zn->next;
-		}
 
 
-		//check for inherited sockets
-		if (uwsgi.is_a_reload || uwsgi.zerg) {
 
 			if (uwsgi.zerg) {
 #ifdef UWSGI_DEBUG
@@ -2078,6 +2083,10 @@ int uwsgi_start(void *v_argv) {
 
 				uwsgi_log("zerg sockets attached\n");
 			}
+		}
+
+		//check for inherited sockets
+		if (uwsgi.is_a_reload) {
 
 			uwsgi_sock = uwsgi.sockets;
 			while (uwsgi_sock) {
@@ -2141,7 +2150,7 @@ int uwsgi_start(void *v_argv) {
 		//now bind all the unbound sockets
 		uwsgi_sock = uwsgi.sockets;
 		while (uwsgi_sock) {
-			if (!uwsgi_sock->bound) {
+			if (!uwsgi_sock->bound && !uwsgi_socket_is_already_bound(uwsgi_sock->name)) {
 				char *tcp_port = strchr(uwsgi_sock->name, ':');
 				if (tcp_port == NULL) {
 					uwsgi_sock->fd = bind_to_unix(uwsgi_sock->name, uwsgi.listen_queue, uwsgi.chmod_socket, uwsgi.abstract_socket);
@@ -2246,6 +2255,7 @@ skipzero:
 		// put listening socket in non-blocking state and set the protocol
 		uwsgi_sock = uwsgi.sockets;
 		while (uwsgi_sock) {
+			if (!uwsgi_sock->bound || uwsgi_sock->fd == -1) goto nextsock;
 			if (!uwsgi_sock->per_core) {
 				uwsgi_sock->arg = fcntl(uwsgi_sock->fd, F_GETFL, NULL);
 				if (uwsgi_sock->arg < 0) {
@@ -2314,7 +2324,7 @@ skipzero:
 				uwsgi_sock->proto_sendfile = NULL;
 				uwsgi_sock->proto_close = uwsgi_proto_base_close;
 			}
-
+nextsock:
 			uwsgi_sock = uwsgi_sock->next;
 		}
 

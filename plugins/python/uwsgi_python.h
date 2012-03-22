@@ -136,9 +136,6 @@ struct uwsgi_python {
 
 	char *callable;
 
-	int ignore_script_name;
-	int catch_exceptions;
-
 	int *current_recursion_depth;
 	struct _frame **current_frame;
 
@@ -255,6 +252,8 @@ int uwsgi_python_profiler_call(PyObject *, PyFrameObject *, int, PyObject *);
 void uwsgi_python_reset_random_seed(void);
 
 char *uwsgi_pythonize(char *);
+
+int uwsgi_python_manage_exceptions(void);
 
 #ifdef UWSGI_PYPY
 #undef UWSGI_MINTERPRETERS

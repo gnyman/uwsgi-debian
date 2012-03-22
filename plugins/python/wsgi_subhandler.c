@@ -159,7 +159,7 @@ void *uwsgi_request_subhandler_wsgi(struct wsgi_request *wsgi_req, struct uwsgi_
 	// call
 
 	PyTuple_SetItem(wsgi_req->async_args, 0, wsgi_req->async_environ);
-	return python_call(wsgi_req->async_app, wsgi_req->async_args, up.catch_exceptions, wsgi_req);
+	return python_call(wsgi_req->async_app, wsgi_req->async_args, uwsgi.catch_exceptions, wsgi_req);
 }
 
 int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
@@ -169,8 +169,6 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 #ifdef UWSGI_SENDFILE
 	ssize_t sf_len = 0;
 #endif
-
-	UWSGI_GET_GIL
 
 	// return or yield ?
 	if (PyString_Check((PyObject *)wsgi_req->async_result)) {
@@ -195,7 +193,6 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 #ifdef UWSGI_ASYNC
 		if (uwsgi.async > 1) {
 			if (wsgi_req->response_size < wsgi_req->sendfile_fd_size) {
-				UWSGI_RELEASE_GIL
 				return UWSGI_AGAIN;
 			}
 		}
@@ -213,7 +210,6 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 		}
 #ifdef UWSGI_ASYNC
 		if (uwsgi.async > 1) {
-			UWSGI_RELEASE_GIL
 			return UWSGI_AGAIN;
 		}
 #endif
@@ -226,12 +222,16 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 
 	if (!pychunk) {
 		if (PyErr_Occurred()) { 
+			int do_exit = uwsgi_python_manage_exceptions();
 		        if (PyErr_ExceptionMatches(PyExc_MemoryError)) {
 				uwsgi_log("Memory Error detected !!!\n");	
 			}		
 			uwsgi.workers[uwsgi.mywid].exceptions++;
 			uwsgi_apps[wsgi_req->app_id].exceptions++;
 			PyErr_Print();
+			if (do_exit) {
+                        	exit(UWSGI_EXCEPTION_CODE);
+                	}
 		}	
 		if (PyObject_HasAttrString((PyObject *)wsgi_req->async_result, "close")) {
 			PyObject *close_method = PyObject_GetAttrString((PyObject *)wsgi_req->async_result, "close");
@@ -272,7 +272,6 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 
 
 	Py_DECREF(pychunk);
-	UWSGI_RELEASE_GIL
 	return UWSGI_AGAIN;
 
 clear:
@@ -280,18 +279,11 @@ clear:
 	if (wsgi_req->sendfile_fd != -1) {
 		Py_DECREF((PyObject *)wsgi_req->async_sendfile);
 	}
-	if (wsgi_req->async_input) {
-		Py_DECREF((PyObject *)wsgi_req->async_input);
-	}
-	if (wsgi_req->async_environ) {
-		PyDict_Clear(wsgi_req->async_environ);
-	}
 	Py_XDECREF((PyObject *)wsgi_req->async_placeholder);
 clear2:
 	Py_DECREF((PyObject *)wsgi_req->async_result);
 	PyErr_Clear();
 
-	UWSGI_RELEASE_GIL
 	return UWSGI_OK;
 }
 
