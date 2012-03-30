@@ -472,19 +472,14 @@ int uwsgi_perl_magic(char *mountpoint, char *lazy) {
 
 // taken from Torsten Foertsch AfterFork.xs
 void uwsgi_perl_post_fork() {
-/*
-	GV *tmpgv;
 
-	PL_ppid = (IV)getppid();
-	hv_clear(PL_pidstatus);
+	GV *tmpgv = gv_fetchpv("$", TRUE, SVt_PV);
+        if (tmpgv) {
+                SvREADONLY_off(GvSV(tmpgv));
+                sv_setiv(GvSV(tmpgv), (IV)getpid());
+                SvREADONLY_on(GvSV(tmpgv));
+        }
 
-	tmpgv = gv_fetchpv("$", TRUE, SVt_PV);
-	if (tmpgv) {
-		SvREADONLY_off(GvSV(tmpgv));
-		sv_setiv(GvSV(tmpgv), (IV)getpid());
-		SvREADONLY_on(GvSV(tmpgv));
-	}
-*/
 }
 
 int uwsgi_perl_mount_app(char *mountpoint, char *app, int regexp) {
