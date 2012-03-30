@@ -169,6 +169,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"spooler-ordered", no_argument, 0, "try to order the execution of spooler tasks", uwsgi_opt_true, &uwsgi.spooler_ordered,0},
 	{"spooler-chdir", required_argument, 0, "chdir() to specified directory before each spooler task", uwsgi_opt_set_str, &uwsgi.spooler_chdir,0},
 	{"spooler-processes", required_argument, 0, "set the number of processes for spoolers", uwsgi_opt_set_int, &uwsgi.spooler_numproc, 0},
+	{"spooler-quiet", no_argument, 0, "do not be verbose with spooler tasks", uwsgi_opt_true, &uwsgi.spooler_quiet, 0},
 #endif
 	{"mule", optional_argument, 0, "add a mule", uwsgi_opt_add_mule, NULL, UWSGI_OPT_MASTER},
 	{"mules", required_argument, 0, "add the specified number of mules", uwsgi_opt_add_mules, NULL, UWSGI_OPT_MASTER},
@@ -2210,11 +2211,15 @@ int uwsgi_start(void *v_argv) {
 				if (gsa.sa->sa_family == AF_UNIX) {
 					uwsgi_sock = uwsgi_new_socket(usa.sa_un.sun_path);
 					uwsgi_sock->family = AF_UNIX;
+					uwsgi_sock->fd = 0; 
+					uwsgi_sock->bound = 1;
 					uwsgi_log("uwsgi socket %d inherited UNIX address %s fd 0\n", uwsgi_get_socket_num(uwsgi_sock), uwsgi_sock->name);
 				}
 				else {
 					uwsgi_sock = uwsgi_new_socket(uwsgi_concat2("::",""));
 					uwsgi_sock->family = AF_INET;
+					uwsgi_sock->fd = 0;
+					uwsgi_sock->bound = 1;
 					uwsgi_log("uwsgi socket %d inherited INET address %s fd 0\n", uwsgi_get_socket_num(uwsgi_sock), uwsgi_sock->name);
 				}
 			}
