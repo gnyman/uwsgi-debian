@@ -1,3 +1,15 @@
+uwsgi (1.1.2+dfsg-2~experimental+1) experimental; urgency=low
+
+  * Update dependencies to build with Apache 2.4. (Closes: #666793)
+  * Add patches:
+    - 0001-ported-mod_uwsgi-to-apache-2.4.patch
+      Apache 2.4 support for mod_uwsgi from upstream
+    - 0002-ported-mod_Ruwsgi-to-apache-2.4.patch
+      Apache 2.4 support for mod_ruwsgi from upstream
+  * Update postinst and prerm scripts to use apache2-maintscript-helper.
+
+ -- Janos Guljas <janos@resenje.org>  Tue, 03 Apr 2012 20:12:06 +0200
+
 uwsgi (1.1.2+dfsg-1) unstable; urgency=low
 
   * New upstream release.

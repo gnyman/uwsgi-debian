@@ -6,7 +6,7 @@ DM-Upload-Allowed: yes
 Build-Depends:
  cdbs,
  debhelper (>= 8),
- apache2-threaded-dev,
+ apache2-dev,
  erlang-dev,
  help2man,
  javahelper,
@@ -618,7 +618,7 @@ Description: uGreen plugin for uWSGI
 
 Package: libapache2-mod-uwsgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, apache2
+Depends: ${shlibs:Depends}, ${misc:Depends}, apache2-api-20120211
 Conflicts: libapache2-mod-ruwsgi
 Replaces: libapache2-mod-ruwsgi
 Description: uwsgi module for Apache2 (mod_uwsgi)
@@ -645,7 +645,7 @@ Description: debugging symbols for Apache2 mod_uwsgi
 
 Package: libapache2-mod-ruwsgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, apache2
+Depends: ${shlibs:Depends}, ${misc:Depends}, apache2-api-20120211
 Conflicts: libapache2-mod-uwsgi
 Replaces: libapache2-mod-uwsgi
 Description: uwsgi module for Apache2 (mod_Ruwsgi)
