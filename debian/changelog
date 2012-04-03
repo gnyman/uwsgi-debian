@@ -1,3 +1,10 @@
+uwsgi (1.1.2+dfsg-2~experimental+2) experimental; urgency=low
+
+  * Add versioned build-dependency for apache2-dev (>> 2.4~).
+  * Update postinst and prerm scripts, thanks to Arno Töll.
+
+ -- Janos Guljas <janos@resenje.org>  Wed, 04 Apr 2012 00:01:40 +0200
+
 uwsgi (1.1.2+dfsg-2~experimental+1) experimental; urgency=low
 
   * Update dependencies to build with Apache 2.4. (Closes: #666793)

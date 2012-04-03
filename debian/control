@@ -6,7 +6,7 @@ DM-Upload-Allowed: yes
 Build-Depends:
  cdbs,
  debhelper (>= 8),
- apache2-dev,
+ apache2-dev (>> 2.4~),
  erlang-dev,
  help2man,
  javahelper,
