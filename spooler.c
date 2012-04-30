@@ -237,7 +237,7 @@ int spool_request(struct uwsgi_spooler *uspool, char *filename, int rn, int core
 	// here the file will be unlocked too
 	close(fd);
 
-	if (!uwsgi.spooler_quiet) 
+	if (!uwsgi.spooler_quiet)
 		uwsgi_log("[spooler] written %d bytes to file %s\n", size + body_len + 4, filename);
 	
 	// and here waiting threads can continue
@@ -310,6 +310,9 @@ void spooler(struct uwsgi_spooler *uspool) {
 		event_queue_add_fd_read(spooler_event_queue, uwsgi.shared->spooler_signal_pipe[1]);
 	}
 
+	// reset the tasks counter
+	uspool->tasks = 0;
+
 	for (;;) {
 
 
@@ -337,19 +340,7 @@ void spooler(struct uwsgi_spooler *uspool) {
 		if (event_queue_wait(spooler_event_queue, timeout, &interesting_fd) > 0) {
 			if (uwsgi.master_process) {
 				if (interesting_fd == uwsgi.shared->spooler_signal_pipe[1]) {
-					uint8_t uwsgi_signal;
-					if (read(interesting_fd, &uwsgi_signal, 1) <= 0) {
-                                                	uwsgi_log_verbose("uWSGI spooler screams: UAAAAAAH my master died, i will follow him...\n");
-                                               		end_me(0); 
-                                	}
-                                	else {
-#ifdef UWSGI_DEBUG
-                                        	uwsgi_log_verbose("master sent signal %d to the spooler\n", uwsgi_signal);
-#endif
-                                        	if (uwsgi_signal_handler(uwsgi_signal)) {
-                                                	uwsgi_log_verbose("error managing signal %d on the spooler\n", uwsgi_signal);
-                                        	}
-                                	}
+					uwsgi_receive_signal(interesting_fd, "spooler", (int) getpid());
 				}
 			}
 		}
@@ -360,6 +351,12 @@ void spooler(struct uwsgi_spooler *uspool) {
 			tmp_wakeup--;
 		}
 		wakeup = tmp_wakeup;
+
+		// need to recycle ?
+		if (uwsgi.spooler_max_tasks > 0 && uspool->tasks >= (uint64_t)uwsgi.spooler_max_tasks) {
+			uwsgi_log("[spooler %s pid: %d] maximum number of tasks reached (%d) recycling ...\n", uspool->dir, (int) uwsgi.mypid, uwsgi.spooler_max_tasks);
+			end_me(0);
+		}
 
 	}
 }
@@ -508,8 +505,8 @@ void spooler_manage_task(struct uwsgi_spooler *uspool, char *dir, char *task) {
 			// now the task is running and should not be waken up
 			uspool->running = 1;
 
-			if (!uwsgi.spooler_quiet) 
-				uwsgi_log("[spooler %s pid: %d] managing request %s ...\n", uspool->dir, (int) uwsgi.mypid, task); 
+			if (!uwsgi.spooler_quiet)
+				uwsgi_log("[spooler %s pid: %d] managing request %s ...\n", uspool->dir, (int) uwsgi.mypid, task);
 
 
 			// chdir before running the task (if requested)
@@ -532,6 +529,8 @@ void spooler_manage_task(struct uwsgi_spooler *uspool, char *dir, char *task) {
                 			}
 					if (ret == 0) continue;
 					callable_found = 1;
+					// increase task counter
+					uspool->tasks++;
 					if (ret == -2) {
 						if (!uwsgi.spooler_quiet)
 							uwsgi_log("[spooler %s pid: %d] done with task %s after %d seconds\n", uspool->dir, (int) uwsgi.mypid, task, time(NULL)-now);

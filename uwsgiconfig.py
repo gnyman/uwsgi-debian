@@ -1,6 +1,6 @@
 # uWSGI build system
 
-uwsgi_version = '1.1.2'
+uwsgi_version = '1.2'
 
 import os
 import re
@@ -306,6 +306,11 @@ class uConf(object):
                 raise 
         except:
             self.include_path = ['/usr/include', '/usr/local/include']
+
+        additional_include_paths = self.get('additional_include_paths')
+        if additional_include_paths:
+            for ipath in additional_include_paths.split():
+                self.include_path.append(ipath)
             
         if not mute:
             print("detected include path: %s" % self.include_path)
@@ -383,6 +388,23 @@ class uConf(object):
         if self.has_include('ifaddrs.h'):
             self.cflags.append('-DUWSGI_HAS_IFADDRS')
 
+        if uwsgi_os in ('FreeBSD', 'OpenBSD'):
+            if self.has_include('execinfo.h') or os.path.exists('/usr/local/include/execinfo.h'):
+                if os.path.exists('/usr/local/include/execinfo.h'):
+                    self.cflags.append('-I/usr/local/include')
+                    self.ldflags.append('-L/usr/local/lib')
+                self.cflags.append('-DUWSGI_HAS_EXECINFO')
+                self.libs.append('-lexecinfo')
+
+        if uwsgi_os == 'OpenBSD':
+            try:
+                obsd_major = int(uwsgi_os_k.split('.')[0])
+                obsd_minor = int(uwsgi_os_k.split('.')[1])
+                if obsd_major >= 5 and obsd_minor > 0:
+                    self.cflags.append('-DUWSGI_NEW_OPENBSD')
+            except:
+                pass
+
         if uwsgi_os == 'SunOS':
             self.libs.append('-lsendfile')
             self.gcc_list.append('lib/sun_fixes')
@@ -415,16 +437,22 @@ class uConf(object):
             if uwsgi_os == 'Linux' or uwsgi_os == 'SunOS':
                 locking_mode = 'pthread_mutex'
             # FreeBSD umtx is still not ready for process shared locking
-            #elif uwsgi_os == 'FreeBSD':
-            #    locking_mode = 'umtx'
+            # starting from FreeBSD 9 posix semaphores can be shared between processes
+            elif uwsgi_os == 'FreeBSD':
+                 try:
+                     fbsd_major = int(uwsgi_os_k.split('.')[0])
+                     if fbsd_major >= 9:
+                         locking_mode = 'posix_sem'
+                 except:
+                     pass
             elif uwsgi_os == 'Darwin':
                 locking_mode = 'osx_spinlock'
 
         if locking_mode == 'pthread_mutex':
             self.cflags.append('-DUWSGI_LOCK_USE_MUTEX')
         # FreeBSD umtx is still not ready for process shared locking
-        #elif locking_mode == 'umtx':
-        #    self.cflags.append('-DUWSGI_LOCK_USE_UMTX')
+        elif locking_mode == 'posix_sem':
+            self.cflags.append('-DUWSGI_LOCK_USE_POSIX_SEM')
         elif locking_mode == 'osx_spinlock':
             self.cflags.append('-DUWSGI_LOCK_USE_OSX_SPINLOCK')
 

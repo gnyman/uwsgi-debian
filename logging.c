@@ -113,7 +113,7 @@ void uwsgi_check_logrotate(void) {
 void log_request(struct wsgi_request *wsgi_req) {
 
 	// optimize this (please)
-	char *time_request;
+	char time_request[26];
 	time_t microseconds, microseconds2;
 	int rlen;
 	int app_req = -1;
@@ -136,6 +136,7 @@ void log_request(struct wsgi_request *wsgi_req) {
 	char *msg1 = " via sendfile() ";
 #endif
 	char *msg3 = " via route() ";
+	char *msg4 = " via offload() ";
 
 	struct uwsgi_app *wi;
 
@@ -159,8 +160,15 @@ void log_request(struct wsgi_request *wsgi_req) {
 	if (wsgi_req->status == -17) {
 		via = msg3;
 	}
+	else if (wsgi_req->status == -30) {
+		via = msg4;
+	}
 
-	time_request = ctime((const time_t *) &wsgi_req->start_of_request.tv_sec);
+#ifdef __sun__
+	ctime_r((const time_t *) &wsgi_req->start_of_request.tv_sec, time_request, 26);
+#else
+	ctime_r((const time_t *) &wsgi_req->start_of_request.tv_sec, time_request);
+#endif
 	microseconds = wsgi_req->end_of_request.tv_sec * 1000000 + wsgi_req->end_of_request.tv_usec;
 	microseconds2 = wsgi_req->start_of_request.tv_sec * 1000000 + wsgi_req->start_of_request.tv_usec;
 
@@ -262,6 +270,13 @@ void get_memusage(uint64_t * rss, uint64_t * vsz) {
 		if (kproc && cnt > 0) {
 			*vsz = kproc->ki_size;
 			*rss = kproc->ki_rssize * uwsgi.page_size;
+		}
+#elif defined(UWSGI_NEW_OPENBSD)
+		struct kinfo_proc *kproc; 
+		kproc = kvm_getprocs(kv, KERN_PROC_PID, uwsgi.mypid, sizeof(struct kinfo_proc), &cnt);
+		if (kproc && cnt > 0) { 
+			*vsz = (kproc->p_vm_dsize + kproc->p_vm_ssize + kproc->p_vm_tsize) * uwsgi.page_size;
+			*rss = kproc->p_vm_rssize * uwsgi.page_size;
 		}
 #elif defined(__NetBSD__) || defined(__OpenBSD__)
 		struct kinfo_proc2 *kproc2;
