@@ -38,6 +38,14 @@
 #define PyVarObject_HEAD_INIT(x, y) PyObject_HEAD_INIT(x) y,
 #endif
 
+#define uwsgi_py_write_set_exception(x) PyErr_SetString(PyExc_IOError, "write error");
+#define uwsgi_py_write_exception(x) uwsgi_py_write_set_exception(x); PyErr_Print();
+
+
+#define uwsgi_py_check_write_errors if (wsgi_req->write_errors > 0 && uwsgi.write_errors_exception_only) {\
+                        uwsgi_py_write_set_exception(wsgi_req);\
+                }\
+                else if (wsgi_req->write_errors > uwsgi.write_errors_tolerance)\
 
 PyAPI_FUNC(PyObject *) PyMarshal_WriteObjectToString(PyObject *, int);
 PyAPI_FUNC(PyObject *) PyMarshal_ReadObjectFromString(char *, Py_ssize_t);
@@ -151,6 +159,8 @@ struct uwsgi_python {
 	pthread_mutex_t lock_pyloaders;
 	void (*gil_get) (void);
 	void (*gil_release) (void);
+	int auto_reload;
+	struct uwsgi_string_list *auto_reload_ignore;
 #endif
 
 	PyObject *workers_tuple;
@@ -248,10 +258,12 @@ void simple_reset_ts(struct wsgi_request *, struct uwsgi_app *);
 void simple_threaded_reset_ts(struct wsgi_request *, struct uwsgi_app *);
 
 int uwsgi_python_profiler_call(PyObject *, PyFrameObject *, int, PyObject *);
+int uwsgi_python_tracer(PyObject *, PyFrameObject *, int, PyObject *);
 
 void uwsgi_python_reset_random_seed(void);
 
 char *uwsgi_pythonize(char *);
+void *uwsgi_python_autoreloader_thread(void *);
 
 int uwsgi_python_manage_exceptions(void);
 

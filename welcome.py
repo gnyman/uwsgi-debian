@@ -3,7 +3,10 @@ import os
 import gc
 import sys
 from uwsgidecorators import *
-gc.set_debug(gc.DEBUG_SAVEALL)
+print(sys.version)
+print(sys.version_info)
+if 'set_debug' in gc.__dict__:
+    gc.set_debug(gc.DEBUG_SAVEALL)
 
 print(os.environ)
 print(sys.modules)
@@ -64,7 +67,6 @@ def setprocname():
         uwsgi.setprocname("i am the worker %d" % uwsgi.worker_id())
 
 def application(env, start_response):
-
     try:
         uwsgi.mule_msg(env['REQUEST_URI'], 1)
     except:

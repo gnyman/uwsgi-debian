@@ -187,9 +187,12 @@ void daemonize(char *logfile) {
 	}
 
 	/* stdin */
-	if (dup2(fdin, 0) < 0) {
-		uwsgi_error("dup2()");
-		exit(1);
+	if (fdin != 0) {
+		if (dup2(fdin, 0) < 0) {
+			uwsgi_error("dup2()");
+			exit(1);
+		}
+		close(fdin);
 	}
 
 
@@ -619,7 +622,9 @@ void uwsgi_as_root() {
 				char *uidname = uwsgi.uidname;
 				if (!uidname) {
 					struct passwd *pw = getpwuid(uwsgi.uid);
-					uidname = pw->pw_name;
+					if (pw)
+						uidname = pw->pw_name;
+					
 				}
 				if (!uidname) uidname = uwsgi_num2str(uwsgi.uid);
 				if (initgroups(uidname, uwsgi.gid)) {
@@ -1013,7 +1018,6 @@ int wsgi_req_accept(int queue, struct wsgi_request *wsgi_req) {
 
 	int ret;
 	int interesting_fd;
-	char uwsgi_signal;
 	struct uwsgi_socket *uwsgi_sock = uwsgi.sockets;
 
 	thunder_lock;
@@ -1032,23 +1036,7 @@ int wsgi_req_accept(int queue, struct wsgi_request *wsgi_req) {
 
 		thunder_unlock;
 
-		if (read(interesting_fd, &uwsgi_signal, 1) <= 0) {
-			if (uwsgi.no_orphans) {
-				uwsgi_log_verbose("uWSGI worker %d screams: UAAAAAAH my master died, i will follow him...\n", uwsgi.mywid);
-				end_me(0);
-			}
-			else {
-				close(interesting_fd);
-			}
-		}
-		else {
-#ifdef UWSGI_DEBUG
-			uwsgi_log_verbose("master sent signal %d to worker %d\n", uwsgi_signal, uwsgi.mywid);
-#endif
-			if (uwsgi_signal_handler(uwsgi_signal)) {
-				uwsgi_log_verbose("error managing signal %d on worker %d\n", uwsgi_signal, uwsgi.mywid);
-			}
-		}
+		uwsgi_receive_signal(interesting_fd, "worker", uwsgi.mywid);
 
 #ifdef UWSGI_THREADING
         	if (uwsgi.threads > 1) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &ret);
@@ -1125,6 +1113,16 @@ void sanitize_args() {
 		uwsgi.vacuum = 1;
 	}
 #endif
+
+	if (uwsgi.write_errors_exception_only) {
+		uwsgi.ignore_sigpipe = 1;
+		uwsgi.ignore_write_errors = 1;
+	}
+
+	if (uwsgi.cheaper_count > 0 && uwsgi.cheaper_count >= uwsgi.numproc) {
+		uwsgi_log("invalid cheaper value: must be lower than processes\n");
+		exit(1);
+	}
 }
 
 void env_to_arg(char *src, char *dst) {
@@ -1189,6 +1187,7 @@ void uwsgi_log(const char *fmt, ...) {
 
 	struct timeval tv;
 	char sftime[64];
+	char ctime_storage[26];
 	time_t now;
 
 	if (uwsgi.logdate) {
@@ -1201,8 +1200,12 @@ void uwsgi_log(const char *fmt, ...) {
 		}
 		else {
 			gettimeofday(&tv, NULL);
-
-			memcpy(logpkt, ctime((const time_t *) &tv.tv_sec), 24);
+#ifdef __sun__
+			ctime_r((const time_t *) &tv.tv_sec, ctime_storage, 26);
+#else
+			ctime_r((const time_t *) &tv.tv_sec, ctime_storage);
+#endif
+			memcpy(logpkt, ctime_storage, 24);
 			memcpy(logpkt + 24, " - ", 3);
 
 			rlen = 24 + 3;
@@ -1238,6 +1241,7 @@ void uwsgi_log_verbose(const char *fmt, ...) {
 	struct timeval tv;
 	char sftime[64];
         time_t now;
+	char ctime_storage[26];
 
 		if (uwsgi.log_strftime) {
                         now = time(NULL);
@@ -1248,8 +1252,12 @@ void uwsgi_log_verbose(const char *fmt, ...) {
                 }
                 else {
                         gettimeofday(&tv, NULL);
-
-                        memcpy(logpkt, ctime((const time_t *) &tv.tv_sec), 24);
+#ifdef __sun__
+			ctime_r((const time_t *) &tv.tv_sec, ctime_storage, 26);
+#else
+			ctime_r((const time_t *) &tv.tv_sec, ctime_storage);
+#endif
+                        memcpy(logpkt, ctime_storage, 24);
                         memcpy(logpkt + 24, " - ", 3);
 
                         rlen = 24 + 3;
@@ -1903,6 +1911,22 @@ int uwsgi_logic_opt_if_not_env(char *key, char *value) {
 	}
 
         return 0;
+}
+
+int uwsgi_logic_opt_if_reload(char *key, char *value) {
+	if (uwsgi.is_a_reload) {
+		add_exported_option(key, value, 0);
+		return 1;
+	}
+	return 0;
+}
+
+int uwsgi_logic_opt_if_not_reload(char *key, char *value) {
+	if (!uwsgi.is_a_reload) {
+		add_exported_option(key, value, 0);
+		return 1;
+	}
+	return 0;
 }
 
 int uwsgi_logic_opt_if_file(char *key, char *value) {
@@ -2692,6 +2716,7 @@ void spawn_daemon(struct uwsgi_daemon *ud) {
 				uwsgi_error("dup2()");
 				exit(1);
 			}
+			close(devnull);
 		}
 
 		if (setsid() < 0) {
@@ -3169,6 +3194,7 @@ struct uwsgi_string_list *uwsgi_string_new_list(struct uwsgi_string_list **list,
         	uwsgi_string->len = strlen(value);
 	}
 	uwsgi_string->next = NULL;
+	uwsgi_string->custom = 0;
 
         return uwsgi_string;
 }
@@ -3899,7 +3925,11 @@ void uwsgi_set_processname(char *name) {
 		strncat(uwsgi.orig_argv[0], uwsgi.procname_append, uwsgi.max_procname-(amount+1));
 	}
 
-	memset(uwsgi.orig_argv[0]+amount+1, ' ', uwsgi.max_procname-(amount-1));
+	// fill with spaces...
+	memset(uwsgi.orig_argv[0]+amount+1, ' ', uwsgi.max_procname-(amount));
+	// end with \0
+	memset(uwsgi.orig_argv[0]+amount+1+(uwsgi.max_procname-(amount)), '\0', 1);
+
 #elif defined(__FreeBSD__)
 	if (uwsgi.procname_prefix) {
 		if (!uwsgi.procname_append) {
@@ -4067,6 +4097,10 @@ char *uwsgi_check_touches(struct uwsgi_string_list *touch_list) {
                 else {
 			if (!touch->custom) touch->custom = (uint64_t) tr_st.st_mtime;
 			if ((uint64_t) tr_st.st_mtime > touch->custom) {
+#ifdef UWSGI_DEBUG
+				uwsgi_log("[uwsgi-check-touches] modification detected on %s: %llu -> %llu\n", touch->value, (unsigned long long) touch->custom,
+					(unsigned long long) tr_st.st_mtime);
+#endif
                         	touch->custom = (uint64_t) tr_st.st_mtime;
 				return touch->value;
 			}
@@ -4147,6 +4181,12 @@ void uwsgi_emulate_cow_for_apps(int id) {
 // in the future we will need to use the best clock source for each os/system
 time_t uwsgi_now() {
 	return time(NULL);
+}
+
+uint64_t uwsgi_micros() {
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (tv.tv_sec * 1000000) + tv.tv_usec;
 }
 
 void uwsgi_write_pidfile(char *pidfile_name) {
@@ -4238,17 +4278,17 @@ ssize_t uwsgi_protected_read(int fd, void *buf, size_t len) {
 	return ret;
 }
 
-char *uwsgi_expand_path(char *dir, int dir_len, char *ptr) { 
-	char src[PATH_MAX+1]; 
-	memcpy(src, dir, dir_len); 
- 	src[dir_len] = 0; 
- 	char *dst = ptr; 
- 	if (!dst) dst = uwsgi_malloc(PATH_MAX+1); 
- 	if (!realpath(src, dst)) { 
- 		uwsgi_error_realpath(src); 
-                if (!ptr) 
- 	        	free(dst); 
- 	        return NULL; 
- 	} 
-	return dst; 
-} 
+char *uwsgi_expand_path(char *dir, int dir_len, char *ptr) {
+	char src[PATH_MAX+1];
+	memcpy(src, dir, dir_len);
+	src[dir_len] = 0;
+	char *dst = ptr;
+	if (!dst) dst = uwsgi_malloc(PATH_MAX+1);
+	if (!realpath(src, dst)) {
+		uwsgi_error_realpath(src);
+		if (!ptr)
+			free(dst);
+		return NULL;
+	}
+	return dst;
+}

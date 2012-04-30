@@ -10,14 +10,14 @@ int manage_python_response(struct wsgi_request *wsgi_req) {
 
 char *uwsgi_python_get_exception_type(PyObject *exc) {
 	char *class_name = NULL;
-#ifndef PYTHREE
+#if !defined(PYTHREE) && !defined(UWSGI_PYPY)
 	if (PyClass_Check(exc)) {
 		class_name = PyString_AsString( ((PyClassObject*)(exc))->cl_name );
 	}
 	else {
 #endif
 		class_name = (char *) ((PyTypeObject*)exc)->tp_name;
-#ifndef PYTHREE
+#if !defined(PYTHREE) && !defined(UWSGI_PYPY)
 	}
 #endif
 
@@ -93,15 +93,14 @@ int uwsgi_python_manage_exceptions(void) {
 
 PyObject *python_call(PyObject *callable, PyObject *args, int catch, struct wsgi_request *wsgi_req) {
 
-	PyObject *pyret;
-
 	//uwsgi_log("ready to call %p %p\n", callable, args);
 
-	pyret = PyEval_CallObject(callable, args);
+	PyObject *pyret = PyEval_CallObject(callable, args);
 
 	//uwsgi_log("called\n");
 
 	if (PyErr_Occurred()) {
+
 
 		int do_exit = uwsgi_python_manage_exceptions();
 
@@ -197,17 +196,18 @@ void init_pyargv() {
 
 	if (up.argv) {
 
+		char *py_argv_copy = uwsgi_str(up.argv);
 		up.argc = 1;
 #ifdef PYTHREE
-		wchar_t *wcargv = uwsgi_calloc( sizeof( wchar_t ) * (strlen(up.argv)+1));
+		wchar_t *wcargv = uwsgi_calloc( sizeof( wchar_t ) * (strlen(py_argv_copy)+1));
 #endif
 
 #ifdef __sun__
 		// FIX THIS !!!
-		ap = strtok(up.argv, " ");
+		ap = strtok(py_argv_copy, " ");
 		while ((ap = strtok(NULL, " ")) != NULL) {
 #else
-		while ((ap = strsep(&up.argv, " \t")) != NULL) {
+		while ((ap = strsep(&py_argv_copy, " \t")) != NULL) {
 #endif
 				if (*ap != '\0') {
 #ifdef PYTHREE
