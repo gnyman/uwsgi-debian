@@ -1,3 +1,11 @@
+uwsgi (1.2+dfsg-2) UNRELEASED; urgency=low
+
+  * debian/uwsgi.init.d
+     - Remove spurious no-op command in init script, thanks to
+       Jean-Baptiste Quenot.
+
+ -- Janos Guljas <janos@resenje.org>  Thu, 10 May 2012 17:14:22 +0200
+
 uwsgi (1.2+dfsg-1) unstable; urgency=low
 
   * New upstream release.

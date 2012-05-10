@@ -140,5 +140,3 @@ case "$WHAT" in
     exit 3
   ;;
 esac
-
-:
