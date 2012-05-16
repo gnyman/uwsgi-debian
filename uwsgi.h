@@ -896,6 +896,8 @@ struct wsgi_request {
 	int do_not_add_to_async_queue;
 
 	int status;
+	void *status_header;
+	void *headers;
 	size_t response_size;
 	ssize_t headers_size;
 
@@ -934,6 +936,10 @@ struct wsgi_request {
 
 	// current socket mapped to request
 	struct uwsgi_socket *socket;
+
+	// check if headers are already sent
+	int headers_sent;
+	int headers_hvec;
 
 	int body_as_file;
 	//for generic use
@@ -1199,6 +1205,7 @@ struct uwsgi_server {
 	int ignore_write_errors;
 	int write_errors_tolerance;
 	int write_errors_exception_only;
+	int disable_write_exception;
 
 	// still working on it
 	char *profiler;
@@ -1264,6 +1271,7 @@ struct uwsgi_server {
 	struct uwsgi_string_list *exec_in_jail;
 	struct uwsgi_string_list *exec_as_root;
 	struct uwsgi_string_list *exec_as_user;
+	struct uwsgi_string_list *exec_as_user_atexit;
 	struct uwsgi_string_list *exec_pre_app;
 
 	struct uwsgi_logger *loggers;
@@ -2826,6 +2834,7 @@ uint64_t uwsgi_micros(void);
 int uwsgi_is_file(char *);
 
 void uwsgi_receive_signal(int, char *, int);
+void uwsgi_exec_atexit(void);
 
 #ifdef UWSGI_AS_SHARED_LIBRARY
 int uwsgi_init(int, char **, char **);
