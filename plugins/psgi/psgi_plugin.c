@@ -101,6 +101,32 @@ int uwsgi_perl_obj_can(SV *obj, char *method, size_t len) {
 
 }
 
+int uwsgi_perl_obj_isa(SV *obj, char *class) { 
+  
+ 	        int ret = 0; 
+ 	 
+ 	        dSP; 
+ 	 
+ 	        ENTER; 
+ 	        SAVETMPS; 
+ 	        PUSHMARK(SP); 
+ 	        XPUSHs(obj); 
+ 	        PUTBACK; 
+ 	 
+ 	        call_pv( "Scalar::Util::reftype", G_SCALAR|G_EVAL); 
+ 	 
+ 	        SPAGAIN; 
+ 	        char *reftype = POPp; 
+ 	        if (reftype && !strcmp(reftype, class)) { 
+ 	                ret = 1; 
+ 	        } 
+ 	        PUTBACK; 
+ 	        FREETMPS; 
+ 	        LEAVE; 
+ 	 
+	        return ret; 
+} 
+
 SV *uwsgi_perl_obj_call(SV *obj, char *method) {
 
         SV *ret = NULL;
@@ -169,6 +195,7 @@ AV *psgi_call(struct wsgi_request *wsgi_req, SV *psgi_func, SV *env) {
 SV *build_psgi_env(struct wsgi_request *wsgi_req) {
 	int i;
 	HV *env = newHV();
+	struct uwsgi_app *wi = &uwsgi_apps[wsgi_req->app_id];
 
 	// fill perl hash
         for(i=0;i<wsgi_req->var_cnt;i++) {
@@ -259,6 +286,8 @@ SV *build_psgi_env(struct wsgi_request *wsgi_req) {
         if (!hv_store(env, "psgi.input", 10, pi, 0)) goto clear;
 	
 	if (!hv_store(env, "psgix.input.buffered", 20, newSViv(wsgi_req->body_as_file), 0)) goto clear;
+
+	if (!hv_store(env, "psgix.logger", 12,newRV((SV*) ((SV **)wi->responder1)[wsgi_req->async_id]) ,0)) goto clear;
 
 	if (uwsgi.master_process) {
 		if (!hv_store(env, "psgix.harakiri", 14, newSViv(1), 0)) goto clear;
