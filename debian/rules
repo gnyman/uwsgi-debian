@@ -2,6 +2,11 @@
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 
+export LDFLAGS=$(shell dpkg-buildflags --get LDFLAGS)
+export CFLAGS=$(shell dpkg-buildflags --get CFLAGS)
+export CFLAGS+=$(shell dpkg-buildflags --get CPPFLAGS)
+export CPPFLAGS=$(shell dpkg-buildflags --get CPPFLAGS)
+
 # Common variables
 # ================
 
@@ -662,15 +667,20 @@ binary-install/python-uwsgicc::
 
 	dh_python2 -p $(cdbs_curpkg)
 
-binary-install/python-uwsgidecorators binary-install/python3-uwsgidecorators::
+binary-install/python-uwsgidecorators::
 	$(eval PYTHON_KIND = $(firstword $(subst -, ,$(notdir $@))))
 	$(eval PYPKG_DESTDIR = $($(subst python,PYTHON,$(PYTHON_KIND))_DIST_PACKAGES_DIR))
 	dh_install -p $(cdbs_curpkg) uwsgidecorators.py $(PYPKG_DESTDIR)
 	dh_python2 -p $(cdbs_curpkg)
 
 binary-install/python3-uwsgidecorators::
+	$(eval PYTHON_KIND = $(firstword $(subst -, ,$(notdir $@))))
+	$(eval PYPKG_DESTDIR = $($(subst python,PYTHON,$(PYTHON_KIND))_DIST_PACKAGES_DIR))
+	dh_install -p $(cdbs_curpkg) uwsgidecorators.py $(PYPKG_DESTDIR)
 	2to3 --write --nobackups --no-diffs \
-	  $(CURDIR)/debian/$(cdbs_curpkg)/$(PYTHON3_DIST_PACKAGES_DIR)/uwsgidecorators.py
+		$(CURDIR)/debian/$(cdbs_curpkg)/$(PYPKG_DESTDIR)/uwsgidecorators.py
+	dh_python3 -p $(cdbs_curpkg)
+
 
 DEB_UPSTREAM_VERSION=$(shell dpkg-parsechangelog | sed -rne 's,^Version: ([^+]+).*,\1,p')
 get-orig-source:
