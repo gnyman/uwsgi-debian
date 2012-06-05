@@ -1,3 +1,11 @@
+uwsgi (1.2.3+dfsg-2) UNRELEASED; urgency=low
+
+  * New binary package uwsgi-plugin-php.
+     - New Build-Depends libphp5-embed, php5-dev, libonig-dev, libdb-dev,
+       libqdbm-dev and libbz2-dev. 
+
+ -- Janos Guljas <janos@resenje.org>  Mon, 21 May 2012 16:30:46 +0200
+
 uwsgi (1.2.3+dfsg-1) unstable; urgency=low
 
   * New upstream release.
