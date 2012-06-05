@@ -180,8 +180,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
  uwsgi-plugin-python3 (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.8 (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
+ uwsgi-plugin-rack
 Description: plugins for integration of uWSGI and application
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -282,7 +281,7 @@ Description: fastrouter plugin for uWSGI
 Package: uwsgi-plugin-fiber
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
+ uwsgi-plugin-rack (= ${binary:Version})
 Description: fiber loop engine plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -515,29 +514,17 @@ Description: Python 3 WSGI plugin for uWSGI
  This package provides Python 3 WSGI plugin for uWSGI (linked with Python 3.X
  runtime).
 
-Package: uwsgi-plugin-rack-ruby1.8
+Package: uwsgi-plugin-rack
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Rack plugin for uWSGI (Ruby 1.8)
+Description: Rack plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Rack plugin for uWSGI (linked with Ruby 1.8 runtime).
-
-Package: uwsgi-plugin-rack-ruby1.9.1
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Rack plugin for uWSGI (Ruby 1.9.1)
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides Rack plugin for uWSGI (linked with Ruby 1.9.1 runtime).
+ This package provides Rack plugin for uWSGI.
 
 Package: uwsgi-plugin-rpc
 Architecture: any
