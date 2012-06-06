@@ -7,6 +7,8 @@ export CFLAGS=$(shell dpkg-buildflags --get CFLAGS)
 export CFLAGS+=$(shell dpkg-buildflags --get CPPFLAGS)
 export CPPFLAGS=$(shell dpkg-buildflags --get CPPFLAGS)
 
+DEB_DH_SHLIBDEPS_ARGS = -l/usr/lib/php5
+
 # Common variables
 # ================
 
