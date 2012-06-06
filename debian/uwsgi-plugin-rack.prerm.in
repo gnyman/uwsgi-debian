@@ -18,15 +18,17 @@ set -e
 
 case "$1" in
     remove)
-      update-alternatives --quiet \
-        --remove \
-          uwsgi-plugin-rack \
-          /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so
+      for RUBY_VER_DOTLESS in @@available_ruby_versions_dotless@@; do
+        update-alternatives --quiet \
+          --remove \
+            uwsgi-plugin-rack \
+            /usr/lib/uwsgi/plugins/rack_ruby${RUBY_VER_DOTLESS}_plugin.so
 
-      update-alternatives --quiet \
-        --remove \
-          uwsgi \
-          /usr/bin/uwsgi_@@plugin_name@@
+        update-alternatives --quiet \
+          --remove \
+            uwsgi \
+            /usr/bin/uwsgi_rack_ruby${RUBY_VER_DOTLESS}
+      done
 
       RACK_PLUGIN_ALTERNATIVES_COUNT="$(\
         update-alternatives --list uwsgi-plugin-rack 2>/dev/null \
