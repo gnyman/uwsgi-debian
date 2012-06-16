@@ -1,0 +1,2 @@
+usr/bin/uwsgi-core usr/bin/uwsgi_rack_ruby18
+usr/bin/uwsgi-core usr/bin/uwsgi_rack_ruby191

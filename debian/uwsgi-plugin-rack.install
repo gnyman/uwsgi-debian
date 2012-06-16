@@ -1,0 +1,2 @@
+rack_ruby18_plugin.so usr/lib/uwsgi/plugins
+rack_ruby191_plugin.so usr/lib/uwsgi/plugins
