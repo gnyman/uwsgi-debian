@@ -557,8 +557,8 @@ install/uwsgi-plugin-rack::
 	)
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
-			-e 's/@@available_ruby_versions_dotless@@/$(subst .,,$${RUBY_VERS})/g' \
-			-e 's/@@default_ruby_version_dotless@@/$(subst .,,$${RUBY_DEFAULT_VER})/g' \
+			-e 's/@@available_ruby_versions_dotless@@/$(subst .,,$(RUBY_VERS))/g' \
+			-e 's/@@default_ruby_version_dotless@@/$(subst .,,$(RUBY_DEFAULT_VER))/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-rack.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
@@ -569,6 +569,9 @@ install/uwsgi-plugin-rack::
 		--no-info \
 		$(CURDIR)/uwsgi_$(PLUGIN_NAME) \
 		> $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME).1
+	for RUBY_VER in $(RUBY_VERS); do \
+		ln -sf $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME).1 $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME)_ruby$$(echo $${RUBY_VER} | tr -d .).1; \
+	done
 
 # Binary-post-install uwsgi-plugin-pyerl-% packages
 $(patsubst %,binary-post-install/uwsgi-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::
