@@ -613,7 +613,7 @@ Description: uGreen plugin for uWSGI
 Package: uwsgi-plugin-php
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- libphp5-embed
+ phpapi-20100525
 Description: PHP plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
