@@ -160,14 +160,14 @@ clean::
 	$(RM) -r $(UWSGI_CORE_DOCS_STAGING_DIR)
 	# instantiated uwsgi-plugin-X templates
 	$(RM) $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(filter-out jwsgi-openjdk-6, $(UWSGI_PLUGIN_PKGS_NAMES)), \
+		uwsgi-plugin-, $(filter-out jwsgi-openjdk-6 rack, $(UWSGI_PLUGIN_PKGS_NAMES)), \
 		.install \
 	)
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
 			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) \
-				lua5.1 luajit rack, \
+				lua5.1 luajit, \
 			.$${TEMPLATE_TYPE} \
 		); do \
 			if [ -f $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
