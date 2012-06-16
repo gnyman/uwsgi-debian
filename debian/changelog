@@ -5,6 +5,8 @@ uwsgi (1.2.3+dfsg-2) UNRELEASED; urgency=low
        libqdbm-dev and libbz2-dev. 
   * debian/pathces/fix-php-ldflags.patch
      - Include php5-embed ld library path when building PHP plugin.
+  * debian/patches/remove-php-libs.patch
+     - Remove PHP libraries when building PHP plugin.
   * Merge rack_ruby18 and rack_ruby191 plugins into one package
     uwsgi-plugins-rack. 
 
