@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for uwsgi-plugin-jwsgi-openjdk-6
+# postinst script for uwsgi-plugin-jwsgi-openjdk-7
 #
 # see: dh_installdeb(1)
 
@@ -23,8 +23,8 @@ case "$1" in
         --install \
           /usr/lib/uwsgi/plugins/jwsgi_plugin.so \
           uwsgi-plugin-jwsgi \
-          /usr/lib/uwsgi/plugins/jwsgi_openjdk6_plugin.so \
-          35
+          /usr/lib/uwsgi/plugins/jwsgi_openjdk7_plugin.so \
+          75
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
