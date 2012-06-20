@@ -1,3 +1,10 @@
+uwsgi (1.2.3+dfsg-2~experimental2) UNRELEASED; urgency=low
+
+  * debian/rules:
+     - Cleanup uwsgibuild log files after the build.
+
+ -- Janos Guljas <janos@resenje.org>  Wed, 20 Jun 2012 15:39:14 +0200
+
 uwsgi (1.2.3+dfsg-2~experimental1) experimental; urgency=low
 
   * Add support for OpenJDK 7 (Closes: #678120):

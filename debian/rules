@@ -210,6 +210,8 @@ clean::
 	)
 	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
+	$(RM) $(CURDIR)/uwsgibuild.lastprofile
+	$(RM) $(CURDIR)/uwsgibuild.log
 
 # uwsgi package
 # -------------
