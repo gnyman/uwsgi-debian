@@ -38,10 +38,6 @@ PYTHON3_MAJOR_VER := 3
 PYTHON_DIST_PACKAGES_DIR = usr/lib/python$(PYTHON_DEFAULT_DOTTED)/dist-packages
 PYTHON3_DIST_PACKAGES_DIR = usr/lib/python3/dist-packages
 
-# Ruby versions
-RUBY_VERS = 1.8 1.9.1
-RUBY_DEFAULT_VER = 1.8
-
 # Search in debian/control for packages with name $(1)% and extract % in list.
 list_pkgname_suffixes = $(strip \
 	$(shell \
@@ -75,7 +71,7 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	jvm-openjdk-6 jwsgi-openjdk-6 \
 	lua5.1 luajit \
 	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)) \
-	rack fiber
+	rack-ruby1.8 rack-ruby1.9.1 fiber
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
@@ -116,8 +112,6 @@ $(foreach PLUGIN_PKG_NAME, $(UWSGI_PLUGIN_PKGS_NAMES), $(eval \
 ))
 
 DEB_INSTALL_DOCS_ALL += $(DEB_SRCDIR)/CONTRIBUTORS
-
-DEB_DH_SHLIBDEPS_ARGS_uwsgi-plugin-php = -l/usr/lib/php5 -- --ignore-missing-info
 
 # Rules
 # =====
@@ -160,14 +154,14 @@ clean::
 	$(RM) -r $(UWSGI_CORE_DOCS_STAGING_DIR)
 	# instantiated uwsgi-plugin-X templates
 	$(RM) $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(filter-out jwsgi-openjdk-6 rack, $(UWSGI_PLUGIN_PKGS_NAMES)), \
+		uwsgi-plugin-, $(filter-out jwsgi-openjdk-6, $(UWSGI_PLUGIN_PKGS_NAMES)), \
 		.install \
 	)
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
 			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) \
-				lua5.1 luajit, \
+				lua5.1 luajit rack-ruby1.8 rack-ruby1.9.1, \
 			.$${TEMPLATE_TYPE} \
 		); do \
 			if [ -f $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
@@ -389,27 +383,15 @@ debian/stamp-plugin-lua5.1 debian/stamp-plugin-luajit:
 	touch $@
 
 # Build rack_ruby18_plugin.so/rack_ruby191_plugin.so
-debian/stamp-plugin-rack:
+debian/stamp-plugin-rack-ruby1.8 debian/stamp-plugin-rack-ruby1.9.1:
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
-	for RUBY_VER in $(RUBY_VERS); do \
-		UWSGICONFIG_RUBYPATH=/usr/bin/ruby$${RUBY_VER} \
-		$(PYTHON) $(UWSGI_BUILDER) \
-		    --plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/rack \
-		             $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-		             rack_ruby$$(echo $${RUBY_VER} | tr -d .); \
-	done
-	touch $@
-
-# Build greenlet plugin
-debian/stamp-plugin-greenlet-python:
-	for PYTHON_VERSION in $(PYTHON_VERS_DOTTED); do \
-		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) \
-			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/greenlet \
-			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-			         greenlet_python$$(echo $${PYTHON_VERSION} | tr -d .); \
-	done
+	UWSGICONFIG_RUBYPATH=/usr/bin/$(call target_name_tail, $@) \
+	$(PYTHON) $(UWSGI_BUILDER) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/rack \
+		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+		         $(PLUGIN_NAME)
 	touch $@
 
 # Install uwsgi-plugin-% package for ordinarily built uWSGI plugin
@@ -548,7 +530,7 @@ install/uwsgi-plugin-lua5.1 install/uwsgi-plugin-luajit::
 		$(CURDIR)/uwsgi_$(PLUGIN_NAME) \
 		> $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME).1
 
-install/uwsgi-plugin-rack::
+install/uwsgi-plugin-rack-ruby1.8 install/uwsgi-plugin-rack-ruby1.9.1::
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
 		$(subst uwsgi-plugin-,,$(notdir $@)) \
 	))
@@ -557,9 +539,16 @@ install/uwsgi-plugin-rack::
 	)
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
-			-e 's/@@available_ruby_versions_dotless@@/$(subst .,,$(RUBY_VERS))/g' \
-			-e 's/@@default_ruby_version_dotless@@/$(subst .,,$(RUBY_DEFAULT_VER))/g' \
+			-e 's/@@ruby_kind@@/$(subst uwsgi-plugin-rack-,,$(notdir $@))/g' \
+			-e 's/@@plugin_name@@/$(PLUGIN_NAME)/g' \
+			-e 's/@@plugin_alternatives_priority@@/$(PLUGIN_PRIORITY)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-rack.$${TEMPLATE_TYPE}.in \
+				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
+	done
+	for TEMPLATE_TYPE in install links manpages; do \
+		sed \
+			-e 's/@@plugin_name@@/$(PLUGIN_NAME)/g' \
+				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
 	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(PLUGIN_NAME)
@@ -569,9 +558,6 @@ install/uwsgi-plugin-rack::
 		--no-info \
 		$(CURDIR)/uwsgi_$(PLUGIN_NAME) \
 		> $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME).1
-	for RUBY_VER in $(RUBY_VERS); do \
-		ln -sf $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME).1 $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME)_ruby$$(echo $${RUBY_VER} | tr -d .).1; \
-	done
 
 # Binary-post-install uwsgi-plugin-pyerl-% packages
 $(patsubst %,binary-post-install/uwsgi-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS))::

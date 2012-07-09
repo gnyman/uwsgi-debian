@@ -1,5 +1,3 @@
-remove-php-libs.patch
-fix-php-ldflags.patch
 000000_01_adjust_lua_plugin_buildscript.patch
 000000_02_remove_assignments_to_LD_RUN_PATH.patch
 000000_03_strip_versions_from_jQuery_scripts_links_in_uwsgicc_templates.patch

@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for uwsgi-plugin-rack
+# postinst script for uwsgi-plugin-rack-@@ruby_kind@@
 #
 # see: dh_installdeb(1)
 
@@ -19,39 +19,31 @@ set -e
 
 case "$1" in
     configure)
-      RUBY_VER_DEFAULT_DOTLESS=@@default_ruby_version_dotless@@
-      for RUBY_VER_DOTLESS in @@available_ruby_versions_dotless@@; do
-        if [ "x$RUBY_VER_DOTLESS" = "x$RUBY_VER_DEFAULT_DOTLESS" ]; then
-          ALTERNATIVE_PRIORITY=75
-        else
-          ALTERNATIVE_PRIORITY=35
-        fi
-        update-alternatives --quiet \
-          --install \
-            /usr/lib/uwsgi/plugins/rack_plugin.so \
-            uwsgi-plugin-rack \
-            /usr/lib/uwsgi/plugins/rack_ruby${RUBY_VER_DOTLESS}_plugin.so \
-            $ALTERNATIVE_PRIORITY \
-          --slave \
-            /usr/bin/uwsgi_rack \
-            uwsgi_rack \
-            /usr/bin/uwsgi-core \
-          --slave \
-            /usr/share/man/man1/uwsgi_rack.1.gz \
-            uwsgi_rack.1.gz \
-            /usr/share/man/man1/uwsgi_rack_ruby${RUBY_VER_DOTLESS}.1.gz
+      update-alternatives --quiet \
+        --install \
+          /usr/lib/uwsgi/plugins/rack_plugin.so \
+          uwsgi-plugin-rack \
+          /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so \
+          @@plugin_alternatives_priority@@ \
+        --slave \
+          /usr/bin/uwsgi_rack \
+          uwsgi_rack \
+          /usr/bin/uwsgi-core \
+        --slave \
+          /usr/share/man/man1/uwsgi_rack.1.gz \
+          uwsgi_rack.1.gz \
+          /usr/share/man/man1/uwsgi_@@plugin_name@@.1.gz
 
-        update-alternatives --quiet \
-          --install \
-            /usr/bin/uwsgi \
-            uwsgi \
-            /usr/bin/uwsgi_rack_ruby${RUBY_VER_DOTLESS} \
-            35 \
-          --slave \
-            /usr/share/man/man1/uwsgi.1.gz \
-            uwsgi.1.gz \
-            /usr/share/man/man1/uwsgi_rack_ruby${RUBY_VER_DOTLESS}.1.gz
-      done
+      update-alternatives --quiet \
+        --install \
+          /usr/bin/uwsgi \
+          uwsgi \
+          /usr/bin/uwsgi_@@plugin_name@@ \
+          35 \
+        --slave \
+          /usr/share/man/man1/uwsgi.1.gz \
+          uwsgi.1.gz \
+          /usr/share/man/man1/uwsgi_@@plugin_name@@.1.gz
 
       UWSGI_RACK_BINARY_IS_UWSGI_ALTERNATIVE="$(\
         update-alternatives --list uwsgi 2>/dev/null \
