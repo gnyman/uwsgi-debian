@@ -1,3 +1,9 @@
+uwsgi (1.2.3+dfsg-2) UNRELEASED; urgency=low
+
+  * Remove uwsgi-plugin-luajit binary package. (Closes: #680132)
+
+ -- Janos Guljas <janos@resenje.org>  Mon, 09 Jul 2012 03:32:09 +0200
+
 uwsgi (1.2.3+dfsg-1) unstable; urgency=low
 
   * New upstream release.
