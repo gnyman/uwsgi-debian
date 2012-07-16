@@ -1,6 +1,10 @@
-uwsgi (1.2.3+dfsg-2) UNRELEASED; urgency=low
+uwsgi (1.2.3+dfsg-2) unstable; urgency=low
 
   * Remove uwsgi-plugin-luajit binary package. (Closes: #680132)
+     - Remove libluajit-5.1-dev from Build-Depends.
+     - Remove uwsgi-plugin-luajit from dependencies for
+       uwsgi-app-integration-plugins.
+     - Remove all occurrences of luajit plugin in debian/rules.
   * Include upstream patch to fix a memory leak in python uwsgi.workers().
 
  -- Janos Guljas <janos@resenje.org>  Mon, 09 Jul 2012 03:32:09 +0200
