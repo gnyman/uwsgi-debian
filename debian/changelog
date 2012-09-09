@@ -1,3 +1,10 @@
+uwsgi (1.2.3+dfsg-5) UNRELEASED; urgency=low
+
+  * debian/patches/remove--pie-cflag-for-probepg.patch (Closes: #687084)
+    - Remove -pie from CFLAGS variable if it's used for building PostgreSQL.
+
+ -- Janos Guljas <janos@resenje.org>  Mon, 10 Sep 2012 00:24:25 +0200
+
 uwsgi (1.2.3+dfsg-4) unstable; urgency=low
 
   * debian/patches/fix-reload-process-name.patch:

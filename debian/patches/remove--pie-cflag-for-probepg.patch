@@ -1,0 +1,23 @@
+Description: Remove -pie from CFLAGS variable
+ postgresql package is explicitly using -pie flag in CFLAGS since the release
+ 9.1.5-2. This flag is in conflict for building shared library, and with this
+ patch it is removed.
+Author: Janos Guljas <janos@resenje.org>
+Last-Update: 2012-09-10
+
+--- a/plugins/probepg/uwsgiplugin.py
++++ b/plugins/probepg/uwsgiplugin.py
+@@ -2,6 +2,13 @@ import os
+ 
+ NAME='probepg'
+ CFLAGS = os.popen('pg_config --cflags').read().rstrip().split()
++if '-pie' in CFLAGS:
++    CFLAGS = set(CFLAGS)
++    try:
++        CFLAGS.remove('-pie')
++    except KeyError:
++        pass
++    CFLAGS = list(CFLAGS)
+ CFLAGS.append('-I' + os.popen('pg_config --includedir').read().rstrip())
+ LDFLAGS = os.popen('pg_config --ldflags').read().rstrip().split()
+ LIBS = ['-L' + os.popen('pg_config --libdir').read().rstrip(), '-lpq']
