@@ -5,4 +5,4 @@
 110515_01_add_overriding_of_JVM_PATH_into_buildscript_of_jwsgi_plugin.patch
 fixed-a-leak-in-uwsgi.workers.patch
 fix-reload-process-name.patch
-remove--pie-cflag-for-probepg.patch
+remove-pg_config_cflags-in-probepg.patch

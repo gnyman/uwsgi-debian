@@ -1,0 +1,23 @@
+Description: Remove pg_config --cflags from probepg build
+ CFLAGS provided by pg_config --cflags are not needed for building probepg
+ plugin. Parameters privded by pg_config --cflags are only informations on
+ how posgresql was built, and not for building shared libraries.
+ Since the release 9.1.5-2, postgresql package is explicitly using -pie flag
+ in CFLAGS. This flag is in conflict for building shared library, and with this
+ patch it is removed, along with other unneeded parameters.
+Bug-Debian: http://bugs.debian.org/687084
+Bug-Debian: http://bugs.debian.org/687208
+Author: Janos Guljas <janos@resenje.org>
+Last-Update: 2012-09-13
+
+--- a/plugins/probepg/uwsgiplugin.py
++++ b/plugins/probepg/uwsgiplugin.py
+@@ -1,7 +1,7 @@
+ import os
+ 
+ NAME='probepg'
+-CFLAGS = os.popen('pg_config --cflags').read().rstrip().split()
++CFLAGS = []
+ CFLAGS.append('-I' + os.popen('pg_config --includedir').read().rstrip())
+ LDFLAGS = os.popen('pg_config --ldflags').read().rstrip().split()
+ LIBS = ['-L' + os.popen('pg_config --libdir').read().rstrip(), '-lpq']
