@@ -1,0 +1,111 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Sun Jul  8 05:09:41 +0200
+Subject: fixed waitpid usage in cheap/cheaper/lazy modes
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/9c8dbbcf3c36
+
+diff -r 42dd6f1e7d4e -r 9c8dbbcf3c36 master.c
+--- a/master.c	Sat Jul 07 10:59:38 2012 +0200
++++ b/master.c	Sun Jul 08 05:09:41 2012 +0200
+@@ -312,8 +312,6 @@
+ 	int ready_to_reload = 0;
+ 	int ready_to_die = 0;
+ 
+-	int master_has_children = 0;
+-
+ 	uint8_t uwsgi_signal;
+ 
+ 	time_t last_request_timecheck = 0, now = 0;
+@@ -755,40 +753,30 @@
+ 			return -1;
+ 		}
+ 
+-		if (!uwsgi.cheap) {
+-
+-			if (uwsgi.numproc > 0 || ushared->gateways_cnt > 0 || uwsgi.daemons_cnt > 0) {
+-				master_has_children = 1;
+-			}
+-#ifdef UWSGI_SPOOLER
+-			if (uwsgi.spoolers) {
+-				master_has_children = 1;
+-			}
+-#endif
+-		}
+-
+-		if (!master_has_children) {
+-			diedpid = 0;
+-		}
+-		else {
+-			diedpid = waitpid(WAIT_ANY, &waitpid_status, WNOHANG);
+-			if (diedpid == -1) {
+-				if (errno == ECHILD && uwsgi.cheaper) {
+-					if (uwsgi.to_heaven) {
+-						ready_to_reload = uwsgi.numproc;
+-						continue;
+-					}
+-					else if (uwsgi.to_hell) {
+-						ready_to_die = uwsgi.numproc;
+-						continue;
+-					}
+-				}
+-				uwsgi_error("waitpid()");
+-				/* here is better to reload all the uWSGI stack */
+-				uwsgi_log("something horrible happened...\n");
+-				reap_them_all(0);
+-				exit(1);
+-			}
++		diedpid = waitpid(WAIT_ANY, &waitpid_status, WNOHANG);
++		if (diedpid == -1) {
++			if (errno == ECHILD) {
++	                        if (uwsgi.to_heaven) {
++	                               	ready_to_reload = uwsgi.numproc;
++	                                continue;
++	                        }
++	                        else if (uwsgi.to_hell) {
++	                        	ready_to_die = uwsgi.numproc;
++	                                continue;
++	                        }
++	                        else if (uwsgi.to_outworld) {
++	                        	uwsgi.lazy_respawned = uwsgi.numproc;
++	                                continue;
++	                        }
++	                        diedpid = 0;
++	                }
++                        else {
++	                        uwsgi_error("waitpid()");
++	                        /* here is better to reload all the uWSGI stack */
++	                        uwsgi_log("something horrible happened...\n");
++	                        reap_them_all(0);
++	                	exit(1);
++	                }
+ 		}
+ 
+ 		if (diedpid == 0) {
+@@ -1211,7 +1199,6 @@
+ 				else if (last_request_timecheck < uwsgi.current_time && (uwsgi.current_time - last_request_timecheck > uwsgi.idle)) {
+ 					uwsgi_log("workers have been inactive for more than %d seconds (%llu-%llu)\n", uwsgi.idle, (unsigned long long) uwsgi.current_time, (unsigned long long) last_request_timecheck);
+ 					uwsgi.cheap = 1;
+-					master_has_children = 0;
+ 					if (uwsgi.die_on_idle) {
+ 						if (uwsgi.has_emperor) {
+ 							char byte = 22;
+@@ -1420,7 +1407,11 @@
+ 
+ 		}
+ 
+-		if (diedpid > 0) {
++
++		// no one died
++		if (diedpid <= 0)
++			continue;
++
+ 			// check for deadlocks first
+ 			struct uwsgi_lock_item *uli = uwsgi.registered_locks;
+ 			while(uli) {
+@@ -1444,7 +1435,7 @@
+ nextlock:
+ 				uli = uli->next;
+ 			}
+-		}
++
+ 		// reload gateways and daemons only on normal workflow
+ 		if (!uwsgi.to_heaven && !uwsgi.to_hell) {

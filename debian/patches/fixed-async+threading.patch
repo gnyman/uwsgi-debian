@@ -1,0 +1,51 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Sat Jul  7 10:19:37 2012 +0200
+Subject: fixed async+threading
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/f915ce55fa05
+
+
+diff -r b6d16aaa53d2 -r f915ce55fa05 async.c
+--- a/async.c	Mon Jun 25 13:42:47 2012 +0200
++++ b/async.c	Sat Jul 07 10:19:37 2012 +0200
+@@ -342,8 +342,9 @@
+ 						runqueue_push(uwsgi.wsgi_req);
+ 						continue;
+ 					}
+-					else if (proto_parser_status == -1) {
+-						uwsgi_log("error parsing request\n");
++					else if (proto_parser_status < 0) {
++						if (proto_parser_status == -1)
++							uwsgi_log("error parsing request\n");
+ 						uwsgi.async_proto_fd_table[interesting_fd] = NULL;
+ 						close(interesting_fd);
+ 						continue;
+diff -r b6d16aaa53d2 -r f915ce55fa05 plugins/python/wsgi_handlers.c
+--- a/plugins/python/wsgi_handlers.c	Mon Jun 25 13:42:47 2012 +0200
++++ b/plugins/python/wsgi_handlers.c	Sat Jul 07 10:19:37 2012 +0200
+@@ -341,6 +341,7 @@
+ 
+ #ifdef UWSGI_ASYNC
+ 	if (wsgi_req->async_status == UWSGI_AGAIN) {
++		UWSGI_GET_GIL
+ 		// get rid of timeout
+ 		if (wsgi_req->async_timed_out) {
+ 			PyDict_SetItemString(wsgi_req->async_environ, "x-wsgiorg.fdevent.timeout", Py_True);
+@@ -357,7 +358,9 @@
+ 		else {
+ 			PyDict_SetItemString(wsgi_req->async_environ, "uwsgi.ready_fd", Py_None);
+ 		}
+-		return manage_python_response(wsgi_req);
++		int ret = manage_python_response(wsgi_req);
++		UWSGI_RELEASE_GIL
++		return ret;
+ 	}
+ #endif
+ 
+@@ -455,6 +458,7 @@
+ 		while (wi->response_subhandler(wsgi_req) != UWSGI_OK) {
+ #ifdef UWSGI_ASYNC
+ 			if (uwsgi.async > 1) {
++				UWSGI_RELEASE_GIL
+ 				return UWSGI_AGAIN;
+ 			}
+ 			else {

@@ -1,0 +1,36 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Sun Jun  3 18:33:21 2012 +0200
+Subject: fixed ruby rvm support
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/1e04d749f439
+
+diff -r 116dbe32deb1 -r 1e04d749f439 plugins/rack/rack_plugin.c
+--- a/plugins/rack/rack_plugin.c	Sat Jun 02 10:00:48 2012 +0200
++++ b/plugins/rack/rack_plugin.c	Sun Jun 03 18:33:21 2012 +0200
+@@ -272,6 +272,7 @@
+ 
+ 	char *ptr = buffer;
+ 
++
+ 	for(i=0;i<size;i++) {
+ 		if (buffer[i] == '\n') {
+ 			buffer[i] = 0;
+@@ -282,7 +283,9 @@
+ 		}
+ 	}
+ 
+-	free(buffer);
++	// do not free the buffer
++        // environ will reuse it !!!
++	//free(buffer);
+ 
+ 	if (waitpid(pid, &waitpid_status, 0) <0) {
+ 		uwsgi_error("waitpid()");
+@@ -322,6 +325,9 @@
+                 free(filename);
+ 		rvm_paths = rvm_paths->next;
+ 	}
++
++	uwsgi_log("ERROR: unable to load gemset %s !!!\n", gemset);
++	exit(1);
+ 	
+ }

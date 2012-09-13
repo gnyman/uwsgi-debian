@@ -1,0 +1,18 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Thu Sep  6 15:24:28 2012 +0200
+Subject: disable SIGSTOP/SIGTSTP in gateways
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/2233c48342c1
+
+
+diff -r da1f361602ce -r 2233c48342c1 gateway.c
+--- a/gateway.c	Thu Sep 06 15:21:27 2012 +0200
++++ b/gateway.c	Thu Sep 06 15:24:28 2012 +0200
+@@ -70,6 +70,8 @@
+         	signal(SIGUSR1, SIG_IGN);
+         	signal(SIGUSR2, SIG_IGN);
+         	signal(SIGPIPE, SIG_IGN);
++		signal(SIGSTOP, SIG_IGN);
++		signal(SIGTSTP, SIG_IGN);
+ 
+ 		ug->loop(id);
+ 		// never here !!! (i hope)

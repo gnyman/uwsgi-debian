@@ -1,0 +1,18 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Sat Jun  2 08:19:09 2012 +0200
+Subject: fixed a threading issue with uwsgi.send()
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/c0b231684b60
+
+diff -r f24ea1a667ce -r c0b231684b60 plugins/python/uwsgi_pymodule.c
+--- a/plugins/python/uwsgi_pymodule.c	Sat Jun 02 07:42:55 2012 +0200
++++ b/plugins/python/uwsgi_pymodule.c	Sat Jun 02 08:19:09 2012 +0200
+@@ -709,7 +709,8 @@
+ 	PyObject *data;
+ 	PyObject *arg1, *arg2;
+ 
+-	int uwsgi_fd = uwsgi.wsgi_req->poll.fd;
++	struct wsgi_request *wsgi_req = current_wsgi_req();
++	int uwsgi_fd = wsgi_req->poll.fd;
+ 
+ 	if (!PyArg_ParseTuple(args, "O|O:send", &arg1, &arg2)) {
+ 		return NULL;

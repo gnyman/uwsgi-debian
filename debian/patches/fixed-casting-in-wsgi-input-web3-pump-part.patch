@@ -1,0 +1,30 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Fri Jul 13 13:21:57 2012 +0200
+Subject: fixed casting in wsgi.input (web3/pump part)
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/08530c952818
+
+
+diff -r e7bca57267bc -r 08530c952818 plugins/python/pump_subhandler.c
+--- a/plugins/python/pump_subhandler.c	Fri Jul 13 12:57:18 2012 +0200
++++ b/plugins/python/pump_subhandler.c	Fri Jul 13 13:21:57 2012 +0200
+@@ -107,7 +107,7 @@
+         // if async_post is mapped as a file, directly use it as wsgi.input
+         if (wsgi_req->async_post) {
+ #ifdef PYTHREE
+-                wsgi_req->async_input = PyFile_FromFd(fileno(wsgi_req->async_post), "pump_body", "rb", 0, NULL, NULL, NULL, 0);
++                wsgi_req->async_input = PyFile_FromFd(fileno((FILE *)wsgi_req->async_post), "pump_body", "rb", 0, NULL, NULL, NULL, 0);
+ #else
+                 wsgi_req->async_input = PyFile_FromFile(wsgi_req->async_post, "pump_body", "r", NULL);
+ #endif
+diff -r e7bca57267bc -r 08530c952818 plugins/python/web3_subhandler.c
+--- a/plugins/python/web3_subhandler.c	Fri Jul 13 12:57:18 2012 +0200
++++ b/plugins/python/web3_subhandler.c	Fri Jul 13 13:21:57 2012 +0200
+@@ -47,7 +47,7 @@
+         // if async_post is mapped as a file, directly use it as wsgi.input
+         if (wsgi_req->async_post) {
+ #ifdef PYTHREE
+-                wsgi_req->async_input = PyFile_FromFd(fileno(wsgi_req->async_post), "web3_input", "rb", 0, NULL, NULL, NULL, 0);
++                wsgi_req->async_input = PyFile_FromFd(fileno((FILE *) wsgi_req->async_post), "web3_input", "rb", 0, NULL, NULL, NULL, 0);
+ #else
+                 wsgi_req->async_input = PyFile_FromFile(wsgi_req->async_post, "web3_input", "r", NULL);
+ #endif

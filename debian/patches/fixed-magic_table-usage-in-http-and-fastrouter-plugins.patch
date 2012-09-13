@@ -1,0 +1,29 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Fri May 25 08:54:44 2012 +0200
+Subject: fixed magic_table usage in http and fastrouter plugins
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/1a5250707afb
+
+diff -r cdd86ccdb955 -r 1a5250707afb plugins/fastrouter/fr.h
+--- a/plugins/fastrouter/fr.h	Mon May 14 07:58:20 2012 +0200
++++ b/plugins/fastrouter/fr.h	Fri May 25 08:54:44 2012 +0200
+@@ -36,7 +36,7 @@
+         int use_cache;
+         int nevents;
+ 
+-	char *magic_table[0xff];
++	char *magic_table[256];
+ 
+         int queue;
+ 
+diff -r cdd86ccdb955 -r 1a5250707afb plugins/http/http.c
+--- a/plugins/http/http.c	Mon May 14 07:58:20 2012 +0200
++++ b/plugins/http/http.c	Fri May 25 08:54:44 2012 +0200
+@@ -508,7 +508,7 @@
+ 	ssize_t len;
+ 	int i, j;
+ 
+-	char *magic_table[0xff];
++	char *magic_table[256];
+ 
+ 	char bbuf[UMAX16];
+ 

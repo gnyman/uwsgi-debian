@@ -1,0 +1,17 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Tue Aug 28 19:00:51 2012 +0200
+Subject: fixed fastcgi support for response bigger than 64k
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/877ce17e6900
+
+
+--- a/proto/fastcgi.c
++++ b/proto/fastcgi.c
+@@ -222,7 +222,7 @@ ssize_t uwsgi_proto_fastcgi_write(struct
+                         	return 0;
+                 	}
+ 			rlen = write(wsgi_req->poll.fd, ptr, chunk_len);
+-			if (rlen != 8) {
++			if (rlen <= 0) {
+                         	if (!uwsgi.ignore_write_errors) {
+                                 	uwsgi_req_error("write()");
+                         	}

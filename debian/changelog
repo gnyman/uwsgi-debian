@@ -1,9 +1,44 @@
-uwsgi (1.2.3+dfsg-5) UNRELEASED; urgency=low
+uwsgi (1.2.3+dfsg-5) unstable; urgency=low
 
   * debian/patches/remove-pg_config_cflags-in-probepg.patch
     - Remove pg_config --cflags from probepg build. (Closes: #687084)
+  * Apply upstream patches:
+    - fixed-magic_table-usage-in-http-and-fastrouter-plugins.patch
+        Fixed magic_table usage in http and fastrouter plugins.
+    - security-check-in-the-http-router.patch
+        Added a security check in the http router.
+    - threading-issue-with-uwsgi-send.patch
+        Fixed a threading issue with uwsgi.send().
+    - fixed-ruby-rvm-support.patch
+        Fixed Ruby RVM support.
+    - fixed-spooler-with-chdir.patch
+        Fixed spooler with chdir.
+    - fixed-async+threading.patch
+        Fixed async+threading in python plugin.
+    - skip-headers-sending-when-no-headers-are-defined.patch
+        Skip headers sending when no headers are defined.
+    - fixed-logfile-inheritance.patch
+        Fixed logfile inheritance.
+    - fixed-waitpid-usage-in-cheap-cheaper-lazy-modes.patch
+        Fixed waitpid usage in cheap/cheaper/lazy modes.
+    - fixed-casting-in-wsgi-input.patch
+        Fixed casting in uwsgi.input.
+    - fixed-casting-in-wsgi-input-web3-pump-part.patch
+        More fixes on casting in uwsgi.input.
+    - fixed-env-clear-in-plain-async-mode.patch
+        Fixed env clear in plain async mode.
+    - allows-ugreen-with-threads.patch
+        Allows ugreen with threads.
+    - fix-mod_uwsgi-authenticated-but-authentication-typeless-requests.patch
+        Fix mod_uwsgi authenticated, but authentication typeless requests.
+    - fixed-fastcgi-support-for-response-bigger-than-64k.patch
+        Fixed fastcgi support for response bigger than 64k.
+    - disable-SIGSTOP-SIGTSTP-in-gateways.patch
+        Disable SIGSTOP/SIGTSTP in gateways.
+    - fixed-idle-mode.patch
+        Fixed idle mode.
 
- -- Janos Guljas <janos@resenje.org>  Thu, 13 Sep 2012 13:40:44 +0200
+ -- Janos Guljas <janos@resenje.org>  Thu, 13 Sep 2012 19:37:31 +0200
 
 uwsgi (1.2.3+dfsg-4) unstable; urgency=low
 

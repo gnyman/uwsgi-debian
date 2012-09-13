@@ -1,0 +1,20 @@
+From: "roberto@quantal64" <roberto@quantal64>
+Date: Fri Jun  8 20:52:50 2012 +0200
+Subject: fixed spooler with chdir
+Origin: http://projects.unbit.it/hg/uwsgi-1.2/rev/4ec299b81628
+
+diff -r 1e04d749f439 -r 4ec299b81628 spooler.c
+--- a/spooler.c	Sun Jun 03 18:33:21 2012 +0200
++++ b/spooler.c	Fri Jun 08 20:52:50 2012 +0200
+@@ -547,6 +547,11 @@
+ 			// here we free and unlock the task
+ 			uwsgi_protected_close(spool_fd);
+ 			uspool->running = 0;
++			if (chdir(dir)) {
++				uwsgi_error("chdir()");
++                		uwsgi_log("[spooler] something horrible happened to the spooler. Better to kill it.\n");
++				exit(1);
++			}
+ 
+ 			if (!callable_found) {
+ 				uwsgi_log("unable to find the spooler function, have you loaded it into the spooler process ?\n");
