@@ -9,6 +9,8 @@ extern struct uwsgi_perl uperl;
 struct uwsgi_perl uperl;
 #endif
 
+struct uwsgi_plugin psgi_plugin;
+
 struct uwsgi_option uwsgi_perl_options[] = {
 
         {"psgi", required_argument, 0, "load a psgi app", uwsgi_opt_set_str, &uperl.psgi, 0},
@@ -101,31 +103,33 @@ int uwsgi_perl_obj_can(SV *obj, char *method, size_t len) {
 
 }
 
-int uwsgi_perl_obj_isa(SV *obj, char *class) { 
-  
- 	        int ret = 0; 
- 	 
- 	        dSP; 
- 	 
- 	        ENTER; 
- 	        SAVETMPS; 
- 	        PUSHMARK(SP); 
- 	        XPUSHs(obj); 
- 	        PUTBACK; 
- 	 
- 	        call_pv( "Scalar::Util::reftype", G_SCALAR|G_EVAL); 
- 	 
- 	        SPAGAIN; 
- 	        char *reftype = POPp; 
- 	        if (reftype && !strcmp(reftype, class)) { 
- 	                ret = 1; 
- 	        } 
- 	        PUTBACK; 
- 	        FREETMPS; 
- 	        LEAVE; 
- 	 
-	        return ret; 
-} 
+int uwsgi_perl_obj_isa(SV *obj, char *class) {
+
+	int ret = 0;
+
+        dSP;
+
+        ENTER;
+        SAVETMPS;
+        PUSHMARK(SP);
+        XPUSHs(obj);
+        PUTBACK;
+
+        call_pv( "Scalar::Util::reftype", G_SCALAR|G_EVAL);
+
+        SPAGAIN;
+        char *reftype = POPp;
+	if (reftype && !strcmp(reftype, class)) {
+		ret = 1;
+	}
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+        return ret;
+
+}
+
 
 SV *uwsgi_perl_obj_call(SV *obj, char *method) {
 
@@ -194,8 +198,8 @@ AV *psgi_call(struct wsgi_request *wsgi_req, SV *psgi_func, SV *env) {
 
 SV *build_psgi_env(struct wsgi_request *wsgi_req) {
 	int i;
-	HV *env = newHV();
 	struct uwsgi_app *wi = &uwsgi_apps[wsgi_req->app_id];
+	HV *env = newHV();
 
 	// fill perl hash
         for(i=0;i<wsgi_req->var_cnt;i++) {
@@ -293,8 +297,17 @@ SV *build_psgi_env(struct wsgi_request *wsgi_req) {
 		if (!hv_store(env, "psgix.harakiri", 14, newSViv(1), 0)) goto clear;
 	}
 
+	if (!hv_store(env, "psgix.cleanup", 13, newSViv(1), 0)) goto clear;
+	// cleanup handlers array
+	av = newAV();
+	if (!hv_store(env, "psgix.cleanup.handlers", 22, newRV_noinc((SV *)av ), 0)) goto clear;
+	
+
 	SV *pe = uwsgi_perl_obj_new("uwsgi::error", 12);
         if (!hv_store(env, "psgi.errors", 11, pe, 0)) goto clear;
+
+	(void) hv_delete(env, "HTTP_CONTENT_LENGTH", 19, G_DISCARD);
+	(void) hv_delete(env, "HTTP_CONTENT_TYPE", 17, G_DISCARD);
 
 	return newRV_noinc((SV *)env);
 
@@ -357,9 +370,9 @@ int uwsgi_perl_init(){
 	}
 
 #ifdef PERL_VERSION_STRING
-	uwsgi_log("initialized Perl %s main interpreter at %p\n", PERL_VERSION_STRING, uperl.main[0]);
+	uwsgi_log_initial("initialized Perl %s main interpreter at %p\n", PERL_VERSION_STRING, uperl.main[0]);
 #else
-	uwsgi_log("initialized Perl main interpreter at %p\n", uperl.main[0]);
+	uwsgi_log_initial("initialized Perl main interpreter at %p\n", uperl.main[0]);
 #endif
 
 	return 1;
@@ -367,8 +380,6 @@ int uwsgi_perl_init(){
 }
 
 int uwsgi_perl_request(struct wsgi_request *wsgi_req) {
-
-	SV **harakiri;
 
 #ifdef UWSGI_ASYNC
 	if (wsgi_req->async_status == UWSGI_AGAIN) {
@@ -385,7 +396,7 @@ int uwsgi_perl_request(struct wsgi_request *wsgi_req) {
 		return -1;
 	}
 
-	wsgi_req->app_id = uwsgi_get_app_id(wsgi_req->appid, wsgi_req->appid_len, 5);
+	wsgi_req->app_id = uwsgi_get_app_id(wsgi_req->appid, wsgi_req->appid_len, psgi_plugin.modifier1);
 	// if it is -1, try to load a dynamic app
 	if (wsgi_req->app_id == -1) {
 		if (wsgi_req->dynamic) {
@@ -450,13 +461,7 @@ int uwsgi_perl_request(struct wsgi_request *wsgi_req) {
 	}
 
 clear2:
-	// check for psgix.harakiri
-        harakiri = hv_fetch((HV*)SvRV( (SV*)wsgi_req->async_environ), "psgix.harakiri.commit", 21, 0);
-        if (harakiri) {
-                if (SvTRUE(*harakiri)) wsgi_req->async_plagued = 1;
-        }
-
-	SvREFCNT_dec(wsgi_req->async_environ);
+	// clear response
 	SvREFCNT_dec(wsgi_req->async_result);
 clear:
 
@@ -471,16 +476,57 @@ clear:
 	return UWSGI_OK;
 }
 
+static void psgi_call_cleanup_hook(SV *hook, SV *env) {
+	dSP;
+	ENTER;
+	SAVETMPS;
+	PUSHMARK(SP);
+	XPUSHs(env);
+	PUTBACK;
+	call_sv(hook, G_DISCARD);
+	if(SvTRUE(ERRSV)) {
+                uwsgi_log("[uwsgi-perl error] %s\n", SvPV_nolen(ERRSV));
+        }
+	FREETMPS;
+	LEAVE;
+}
 
 void uwsgi_perl_after_request(struct wsgi_request *wsgi_req) {
 
-	if (uwsgi.shared->options[UWSGI_OPTION_LOGGING])
-		log_request(wsgi_req);
+	log_request(wsgi_req);
 
+	// dereference %env
+	SV *env = SvRV((SV *) wsgi_req->async_environ);
+
+	// check for cleanup handlers
+	if (hv_exists((HV *)env, "psgix.cleanup.handlers", 22)) {
+		SV **cleanup_handlers = hv_fetch((HV *)env, "psgix.cleanup.handlers", 22, 0);
+		if (SvROK(*cleanup_handlers)) {
+			if (SvTYPE(SvRV(*cleanup_handlers)) == SVt_PVAV) {
+				I32 n = av_len((AV *)SvRV(*cleanup_handlers));
+				I32 i;
+				for(i=0;i<=n;i++) {
+					SV **hook = av_fetch((AV *)SvRV(*cleanup_handlers), i, 0);
+					psgi_call_cleanup_hook(*hook, (SV *) wsgi_req->async_environ);
+				}
+			}
+		}
+	}
+
+	// check for psgix.harakiri
+	if (hv_exists((HV *)env, "psgix.harakiri.commit", 21)) {
+		SV **harakiri = hv_fetch((HV *)env, "psgix.harakiri.commit", 21, 0);
+		if (SvTRUE(*harakiri)) wsgi_req->async_plagued = 1;
+	}
+
+	// async plagued could be defined in other areas...
 	if (wsgi_req->async_plagued) {
 		uwsgi_log("*** psgix.harakiri.commit requested ***\n");
 		goodbye_cruel_world();
 	}
+
+	// clear the env
+	SvREFCNT_dec(wsgi_req->async_environ);
 
 }
 
@@ -510,7 +556,7 @@ void uwsgi_perl_post_fork() {
 	}
 }
 
-int uwsgi_perl_mount_app(char *mountpoint, char *app, int regexp) {
+int uwsgi_perl_mount_app(char *mountpoint, char *app) {
 
 	if (uwsgi_endswith(app, ".pl") || uwsgi_endswith(app, ".psgi")) {
         	uwsgi.wsgi_req->appid = mountpoint;
@@ -549,6 +595,32 @@ void uwsgi_perl_enable_threads(void) {
 #endif
 }
 
+int uwsgi_perl_signal_handler(uint8_t sig, void *handler) {
+
+	int ret = 0;
+
+	dSP;
+        ENTER;
+        SAVETMPS;
+        PUSHMARK(SP);
+        XPUSHs( sv_2mortal(newSViv(sig)));
+        PUTBACK;
+
+        call_sv( SvRV((SV*)handler), G_DISCARD);
+
+	if(SvTRUE(ERRSV)) {
+                uwsgi_log("[uwsgi-perl error] %s\n", SvPV_nolen(ERRSV));
+		ret = -1;
+        }
+
+        SPAGAIN;
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+	return ret;
+}
+
 struct uwsgi_plugin psgi_plugin = {
 
 	.name = "psgi",
@@ -560,6 +632,9 @@ struct uwsgi_plugin psgi_plugin = {
 	.mount_app = uwsgi_perl_mount_app,
 
 	.init_thread = uwsgi_perl_init_thread,
+	.signal_handler = uwsgi_perl_signal_handler,
+
+	.mule = uwsgi_perl_mule,
 
 	.post_fork = uwsgi_perl_post_fork,
 	.request = uwsgi_perl_request,

@@ -3,6 +3,7 @@
 extern struct uwsgi_server uwsgi;
 struct uwsgi_perl uperl;
 
+extern struct uwsgi_plugin psgi_plugin;
 
 
 XS(XS_input_seek) {
@@ -36,16 +37,16 @@ XS(XS_input) {
 }
 
 XS(XS_psgix_logger) {
-	dXSARGS; 
- 	psgi_check_args(1); 
- 	HV *hv_args = (HV *) (SvRV(ST(0))); 
- 	if (!hv_exists(hv_args, "level", 5) || !hv_exists(hv_args, "message", 7)) { 
- 		Perl_croak(aTHX_ "psgix.logger requires bot level and message items"); 
-        } 
- 	char *level = SvPV_nolen(*(hv_fetch(hv_args, "level", 5, 0))); 
- 	char *message = SvPV_nolen(*(hv_fetch(hv_args, "message", 7, 0))); 
- 	uwsgi_log("[uwsgi-perl %s] %s\n", level, message);  
- 	XSRETURN(0); 
+	dXSARGS;
+	psgi_check_args(1);
+	HV *hv_args = (HV *) (SvRV(ST(0)));
+	if (!hv_exists(hv_args, "level", 5) || !hv_exists(hv_args, "message", 7)) {
+		Perl_croak(aTHX_ "psgix.logger requires bot level and message items");
+	}
+	char *level = SvPV_nolen(*(hv_fetch(hv_args, "level", 5, 0)));
+	char *message = SvPV_nolen(*(hv_fetch(hv_args, "message", 7, 0)));
+	uwsgi_log("[uwsgi-perl %s] %s\n", level, message); 
+	XSRETURN(0);
 }
 
 XS(XS_stream)
@@ -134,21 +135,21 @@ XS(XS_input_read) {
                 sv_setpvn(read_buf, wsgi_req->post_buffering_buf, remains);
                 bytes = remains;
                 wsgi_req->post_pos += remains;
-
+		goto ret;
         }
 
         tmp_buf = uwsgi_malloc(remains);
 
         if (uwsgi_waitfd(fd, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]) <= 0) {
                 free(tmp_buf);
-                croak("error waiting for wsgi.input data");
+                croak("error waiting for psgi.input data");
                 goto ret;
         }
 
         bytes = read(fd, tmp_buf, remains);
         if (bytes < 0) {
                 free(tmp_buf);
-                croak("error reading wsgi.input data");
+                croak("error reading psgi.input data");
                 goto ret;
         }
 
@@ -207,7 +208,6 @@ XS(XS_uwsgi_stacktrace) {
 	dXSARGS;
 
         psgi_check_args(0);
-
 	uwsgi_log("%s", SvPV_nolen(ERRSV));
 	uwsgi_log("*** uWSGI perl stacktrace ***\n");
 	SV *ret = perl_eval_pv("Devel::StackTrace->new->as_string;", 0);
@@ -233,6 +233,8 @@ xs_init(pTHX)
         /* DynaLoader is a special case */
         newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 
+	if (!uperl.tmp_input_stash) goto nonworker;
+
         newXS("uwsgi::input::new", XS_input, "uwsgi::input");
         newXS("uwsgi::input::read", XS_input_read, "uwsgi::input");
         newXS("uwsgi::input::seek", XS_input_seek, "uwsgi::input");
@@ -242,7 +244,6 @@ xs_init(pTHX)
         newXS("uwsgi::error::new", XS_error, "uwsgi::error");
         newXS("uwsgi::error::print", XS_error_print, "uwsgi::print");
         uperl.tmp_error_stash[uperl.tmp_current_i] = gv_stashpv("uwsgi::error", 0);
-
 	uperl.tmp_psgix_logger[uperl.tmp_current_i] = newXS("uwsgi::psgix_logger", XS_psgix_logger, "uwsgi");
         uperl.tmp_stream_responder[uperl.tmp_current_i] = newXS("uwsgi::stream", XS_stream, "uwsgi");
 
@@ -253,6 +254,8 @@ xs_init(pTHX)
 
 
         uperl.tmp_streaming_stash[uperl.tmp_current_i] = gv_stashpv("uwsgi::streaming", 0);
+
+nonworker:
 
 #ifdef UWSGI_EMBEDDED
         init_perl_embedded_module();
@@ -286,7 +289,7 @@ static void uwsgi_perl_free_stashes(void) {
         free(uperl.tmp_input_stash);
         free(uperl.tmp_error_stash);
         free(uperl.tmp_stream_responder);
-	free(uperl.tmp_psgix_logger); 
+        free(uperl.tmp_psgix_logger);
 }
 
 int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, PerlInterpreter **interpreters) {
@@ -434,15 +437,20 @@ int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, Pe
 		goto clear;
         }
 
+	if (uwsgi_apps_cnt >= uwsgi.max_apps) {
+		uwsgi_log("ERROR: you cannot load more than %d apps in a worker\n", uwsgi.max_apps);
+		goto clear;
+	}
+
 	int id = uwsgi_apps_cnt;
 	struct uwsgi_app *wi = NULL;
 
 	if (wsgi_req) {
 		// we need a copy of app_id
-		wi = uwsgi_add_app(id, 5, uwsgi_concat2n(wsgi_req->appid, wsgi_req->appid_len, "", 0), wsgi_req->appid_len, interpreters, callables);
+		wi = uwsgi_add_app(id, psgi_plugin.modifier1, uwsgi_concat2n(wsgi_req->appid, wsgi_req->appid_len, "", 0), wsgi_req->appid_len, interpreters, callables);
 	}
 	else {
-		wi = uwsgi_add_app(id, 5, "", 0, interpreters, callables);
+		wi = uwsgi_add_app(id, psgi_plugin.modifier1, "", 0, interpreters, callables);
 	}
 
 	wi->started_at = now;
@@ -489,6 +497,22 @@ void uwsgi_psgi_app() {
 		//load app in the main interpreter list
 		init_psgi_app(NULL, uperl.psgi, strlen(uperl.psgi), uperl.main);
         }
+
+}
+
+int uwsgi_perl_mule(char *opt) {
+
+        if (uwsgi_endswith(opt, ".pl")) {
+                PERL_SET_CONTEXT(uperl.main[0]);
+                uperl.embedding[1] = opt;
+                if (perl_parse(uperl.main[0], xs_init, 2, uperl.embedding, NULL)) {
+                        return 0;
+                }
+                perl_run(uperl.main[0]);
+                return 1;
+        }
+
+        return 0;
 
 }
 

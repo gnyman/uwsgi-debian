@@ -13,9 +13,7 @@ extern struct uwsgi_python up;
 
 extern char **environ;
 
-#ifdef UWSGI_SENDFILE
 PyMethodDef uwsgi_sendfile_method[] = {{"uwsgi_sendfile", py_uwsgi_sendfile, METH_VARARGS, ""}};
-#endif
 
 #ifdef UWSGI_ASYNC
 PyMethodDef uwsgi_eventfd_read_method[] = { {"uwsgi_eventfd_read", py_eventfd_read, METH_VARARGS, ""}};
@@ -77,35 +75,37 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 
 	PyObject *app_list = NULL, *applications = NULL;
 
+
+	if (uwsgi_apps_cnt >= uwsgi.max_apps) {
+		uwsgi_log("ERROR: you cannot load more than %d apps in a worker\n", uwsgi.max_apps);
+		return -1;
+	}
+
+
 	int id = uwsgi_apps_cnt;
+
 	int multiapp = 0;
 
 	int i;
-
-	char *mountpoint;
 
 	struct uwsgi_app *wi;
 
 	time_t now = uwsgi_now();
 
-	mountpoint = uwsgi_strncopy(wsgi_req->appid, wsgi_req->appid_len);
-
-	if (uwsgi_get_app_id(mountpoint, strlen(mountpoint), -1) != -1) {
-		uwsgi_log( "mountpoint %.*s already configured. skip.\n", strlen(mountpoint), mountpoint);
-		free(mountpoint);
+	if (uwsgi_get_app_id(wsgi_req->appid, wsgi_req->appid_len, -1) != -1) {
+		uwsgi_log( "mountpoint %.*s already configured. skip.\n", wsgi_req->appid_len, wsgi_req->appid);
 		return -1;
 	}
-
 
 	wi = &uwsgi_apps[id];
 
 	memset(wi, 0, sizeof(struct uwsgi_app));
-	wi->mountpoint = mountpoint;
-	wi->mountpoint_len = strlen(mountpoint);
+	wi->mountpoint_len = wsgi_req->appid_len < 0xff ? wsgi_req->appid_len : (0xff-1);
+	strncpy(wi->mountpoint, wsgi_req->appid, wi->mountpoint_len);
 
 	// dynamic chdir ?
 	if (wsgi_req->chdir_len > 0) {
-		wi->chdir = uwsgi_strncopy(wsgi_req->chdir, wsgi_req->chdir_len);
+		strncpy(wi->chdir, wsgi_req->chdir, wsgi_req->chdir_len < 0xff ? wsgi_req->chdir_len : (0xff-1));
 #ifdef UWSGI_DEBUG
 		uwsgi_debug("chdir to %s\n", wi->chdir);
 #endif
@@ -193,11 +193,10 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 	wi->interpreter = up.main_thread;
 #endif
 
-	if (wsgi_req->touch_reload_len) {
+	if (wsgi_req->touch_reload_len > 0 && wsgi_req->touch_reload_len < 0xff) {
 		struct stat trst;
-		char *touch_reload = uwsgi_strncopy(wsgi_req->touch_reload, wsgi_req->touch_reload_len);
-		if (!stat(touch_reload, &trst)) {
-			wi->touch_reload = touch_reload;
+		strncpy(wi->touch_reload, wsgi_req->touch_reload, wsgi_req->touch_reload_len);
+		if (!stat(wi->touch_reload, &trst)) {
 			wi->touch_reload_mtime = trst.st_mtime;
 		}
 	}
@@ -205,7 +204,7 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 	wi->callable = up.loaders[loader](arg1);
 
 	if (!wi->callable) {
-		uwsgi_log("unable to load app %d (mountpoint='%s') (callable not found or import error)\n", id, mountpoint);
+		uwsgi_log("unable to load app %d (mountpoint='%s') (callable not found or import error)\n", id, wi->mountpoint);
 		goto doh;
 	}
 
@@ -227,8 +226,9 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 			uwsgi_log("the app mountpoint must be a string\n");
 			goto doh;
 		}
-		wi->mountpoint = PyString_AsString(app_mnt);
-		wi->mountpoint_len = strlen(wi->mountpoint);
+		char *tmp_mountpoint = PyString_AsString(app_mnt);
+		wi->mountpoint_len = strlen(wi->mountpoint) < 0xff ? strlen(wi->mountpoint) : (0xff-1);
+		strncpy(wi->mountpoint, tmp_mountpoint, wi->mountpoint_len);
 		wsgi_req->appid = wi->mountpoint;
 		wsgi_req->appid_len = wi->mountpoint_len;
 #ifdef UWSGI_DEBUG
@@ -329,10 +329,8 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 #endif
 
 	if (app_type == PYTHON_APP_TYPE_WSGI) {
-#ifdef UWSGI_SENDFILE
 		// prepare sendfile() for WSGI app
 		wi->sendfile = PyCFunction_New(uwsgi_sendfile_method, NULL);
-#endif
 
 #ifdef UWSGI_ASYNC
 		wi->eventfd_read = PyCFunction_New(uwsgi_eventfd_read_method, NULL);
@@ -357,9 +355,9 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 		// if we have multiple threads we need to initialize a PyThreadState for each one
 		for(i=0;i<uwsgi.threads;i++) {
 			//uwsgi_log("%p\n", uwsgi.core[i]->ts[id]);
-			uwsgi.core[i]->ts[id] = PyThreadState_New( ((PyThreadState *)wi->interpreter)->interp);
-			if (!uwsgi.core[i]->ts[id]) {
-				uwsgi_log("unable to allocate new PyThreadState structure for app %s", mountpoint);
+			uwsgi.workers[uwsgi.mywid].cores[i].ts[id] = PyThreadState_New( ((PyThreadState *)wi->interpreter)->interp);
+			if (!uwsgi.workers[uwsgi.mywid].cores[i].ts[id]) {
+				uwsgi_log("unable to allocate new PyThreadState structure for app %s", wi->mountpoint);
 				goto doh;
 			}
 		}
@@ -424,7 +422,6 @@ int init_uwsgi_app(int loader, void *arg1, struct wsgi_request *wsgi_req, PyThre
 	return id;
 
 doh:
-	free(mountpoint);
 	if (PyErr_Occurred())
 		PyErr_Print();
 #ifdef UWSGI_MINTERPRETERS
@@ -482,7 +479,9 @@ PyObject *uwsgi_uwsgi_loader(void *arg1) {
 
 	PyObject *tmp_callable;
 	PyObject *applications;
+#ifdef UWSGI_EMBEDDED
 	PyObject *uwsgi_dict = get_uwsgi_pydict("uwsgi");
+#endif
 
 	char *module = (char *) arg1;
 
@@ -505,8 +504,10 @@ PyObject *uwsgi_uwsgi_loader(void *arg1) {
 		return NULL;
 	}
 
+#ifdef UWSGI_EMBEDDED
 	applications = PyDict_GetItemString(uwsgi_dict, "applications");
 	if (applications && PyDict_Check(applications)) return applications;
+#endif
 
 	applications = PyDict_GetItemString(wsgi_dict, "applications");
 	if (applications && PyDict_Check(applications)) return applications;
@@ -661,7 +662,7 @@ PyObject *uwsgi_paste_loader(void *arg1) {
 					PyErr_Print();
 					exit(UWSGI_FAILED_APP_CODE);
 				}
-				PyTuple_SetItem(paste_logger_arg, 0, PyString_FromString(paste+7));
+				PyTuple_SetItem(paste_logger_arg, 0, UWSGI_PYFROMSTRING(paste+7));
 				if (python_call(paste_logger_fileConfig, paste_logger_arg, 0, NULL)) {
 					PyErr_Print();
 				}
@@ -693,7 +694,7 @@ PyObject *uwsgi_paste_loader(void *arg1) {
 		exit(UWSGI_FAILED_APP_CODE);
 	}
 
-	if (PyTuple_SetItem(paste_arg, 0, PyString_FromString(paste))) {
+	if (PyTuple_SetItem(paste_arg, 0, UWSGI_PYFROMSTRING(paste))) {
 		PyErr_Print();
 		exit(UWSGI_FAILED_APP_CODE);
 	}

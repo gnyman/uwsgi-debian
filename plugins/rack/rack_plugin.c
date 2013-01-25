@@ -3,6 +3,7 @@
 extern struct uwsgi_server uwsgi;
 
 struct uwsgi_rack ur;
+struct uwsgi_plugin rack_plugin;
 
 struct uwsgi_option uwsgi_rack_options[] = {
 
@@ -17,12 +18,24 @@ struct uwsgi_option uwsgi_rack_options[] = {
         {"rubyrequire", required_argument, 0, "import/require a ruby module/script", uwsgi_opt_add_string_list, &ur.rbrequire, 0},
         {"require", required_argument, 0, "import/require a ruby module/script", uwsgi_opt_add_string_list, &ur.rbrequire, 0},
 
+        {"shared-rb-require", required_argument, 0, "import/require a ruby module/script (shared)", uwsgi_opt_add_string_list, &ur.shared_rbrequire, 0},
+        {"shared-ruby-require", required_argument, 0, "import/require a ruby module/script (shared)", uwsgi_opt_add_string_list, &ur.shared_rbrequire, 0},
+        {"shared-rbrequire", required_argument, 0, "import/require a ruby module/script (shared)", uwsgi_opt_add_string_list, &ur.shared_rbrequire, 0},
+        {"shared-rubyrequire", required_argument, 0, "import/require a ruby module/script (shared)", uwsgi_opt_add_string_list, &ur.shared_rbrequire, 0},
+        {"shared-require", required_argument, 0, "import/require a ruby module/script (shared)", uwsgi_opt_add_string_list, &ur.shared_rbrequire, 0},
+
         {"gemset", required_argument, 0, "load the specified gemset (rvm)", uwsgi_opt_set_str, &ur.gemset, 0},
         {"rvm", required_argument, 0, "load the specified gemset (rvm)", uwsgi_opt_set_str, &ur.gemset, 0},
 
-        {"rvm-path", required_argument, 0, "search for rvm in the specifiied directory", uwsgi_opt_add_string_list, &ur.rvm_path, 0},
+        {"rvm-path", required_argument, 0, "search for rvm in the specified directory", uwsgi_opt_add_string_list, &ur.rvm_path, 0},
 
         {"rbshell", optional_argument, 0, "run  a ruby/irb shell", uwsgi_opt_true, &ur.rb_shell, 0},
+
+#ifdef RUBY19
+        {"rb-threads", required_argument, 0, "set the number of ruby threads to run", uwsgi_opt_set_int, &ur.rb_threads, 0},
+        {"rbthreads", required_argument, 0, "set the number of ruby threads to run", uwsgi_opt_set_int, &ur.rb_threads, 0},
+        {"ruby-threads", required_argument, 0, "set the number of ruby threads to run", uwsgi_opt_set_int, &ur.rb_threads, 0},
+#endif
 
         {0, 0, 0, 0, 0, 0 ,0},
 
@@ -72,6 +85,14 @@ VALUE rb_uwsgi_io_gets(VALUE obj, VALUE args) {
 	struct wsgi_request *wsgi_req;
 	VALUE line;
 	Data_Get_Struct(obj, struct wsgi_request, wsgi_req);
+	char linebuf[4096];
+
+	if (wsgi_req->async_post) {
+		if (fgets(linebuf, 4096, (FILE *) wsgi_req->async_post) == NULL) {
+			return Qnil;
+		}	
+		return rb_str_new2(linebuf);
+	}
 
 	// return a line of body
 	for(i=wsgi_req->buf_pos;i<wsgi_req->post_cl;i++) {
@@ -93,12 +114,18 @@ VALUE rb_uwsgi_io_gets(VALUE obj, VALUE args) {
 
 VALUE rb_uwsgi_io_each(VALUE obj, VALUE args) {
 
-	struct wsgi_request *wsgi_req;
-	Data_Get_Struct(obj, struct wsgi_request, wsgi_req);
+	if (!rb_block_given_p())
+		rb_raise(rb_eArgError, "Expected block on rack.input 'each' method");
 
 	// yield strings chunks
-	rb_raise(rb_eRuntimeError, "rack.input::each is not implemented (req %p)\n", wsgi_req);
-
+	for(;;) {
+		VALUE chunk = rb_uwsgi_io_gets(obj, Qnil);
+		if (chunk == Qnil) {
+			return Qnil;
+		}
+		rb_yield(chunk);
+	}
+	// never here
 	return Qnil;
 }
 
@@ -107,13 +134,65 @@ VALUE rb_uwsgi_io_read(VALUE obj, VALUE args) {
 	struct wsgi_request *wsgi_req;
 	Data_Get_Struct(obj, struct wsgi_request, wsgi_req);
 	VALUE chunk;
-	unsigned int chunk_size;
+	long chunk_size;
 
-	if (!wsgi_req->post_cl || wsgi_req->buf_pos >= wsgi_req->post_cl) {
 /*
 	When EOF is reached, this method returns nil if length is given and not nil, or "" if length is not given or is nil.
 	If buffer is given, then the read data will be placed into buffer instead of a newly created String object.
 */
+
+	// --- disk buffering ---
+
+	if (wsgi_req->async_post) {
+		// 0 size, read the whole body from the file...
+		if (RARRAY_LEN(args) == 0) {
+			char *tmp_chunk = uwsgi_malloc(wsgi_req->post_cl);
+			size_t rlen = fread(tmp_chunk, 1, wsgi_req->post_cl, (FILE *) wsgi_req->async_post);
+			if (rlen == 0) {
+				free(tmp_chunk);
+				return rb_str_new("", 0);
+			}
+			// return a new string
+			chunk = rb_str_new(tmp_chunk, rlen);
+			free(tmp_chunk);
+			return chunk;
+		}
+		// size specified
+		else if (RARRAY_LEN(args) > 0) {
+			if (RARRAY_PTR(args)[0] == Qnil) {
+				chunk_size = wsgi_req->post_cl;
+			}
+			else {
+				chunk_size = NUM2LONG(RARRAY_PTR(args)[0]);
+				// hack to tolerate broken middlewares
+				if (chunk_size <= 0) {
+					chunk_size = wsgi_req->post_cl;
+				}
+			}
+			char *tmp_chunk = uwsgi_malloc(chunk_size);
+			size_t rlen = fread(tmp_chunk, 1, chunk_size, (FILE *) wsgi_req->async_post);
+			// error, return Qnil
+			if (rlen == 0) {
+				free(tmp_chunk);
+				return Qnil;
+			}
+			// push in the specified buffer
+			if (RARRAY_LEN(args) > 1) {
+                        	rb_str_cat(RARRAY_PTR(args)[1], tmp_chunk, rlen);
+			}
+			// return a new string
+			chunk = rb_str_new(tmp_chunk, rlen);
+			free(tmp_chunk);
+			return chunk;
+                }
+		// never happend...
+		return Qnil;
+	}
+
+	// --- memory buffering ---
+
+	// first check for virtual EOF
+	if (!wsgi_req->post_cl || wsgi_req->buf_pos >= wsgi_req->post_cl) {
 		if (RARRAY_LEN(args) > 0) {
 			if (RARRAY_PTR(args)[0] == Qnil) {
 				return rb_str_new("", 0);
@@ -130,14 +209,21 @@ VALUE rb_uwsgi_io_read(VALUE obj, VALUE args) {
 		return chunk;
 	}
 	else if (RARRAY_LEN(args) > 0) {
-		chunk_size = NUM2UINT(RARRAY_PTR(args)[0]);
+		if (RARRAY_PTR(args)[0] == Qnil) {
+			chunk_size = wsgi_req->post_cl;
+		}
+		else {
+			chunk_size = NUM2LONG(RARRAY_PTR(args)[0]);
+			// hack to tolerate broken middlewares
+			if (chunk_size <= 0) {
+				chunk_size = wsgi_req->post_cl;
+			}
+		}
 		if (wsgi_req->buf_pos+chunk_size > wsgi_req->post_cl) {
 			chunk_size = wsgi_req->post_cl-wsgi_req->buf_pos;
 		}
 		if (RARRAY_LEN(args) > 1) {
 			rb_str_cat(RARRAY_PTR(args)[1], wsgi_req->post_buffering_buf+wsgi_req->buf_pos, chunk_size);
-			wsgi_req->buf_pos+=chunk_size;
-			return RARRAY_PTR(args)[1];
 		}
 		chunk = rb_str_new(wsgi_req->post_buffering_buf+wsgi_req->buf_pos, chunk_size);
 		wsgi_req->buf_pos+=chunk_size;
@@ -156,8 +242,14 @@ VALUE rb_uwsgi_io_rewind(VALUE obj, VALUE args) {
 		return Qnil;
 	}
 
-	wsgi_req->buf_pos = 0;
-
+	// buffered to disk ?
+	if (wsgi_req->async_post) {
+		rewind((FILE *) wsgi_req->async_post);
+	}
+	// or memory ???
+	else {
+		wsgi_req->buf_pos = 0;
+	}
 	return Qnil;
 }
 
@@ -272,6 +364,7 @@ void uwsgi_ruby_gem_set_apply(char *gemset) {
 
 	char *ptr = buffer;
 
+
 	for(i=0;i<size;i++) {
 		if (buffer[i] == '\n') {
 			buffer[i] = 0;
@@ -282,7 +375,9 @@ void uwsgi_ruby_gem_set_apply(char *gemset) {
 		}
 	}
 
-	free(buffer);
+	// do not free the buffer
+        // environ will reuse it !!!
+	//free(buffer);
 
 	if (waitpid(pid, &waitpid_status, 0) <0) {
 		uwsgi_error("waitpid()");
@@ -322,6 +417,9 @@ void uwsgi_ruby_gemset(char *gemset) {
                 free(filename);
 		rvm_paths = rvm_paths->next;
 	}
+
+	uwsgi_log("ERROR: unable to load gemset %s !!!\n", gemset);
+	exit(1);
 	
 }
 
@@ -379,6 +477,20 @@ int uwsgi_rack_init(){
 	return 0;
 }
 
+void uwsgi_rack_preinit_apps() {
+
+	struct uwsgi_string_list *usl = ur.shared_rbrequire;
+        while(usl) {
+                int error = 0;
+                rb_protect( uwsgi_require_file, rb_str_new2(usl->value), &error ) ;
+                if (error) {
+                        uwsgi_ruby_exception();
+                }
+                usl = usl->next;
+        }
+
+}
+
 VALUE uwsgi_rb_call_new(VALUE obj) {
     return rb_funcall(obj, rb_intern("new"), 0);
 }
@@ -386,6 +498,13 @@ VALUE uwsgi_rb_call_new(VALUE obj) {
 void uwsgi_rack_init_apps(void) {
 
 	int error;
+
+	if (uwsgi_apps_cnt >= uwsgi.max_apps) {
+                uwsgi_log("ERROR: you cannot load more than %d apps in a worker\n", uwsgi.max_apps);
+		return;
+        }
+
+
 	ur.app_id = uwsgi_apps_cnt;
 	struct uwsgi_string_list *usl = ur.rbrequire;
 
@@ -505,7 +624,7 @@ ready:
 	rb_define_method(ur.rb_uwsgi_io_class, "read", rb_uwsgi_io_read, -2);
 	rb_define_method(ur.rb_uwsgi_io_class, "rewind", rb_uwsgi_io_rewind, 0);
 
-	struct uwsgi_app *ua = uwsgi_add_app(ur.app_id, 7, (char*)"", 0, NULL, NULL);
+	struct uwsgi_app *ua = uwsgi_add_app(ur.app_id, rack_plugin.modifier1, (char*)"", 0, NULL, NULL);
 	ua->started_at = now;
 	ua->startup_time = uwsgi_now() - now;
 
@@ -653,6 +772,11 @@ int uwsgi_rack_request(struct wsgi_request *wsgi_req) {
 
 	struct http_status_codes *http_sc;
 
+	if (!ur.call) {
+		internal_server_error(wsgi_req, "Ruby application not found");
+		return -1;
+	}
+
 	/* Standard RACK request */
         if (!wsgi_req->uh.pktsize) {
                 uwsgi_log("Invalid RACK request. skip.\n");
@@ -665,7 +789,6 @@ int uwsgi_rack_request(struct wsgi_request *wsgi_req) {
 
 	wsgi_req->app_id = ur.app_id;
 	uwsgi_apps[wsgi_req->app_id].requests++;
-
 
         env = rb_hash_new();
 
@@ -711,20 +834,31 @@ int uwsgi_rack_request(struct wsgi_request *wsgi_req) {
         }
 
 
-	rb_hash_aset(env, rb_str_new2("rack.multithread"), Qfalse);
-	rb_hash_aset(env, rb_str_new2("rack.multiprocess"), Qtrue);
+	if (uwsgi.threads > 1) {
+		rb_hash_aset(env, rb_str_new2("rack.multithread"), Qtrue);
+	}
+	else {
+		rb_hash_aset(env, rb_str_new2("rack.multithread"), Qfalse);
+	}
+
+	if (uwsgi.numproc > 1) {
+		rb_hash_aset(env, rb_str_new2("rack.multiprocess"), Qtrue);
+	}
+	else {
+		rb_hash_aset(env, rb_str_new2("rack.multiprocess"), Qfalse);
+	}
+
 	rb_hash_aset(env, rb_str_new2("rack.run_once"), Qfalse);
 
 	VALUE dws_wr = Data_Wrap_Struct(ur.rb_uwsgi_io_class, 0, 0, wsgi_req);
 
-	if (wsgi_req->async_post) {
-		rb_hash_aset(env, rb_str_new2("rack.input"), rb_funcall( rb_const_get(rb_cObject, rb_intern("IO")), rb_intern("new"), 2, INT2NUM(fileno((FILE*)wsgi_req->async_post)), rb_str_new("r",1) ));
-	}
-	else {
-		rb_hash_aset(env, rb_str_new2("rack.input"), rb_funcall(ur.rb_uwsgi_io_class, rb_intern("new"), 1, dws_wr ));
-	}
+	rb_hash_aset(env, rb_str_new2("rack.input"), rb_funcall(ur.rb_uwsgi_io_class, rb_intern("new"), 1, dws_wr ));
 
 	rb_hash_aset(env, rb_str_new2("rack.errors"), rb_funcall( rb_const_get(rb_cObject, rb_intern("IO")), rb_intern("new"), 2, INT2NUM(2), rb_str_new("w",1) ));
+
+	// remove HTTP_CONTENT_LENGTH and HTTP_CONTENT_TYPE
+	rb_hash_delete(env, rb_str_new2("HTTP_CONTENT_LENGTH"));
+	rb_hash_delete(env, rb_str_new2("HTTP_CONTENT_TYPE"));
 
 	ret = rb_protect( call_dispatch, env, &error);
 	if (error) {
@@ -782,6 +916,19 @@ int uwsgi_rack_request(struct wsgi_request *wsgi_req) {
 			}
 		}
 
+		struct uwsgi_string_list *ah = uwsgi.additional_headers;
+		struct iovec iov[2];
+		while(ah) {
+                	iov[0].iov_base = ah->value;
+                	iov[0].iov_len = ah->len;
+                	iov[1].iov_base = "\r\n";
+                	iov[1].iov_len = 2;
+                	wsgi_req->headers_size += wsgi_req->socket->proto_writev_header(wsgi_req, iov, 2);
+                	wsgi_req->header_cnt++;
+                	ah = ah->next;
+        	}
+
+
 		wsgi_req->socket->proto_write(wsgi_req, (char *)"\r\n", 2);
 
 		body = RARRAY_PTR(ret)[2] ;
@@ -835,20 +982,20 @@ clear:
 #ifdef UWSGI_DEBUG
 			uwsgi_log("calling ruby GC\n");
 #endif
-			rb_gc();
+			// try to limit damanges if threads are enabled...
+			if (wsgi_req->async_id == 0) {
+				rb_gc();
+			}
 	}
 
 	ur.cycles++;
-
-
 
 	return 0;
 }
 
 void uwsgi_rack_after_request(struct wsgi_request *wsgi_req) {
 
-	if (uwsgi.shared->options[UWSGI_OPTION_LOGGING])
-		log_request(wsgi_req);
+	log_request(wsgi_req);
 }
 
 void uwsgi_rack_suspend(struct wsgi_request *wsgi_req) {
@@ -860,44 +1007,6 @@ void uwsgi_rack_resume(struct wsgi_request *wsgi_req) {
 
 	uwsgi_log("RESUMING RUBY\n");
 }
-
-#ifdef RUBY19
-VALUE uwsgi_call_block(VALUE body, VALUE block) {
-
-	return rb_funcall(block, rb_intern("call"), 1, body );
-}
-
-VALUE uwsgi_rack_patch_body_proxy_each(int argc, VALUE *argv, VALUE self) {
-
-	VALUE block = Qnil;
-	rb_scan_args(argc, argv, "0&", &block);
-
-	if(!RTEST(block)) {
-		rb_raise(rb_eArgError, "a block is required");
-		return Qnil;
-	}
-
-	VALUE original_body = rb_iv_get(self, "@body");
-	if (original_body != Qnil) {
-		return rb_block_call(original_body, rb_intern("each"), 0, 0, uwsgi_call_block, block);
-	}
-
-	return Qnil;
-}
-
-VALUE uwsgi_rack_patch_body_proxy(VALUE foo) {
-
-	VALUE rack = rb_const_get(rb_cObject, rb_intern("Rack"));
-	VALUE rack_body_proxy = rb_const_get(rack, rb_intern("BodyProxy"));	
-
-	if (!rb_respond_to(rack_body_proxy, rb_intern("each"))) {
-		rb_define_method(rack_body_proxy, "each", uwsgi_rack_patch_body_proxy_each, -1);
-		return Qtrue;
-	}
-
-	return Qnil;
-}
-#endif
 
 VALUE init_rack_app( VALUE script ) {
 
@@ -915,9 +1024,21 @@ VALUE init_rack_app( VALUE script ) {
         VALUE rack = rb_const_get(rb_cObject, rb_intern("Rack"));
 
 #ifdef RUBY19
-	VALUE ret = rb_protect(uwsgi_rack_patch_body_proxy, rack, &error);
-	if (!error && ret != Qnil) {
-		uwsgi_log("Rack::BodyProxy successfully patched for ruby 1.9.x\n");
+	if (rb_funcall(rack, rb_intern("const_defined?"), 1, ID2SYM(rb_intern("BodyProxy"))) == Qtrue) {
+		VALUE bodyproxy = rb_const_get(rack, rb_intern("BodyProxy"));
+		// get the list of available instance_methods
+		VALUE argv = Qfalse;
+		VALUE methods_list = rb_class_instance_methods(1, &argv, bodyproxy);
+#ifdef UWSGI_DEBUG
+		uwsgi_log("%s\n", RSTRING_PTR(rb_inspect(methods_list)));
+#endif
+		if (rb_ary_includes(methods_list, ID2SYM(rb_intern("each"))) == Qfalse) {
+			if (rb_eval_string("module Rack;class BodyProxy;def each(&block);@body.each(&block);end;end;end")) {
+				if (uwsgi.mywid <= 1) {
+					uwsgi_log("Rack::BodyProxy successfully patched for ruby 1.9.x\n");
+				}
+			}
+		}
 	}
 #endif
 
@@ -950,7 +1071,7 @@ int uwsgi_rack_magic(char *mountpoint, char *lazy) {
 	return 0;
 }
 
-int uwsgi_rack_mount_app(char *mountpoint, char *app, int regexp) {
+int uwsgi_rack_mount_app(char *mountpoint, char *app) {
 
 	
 	if (uwsgi_endswith(app, ".ru") || uwsgi_endswith(app, ".rb")) {
@@ -1104,7 +1225,19 @@ int uwsgi_rack_spooler(char *filename, char *buf, uint16_t len, char *body, size
 }
 
 
+void uwsgi_ruby_enable_native_threads() {
+	uwsgi_log("DANGER: native threads do not work under ruby !!!\n");
+}
 
+void uwsgi_ruby_init_thread(int core_id) {
+	uwsgi_log("DANGER: native threads do not work under ruby !!!\n");
+}
+
+void uwsgi_rack_postinit_apps(void) {
+
+	if (ur.rb_threads > 1) {
+	}
+}
 
 
 struct uwsgi_plugin rack_plugin = {
@@ -1124,14 +1257,21 @@ struct uwsgi_plugin rack_plugin = {
 
 	.spooler = uwsgi_rack_spooler,
 
+	.preinit_apps = uwsgi_rack_preinit_apps,
+
 	.init_apps = uwsgi_rack_init_apps,
 	.mount_app = uwsgi_rack_mount_app,
+	
+	.postinit_apps = uwsgi_rack_postinit_apps,
 
 	.magic = uwsgi_rack_magic,
 
 	.mule = uwsgi_rack_mule,
 	.mule_msg = uwsgi_rack_mule_msg,
 	.rpc = uwsgi_ruby_rpc,
+
+	.enable_threads = uwsgi_ruby_enable_native_threads,
+	.init_thread = uwsgi_ruby_init_thread,
 
 	.suspend = uwsgi_rack_suspend,
 	.resume = uwsgi_rack_resume,

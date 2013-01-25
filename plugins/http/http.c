@@ -1,12 +1,6 @@
 /*
 
-   uWSGI http
-
-   requires:
-
-   - async
-   - caching
-   - pcre (optional)
+   uWSGI httprouter
 
 */
 
@@ -14,245 +8,198 @@
 
 extern struct uwsgi_server uwsgi;
 
-#include "../../lib/corerouter.h"
-
-#define MAX_HTTP_VEC 128
-
-#define HTTP_STATUS_FREE 0
-#define HTTP_STATUS_CONNECTING 1
-#define HTTP_STATUS_RECV 2
-#define HTTP_STATUS_RESPONSE 4
-
-#define add_timeout(x) uwsgi_add_rb_timer(uhttp.timeouts, time(NULL)+uhttp.socket_timeout, x)
-#define del_timeout(x) rb_erase(&x->timeout->rbt, uhttp.timeouts); free(x->timeout);
+#include "../corerouter/cr.h"
 
 struct uwsgi_http {
 
-	int has_sockets;
-
-	int processes;
-
-	int use_cache;
-	int use_cluster;
-	int nevents;
-
-	int cheap;
-	int i_am_cheap;
-
-	int has_subscription_sockets;
-	int subscription_regexp;
-
-	char *pattern;
-	int pattern_len;
-
-	char *base;
-	int base_len;
-
-	char *to;
-	int to_len;
-
-	struct uwsgi_string_list *http_vars;
+	struct uwsgi_corerouter cr;
 
 	uint8_t modifier1;
-	int load;
-
-	int socket_timeout;
-
-	struct uwsgi_subscribe_slot *subscriptions;
-
+	struct uwsgi_string_list *http_vars;
 	int manage_expect;
 
-	struct rb_root *timeouts;
+	int raw_body;
+	int keepalive;
+
+#ifdef UWSGI_SSL
+	int https_export_cert;
+#endif
+	struct uwsgi_string_list *stud_prefix;
+
 } uhttp;
 
-void uwsgi_opt_http(char *opt, char *value, void *foobar) {
+#ifdef UWSGI_SSL
 
-	uwsgi_new_gateway_socket(value, "uWSGI http");
-	uhttp.has_sockets++;
+#define UWSGI_HTTP_NOSSL	0
+#define UWSGI_HTTP_SSL		1
+#define UWSGI_HTTP_FORCE_SSL	2
+
+void uwsgi_opt_https(char *opt, char *value, void *cr) {
+        struct uwsgi_corerouter *ucr = (struct uwsgi_corerouter *) cr;
+        char *client_ca = NULL;
+
+        // build socket, certificate and key file
+        char *sock = uwsgi_str(value);
+        char *crt = strchr(sock, ',');
+        if (!crt) {
+                uwsgi_log("invalid https syntax must be socket,crt,key\n");
+                exit(1);
+        }
+        *crt = '\0'; crt++;
+        char *key = strchr(crt, ',');
+        if (!key) {
+                uwsgi_log("invalid https syntax must be socket,crt,key\n");
+                exit(1);
+        }
+        *key = '\0'; key++;
+
+        char *ciphers = strchr(key, ',');
+        if (ciphers) {
+                *ciphers = '\0'; ciphers++;
+                client_ca = strchr(ciphers, ',');
+                if (client_ca) {
+                        *client_ca = '\0'; client_ca++;
+                }
+        }
+
+        struct uwsgi_gateway_socket *ugs = uwsgi_new_gateway_socket(sock, ucr->name);
+        // ok we have the socket, initialize ssl if required
+        if (!uwsgi.ssl_initialized) {
+                uwsgi_ssl_init();
+        }
+
+        // initialize ssl context
+        ugs->ctx = uwsgi_ssl_new_server_context(uwsgi_concat3(ucr->short_name, "-", ugs->name),crt, key, ciphers, client_ca);
+        // set the ssl mode
+        ugs->mode = UWSGI_HTTP_SSL;
+
+        ucr->has_sockets++;
 }
 
-void uwsgi_opt_http_ss(char *opt, char *value, void *foobar) {
+void uwsgi_opt_http_to_https(char *opt, char *value, void *cr) {
+        struct uwsgi_corerouter *ucr = (struct uwsgi_corerouter *) cr;
 
-        struct uwsgi_gateway_socket *ugs = uwsgi_new_gateway_socket(value, "uWSGI http");
-        ugs->subscription = 1;
-        uhttp.has_subscription_sockets++;
+        char *sock = uwsgi_str(value);
+        char *port = strchr(sock, ',');
+        if (port) {
+                *port = '\0';
+                port++;
+        }
 
+        struct uwsgi_gateway_socket *ugs = uwsgi_new_gateway_socket(sock, ucr->name);
+
+        // set context to the port
+        ugs->ctx = port;
+        // force SSL mode
+        ugs->mode = UWSGI_HTTP_FORCE_SSL;
+
+        ucr->has_sockets++;
 }
 
-void uwsgi_opt_http_use_pattern(char *opt, char *value, void *foobar) {
-	uhttp.pattern = value;
-        // optimization
-        uhttp.pattern_len = strlen(uhttp.pattern);
-}
-
-void uwsgi_opt_http_use_base(char *opt, char *value, void *foobar) {
-	uhttp.base = value;
-        // optimization
-        uhttp.base_len = strlen(uhttp.base);
-}
-
-void uwsgi_opt_http_use_to(char *opt, char *value, void *foobar) {
-        uhttp.to = value;
-        // optimization
-	uhttp.to_len = strlen(uhttp.to);
-}
-
+#endif
 
 struct uwsgi_option http_options[] = {
-	{"http", required_argument, 0, "add an http router/server on the specified address", uwsgi_opt_http, NULL, 0},
-	{"http-processes", required_argument, 0, "set the number of http processes to spawn", uwsgi_opt_set_int, &uhttp.processes, 0},
-	{"http-workers", required_argument, 0, "set the number of http processes to spawn", uwsgi_opt_set_int, &uhttp.processes, 0},
+	{"http", required_argument, 0, "add an http router/server on the specified address", uwsgi_opt_corerouter, &uhttp, 0},
+#ifdef UWSGI_SSL
+	{"https", required_argument, 0, "add an https router/server on the specified address with specified certificate and key", uwsgi_opt_https, &uhttp, 0},
+	{"https-export-cert", no_argument, 0, "export uwsgi variable HTTPS_CC containing the raw client certificate", uwsgi_opt_true, &uhttp.https_export_cert, 0},
+	{"http-to-https", required_argument, 0, "add an http router/server on the specified address and redirect all of the requests to https", uwsgi_opt_http_to_https, &uhttp, 0},
+#endif
+	{"http-processes", required_argument, 0, "set the number of http processes to spawn", uwsgi_opt_set_int, &uhttp.cr.processes, 0},
+	{"http-workers", required_argument, 0, "set the number of http processes to spawn", uwsgi_opt_set_int, &uhttp.cr.processes, 0},
 	{"http-var", required_argument, 0, "add a key=value item to the generated uwsgi packet", uwsgi_opt_add_string_list, &uhttp.http_vars, 0},
-	{"http-to", required_argument, 0, "forward requests to the specified node", uwsgi_opt_http_use_to, NULL, 0 },
+	{"http-to", required_argument, 0, "forward requests to the specified node (you can specify it multiple time for lb)", uwsgi_opt_add_string_list, &uhttp.cr.static_nodes, 0 },
+	{"http-zerg", required_argument, 0, "attach the http router to a zerg server", uwsgi_opt_corerouter_zerg, &uhttp, 0 },
+	{"http-fallback", required_argument, 0, "fallback to the specified node in case of error", uwsgi_opt_add_string_list, &uhttp.cr.fallback, 0},
 	{"http-modifier1", required_argument, 0, "set uwsgi protocol modifier1", uwsgi_opt_set_int, &uhttp.modifier1, 0},
-	{"http-use-cache", no_argument, 0, "use uWSGI cache as key->value virtualhost mapper", uwsgi_opt_true, &uhttp.use_cache, 0},
-	{"http-use-pattern", required_argument, 0, "use the specified pattern for mapping requests to unix sockets", uwsgi_opt_http_use_pattern, NULL, 0},
-	{"http-use-base", required_argument, 0, "use the specified base for mapping requests to unix sockets", uwsgi_opt_http_use_base, NULL, 0},
-	{"http-use-cluster", no_argument, 0, "load balance to nodes subscribed to the cluster", uwsgi_opt_true, &uhttp.use_cluster, 0},
-	{"http-events", required_argument, 0, "set the number of concurrent http async events", uwsgi_opt_set_int, &uhttp.nevents, 0},
-	{"http-subscription-server", required_argument, 0, "enable the subscription server", uwsgi_opt_http_ss, NULL, 0},
-	{"http-subscription-use-regexp", no_argument, 0, "enable regexp usage in subscription system", uwsgi_opt_true, &uhttp.subscription_regexp, 0},
-	{"http-timeout", required_argument, 0, "set internal http socket timeout", uwsgi_opt_set_int, &uhttp.socket_timeout, 0},
+	{"http-use-cache", no_argument, 0, "use uWSGI cache as key->value virtualhost mapper", uwsgi_opt_true, &uhttp.cr.use_cache, 0},
+	{"http-use-pattern", required_argument, 0, "use the specified pattern for mapping requests to unix sockets", uwsgi_opt_corerouter_use_pattern, &uhttp, 0},
+	{"http-use-base", required_argument, 0, "use the specified base for mapping requests to unix sockets", uwsgi_opt_corerouter_use_base, &uhttp, 0},
+	{"http-use-cluster", no_argument, 0, "load balance to nodes subscribed to the cluster", uwsgi_opt_true, &uhttp.cr.use_cluster, 0},
+	{"http-events", required_argument, 0, "set the number of concurrent http async events", uwsgi_opt_set_int, &uhttp.cr.nevents, 0},
+	{"http-subscription-server", required_argument, 0, "enable the subscription server", uwsgi_opt_corerouter_ss, &uhttp, 0},
+	{"http-timeout", required_argument, 0, "set internal http socket timeout", uwsgi_opt_set_int, &uhttp.cr.socket_timeout, 0},
 	{"http-manage-expect", no_argument, 0, "manage the Expect HTTP request header", uwsgi_opt_true, &uhttp.manage_expect, 0},
+	{"http-keepalive", no_argument, 0, "experimental HTTP keepalive support (non-pipelined) requests (requires backend support)", uwsgi_opt_true, &uhttp.keepalive, 0},
+
+	{"http-raw-body", no_argument, 0, "blindly send HTTP body to backends (required for WebSockets and Icecast support)", uwsgi_opt_true, &uhttp.raw_body, 0},
+
+	{"http-use-code-string", required_argument, 0, "use code string as hostname->server mapper for the http router", uwsgi_opt_corerouter_cs, &uhttp, 0},
+        {"http-use-socket", optional_argument, 0, "forward request to the specified uwsgi socket", uwsgi_opt_corerouter_use_socket, &uhttp, 0},
+        {"http-gracetime", required_argument, 0, "retry connections to dead static nodes after the specified amount of seconds", uwsgi_opt_set_int, &uhttp.cr.static_node_gracetime, 0},
+
+	{"http-quiet", required_argument, 0, "do not report failed connections to instances", uwsgi_opt_true, &uhttp.cr.quiet, 0},
+        {"http-cheap", no_argument, 0, "run the http router in cheap mode", uwsgi_opt_true, &uhttp.cr.cheap, 0},
+
+	{"http-stats", required_argument, 0, "run the http router stats server", uwsgi_opt_set_str, &uhttp.cr.stats_server, 0},
+	{"http-stats-server", required_argument, 0, "run the http router stats server", uwsgi_opt_set_str, &uhttp.cr.stats_server, 0},
+	{"http-ss", required_argument, 0, "run the http router stats server", uwsgi_opt_set_str, &uhttp.cr.stats_server, 0},
+	{"http-harakiri", required_argument, 0, "enable http router harakiri", uwsgi_opt_set_int, &uhttp.cr.harakiri, 0},
+	{"http-stud-prefix", required_argument, 0, "expect a stud prefix (1byte family + 4/16 bytes address) on connections from the specified address", uwsgi_opt_add_addr_list, &uhttp.stud_prefix, 0},
 	{0, 0, 0, 0, 0, 0, 0},
 };
 
-extern struct uwsgi_server uwsgi;
-
-
-void http_manage_subscription(char *key, uint16_t keylen, char *val, uint16_t vallen, void *data) {
-
-	struct uwsgi_subscribe_req *usr = (struct uwsgi_subscribe_req *) data;
-
-	if (!uwsgi_strncmp("key", 3, key, keylen)) {
-		usr->key = val;
-		usr->keylen = vallen;
-	}
-
-	else if (!uwsgi_strncmp("auth", 4, key, keylen)) {
-		usr->auth = val;
-		usr->auth_len = vallen;
-	}
-
-	else if (!uwsgi_strncmp("address", 7, key, keylen)) {
-		usr->address = val;
-		usr->address_len = vallen;
-	}
-
-}
-
-
 struct http_session {
 
-	int fd;
-	int instance_fd;
-	int status;
-	struct uwsgi_header uh;
-	uint8_t h_pos;
-	uint16_t pos;
-	uint16_t parse_pos;
-	char *ptr;
+	struct corerouter_session cs;
 
 	int rnrn;
-
-	char *hostname;
-	uint16_t hostname_len;
-
-	char *instance_address;
-	uint64_t instance_address_len;
-
-	int instance_failed;
-
-	int pass_fd;
-
-	size_t remains;
 
 	char *port;
 	int port_len;
 
-	struct iovec iov[MAX_HTTP_VEC];
-	int iov_len;
+	char *request_uri;
+	uint16_t request_uri_len;
 
-	char uss[MAX_HTTP_VEC * 2];
-
-	char buffer[UMAX16];
-	char path_info[UMAX16];
+	char *path_info;
 	uint16_t path_info_len;
 
-	size_t content_length;
 	size_t received_body;
 
-	struct uwsgi_subscribe_node *un;
+#ifdef UWSGI_SSL
+	SSL *ssl;
+	X509 *ssl_client_cert;
+	char *ssl_client_dn;
+	BIO *ssl_bio;
+	char *ssl_cc;
+	int force_ssl;
+	struct uwsgi_buffer *force_ssl_buf;
+#endif
+
+	struct uwsgi_buffer *uwsgi_req;
+	int send_expect_100;
 
 	in_addr_t ip_addr;
 	char ip[INET_ADDRSTRLEN];
 
-	struct uwsgi_rb_timer *timeout;
+	struct uwsgi_buffer *post_buf;
+        size_t post_buf_max;
+        size_t post_buf_len;
+        off_t post_buf_pos;
+
+	// 1 (family) + 4/16 (addr)
+	char stud_prefix[17];
+	size_t stud_prefix_remains;
+	size_t stud_prefix_pos;
+
+
 };
 
-static struct uwsgi_rb_timer *reset_timeout(struct http_session *uhttp_session) {
+#ifdef UWSGI_SSL
+int uwsgi_http_ssl_shutdown(struct http_session *, int);
+#endif
 
-	del_timeout(uhttp_session);
-	return add_timeout(uhttp_session);
-}
+int http_add_uwsgi_header(struct http_session *hs, char *hh, uint16_t hhlen) {
 
-static void close_session(struct http_session **uhttp_table, struct http_session *uhttp_session) {
-
-	close(uhttp_session->fd);
-	uhttp_table[uhttp_session->fd] = NULL;
-	if (uhttp_session->instance_fd != -1) {
-		if (uhttp.subscriptions && (uhttp_session->instance_failed || uhttp_session->status == HTTP_STATUS_CONNECTING)) {
-			uwsgi_log("marking %.*s as failed\n", (int) uhttp_session->instance_address_len, uhttp_session->instance_address);
-			uwsgi_remove_subscribe_node(&uhttp.subscriptions, uhttp_session->un);
-		}
-		close(uhttp_session->instance_fd);
-		uhttp_table[uhttp_session->instance_fd] = NULL;
-	}
-
-	uhttp.load--;
-	del_timeout(uhttp_session);
-	free(uhttp_session);
-
-}
-
-static void expire_timeouts(struct http_session **uhttp_table) {
-
-	time_t current = time(NULL);
-	struct uwsgi_rb_timer *urbt;
-
-	for (;;) {
-
-		urbt = uwsgi_min_rb_timer(uhttp.timeouts);
-
-		if (urbt == NULL)
-			return;
-
-		if (urbt->key <= current) {
-			close_session(uhttp_table, (struct http_session *) urbt->data);
-			uwsgi_log("timeout !!!\n");
-			continue;
-		}
-
-		break;
-	}
-}
-
-
-struct http_session *alloc_uhttp_session() {
-
-	return uwsgi_malloc(sizeof(struct http_session));
-}
-
-uint16_t http_add_uwsgi_header(struct http_session *h_session, struct iovec *iov, char *strsize1, char *strsize2, char *hh, uint16_t hhlen, int *c) {
+	struct corerouter_session *cs = &hs->cs;
+	struct uwsgi_buffer *buf = hs->uwsgi_req;
 
 	int i;
 	int status = 0;
 	char *val = hh;
 	uint16_t keylen = 0, vallen = 0;
 	int prefix = 0;
-
-	if (*c >= MAX_HTTP_VEC)
-		return 0;
+	char strsize[2];
 
 	for (i = 0; i < hhlen; i++) {
 		if (!status) {
@@ -275,103 +222,78 @@ uint16_t http_add_uwsgi_header(struct http_session *h_session, struct iovec *iov
 	}
 
 	if (!keylen)
-		return 0;
-
-	if ((*c) + 4 >= MAX_HTTP_VEC)
-		return 0;
+		return -1;
 
 	if (!uwsgi_strncmp("HOST", 4, hh, keylen)) {
-		h_session->hostname = val;
-		h_session->hostname_len = vallen;
+		cs->hostname = val;
+		cs->hostname_len = vallen;
 	}
 
 	if (!uwsgi_strncmp("CONTENT_LENGTH", 14, hh, keylen)) {
-		h_session->content_length = uwsgi_str_num(val, vallen);
+		cs->post_cl = uwsgi_str_num(val, vallen);
 	}
 
 	if (uwsgi_strncmp("CONTENT_TYPE", 12, hh, keylen) && uwsgi_strncmp("CONTENT_LENGTH", 14, hh, keylen)) {
 		keylen += 5;
 		prefix = 1;
-		if ((*c) + 5 >= MAX_HTTP_VEC)
-			return 0;
 	}
 
-	strsize1[0] = (uint8_t) (keylen & 0xff);
-	strsize1[1] = (uint8_t) ((keylen >> 8) & 0xff);
+	strsize[0] = (uint8_t) (keylen & 0xff);
+	strsize[1] = (uint8_t) ((keylen >> 8) & 0xff);
 
-	iov[*c].iov_base = strsize1;
-	iov[*c].iov_len = 2;
-	*c += 1;
+	if (uwsgi_buffer_append(buf, strsize, 2)) return -1;
 
 	if (prefix) {
-		iov[*c].iov_base = "HTTP_";
-		iov[*c].iov_len = 5;
-		*c += 1;
+		if (uwsgi_buffer_append(buf, "HTTP_", 5)) return -1;
 	}
 
-	iov[*c].iov_base = hh;
-	iov[*c].iov_len = keylen - (prefix * 5);
-	*c += 1;
+	if (uwsgi_buffer_append(buf, hh, keylen - (prefix * 5))) return -1;
 
-	strsize2[0] = (uint8_t) (vallen & 0xff);
-	strsize2[1] = (uint8_t) ((vallen >> 8) & 0xff);
+	strsize[0] = (uint8_t) (vallen & 0xff);
+	strsize[1] = (uint8_t) ((vallen >> 8) & 0xff);
 
-	iov[*c].iov_base = strsize2;
-	iov[*c].iov_len = 2;
-	*c += 1;
+	if (uwsgi_buffer_append(buf, strsize, 2)) return -1;
+	if (uwsgi_buffer_append(buf, val, vallen)) return -1;
 
-	iov[*c].iov_base = val;
-	iov[*c].iov_len = vallen;
-	*c += 1;
-
-	return 2 + keylen + 2 + vallen;
+	return 0;
 }
 
 
-uint16_t http_add_uwsgi_var(struct iovec * iov, char *strsize1, char *strsize2, char *key, uint16_t keylen, char *val, uint16_t vallen, int *c) {
+int http_add_uwsgi_var(struct http_session *hs, char *key, uint16_t keylen, char *val, uint16_t vallen) {
 
-	if ((*c) + 4 >= MAX_HTTP_VEC)
-		return 0;
+	struct uwsgi_buffer *buf = hs->uwsgi_req;
+	char strsize[2];
 
-	strsize1[0] = (uint8_t) (keylen & 0xff);
-	strsize1[1] = (uint8_t) ((keylen >> 8) & 0xff);
+	strsize[0] = (uint8_t) (keylen & 0xff);
+	strsize[1] = (uint8_t) ((keylen >> 8) & 0xff);
 
-	iov[*c].iov_base = strsize1;
-	iov[*c].iov_len = 2;
-	*c += 1;
+	if (uwsgi_buffer_append(buf, strsize, 2)) return -1;
+        if (uwsgi_buffer_append(buf, key, keylen)) return -1;
 
-	iov[*c].iov_base = key;
-	iov[*c].iov_len = keylen;
-	*c += 1;
+	strsize[0] = (uint8_t) (vallen & 0xff);
+	strsize[1] = (uint8_t) ((vallen >> 8) & 0xff);
 
-	strsize2[0] = (uint8_t) (vallen & 0xff);
-	strsize2[1] = (uint8_t) ((vallen >> 8) & 0xff);
+	if (uwsgi_buffer_append(buf, strsize, 2)) return -1;
+        if (uwsgi_buffer_append(buf, val, vallen)) return -1;
 
-	iov[*c].iov_base = strsize2;
-	iov[*c].iov_len = 2;
-	*c += 1;
-
-	iov[*c].iov_base = val;
-	iov[*c].iov_len = vallen;
-	*c += 1;
-
-	return 2 + keylen + 2 + vallen;
+	return 0;
 }
 
-int http_parse(struct http_session *h_session) {
+int http_parse(struct http_session *h_session, size_t http_req_len) {
 
-	char *ptr = h_session->buffer;
-	char *watermark = h_session->ptr;
+	char *ptr = h_session->cs.buffer->buf;
+	char *watermark = ptr + http_req_len;
 	char *base = ptr;
-	// leave a slot for uwsgi header
-	int c = 1;
 	char *query_string = NULL;
-	char *protocol = NULL; size_t protocol_len = 0;
+
+	h_session->uwsgi_req = uwsgi_buffer_new(uwsgi.page_size);
+	if (!h_session->uwsgi_req) return -1;
+	h_session->uwsgi_req->limit = UMAX16;
 
 	// REQUEST_METHOD 
 	while (ptr < watermark) {
 		if (*ptr == ' ') {
-			h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "REQUEST_METHOD", 14, base, ptr - base, &c);
+			if (http_add_uwsgi_var(h_session, "REQUEST_METHOD", 14, base, ptr - base)) return -1;
 			ptr++;
 			break;
 		}
@@ -384,21 +306,25 @@ int http_parse(struct http_session *h_session) {
 		if (*ptr == '?' && !query_string) {
 			// PATH_INFO must be url-decoded !!!
 			h_session->path_info_len = ptr - base;
+			h_session->path_info = uwsgi_malloc(h_session->path_info_len);
 			http_url_decode(base, &h_session->path_info_len, h_session->path_info);
-			h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "PATH_INFO", 9, h_session->path_info, h_session->path_info_len, &c);
+			if (http_add_uwsgi_var(h_session, "PATH_INFO", 9, h_session->path_info, h_session->path_info_len)) return -1;
 			query_string = ptr + 1;
 		}
 		else if (*ptr == ' ') {
-			h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "REQUEST_URI", 11, base, ptr - base, &c);
+			h_session->request_uri = base;
+			h_session->request_uri_len = ptr - base;
+			if (http_add_uwsgi_var(h_session, "REQUEST_URI", 11, base, ptr - base)) return -1;
 			if (!query_string) {
 				// PATH_INFO must be url-decoded !!!
 				h_session->path_info_len = ptr - base;
+				h_session->path_info = uwsgi_malloc(h_session->path_info_len);
 				http_url_decode(base, &h_session->path_info_len, h_session->path_info);
-				h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "PATH_INFO", 9, h_session->path_info, h_session->path_info_len, &c);
-				h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "QUERY_STRING", 12, "", 0, &c);
+				if (http_add_uwsgi_var(h_session, "PATH_INFO", 9, h_session->path_info, h_session->path_info_len)) return -1;
+				if (http_add_uwsgi_var(h_session, "QUERY_STRING", 12, "", 0)) return -1;
 			}
 			else {
-				h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "QUERY_STRING", 12, query_string, ptr - query_string, &c);
+				if (http_add_uwsgi_var(h_session, "QUERY_STRING", 12, query_string, ptr - query_string)) return -1;
 			}
 			ptr++;
 			break;
@@ -414,8 +340,7 @@ int http_parse(struct http_session *h_session) {
 				return 0;
 			if (*(ptr + 1) != '\n')
 				return 0;
-			h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "SERVER_PROTOCOL", 15, base, ptr - base, &c);
-			protocol = base; protocol_len = ptr - base;
+			if (http_add_uwsgi_var(h_session, "SERVER_PROTOCOL", 15, base, ptr - base)) return -1;
 			ptr += 2;
 			break;
 		}
@@ -423,24 +348,56 @@ int http_parse(struct http_session *h_session) {
 	}
 
 	// SCRIPT_NAME
-	h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "SCRIPT_NAME", 11, "", 0, &c);
+	if (http_add_uwsgi_var(h_session, "SCRIPT_NAME", 11, "", 0)) return -1;
 
 	// SERVER_NAME
-	h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "SERVER_NAME", 11, uwsgi.hostname, uwsgi.hostname_len, &c);
-	h_session->hostname = uwsgi.hostname;
-	h_session->hostname_len = uwsgi.hostname_len;
+	if (http_add_uwsgi_var(h_session, "SERVER_NAME", 11, uwsgi.hostname, uwsgi.hostname_len)) return -1;
+	h_session->cs.hostname = uwsgi.hostname;
+	h_session->cs.hostname_len = uwsgi.hostname_len;
 
 	// SERVER_PORT
-	h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "SERVER_PORT", 11, h_session->port, h_session->port_len, &c);
-	h_session->hostname = uwsgi.hostname;
-	h_session->hostname_len = uwsgi.hostname_len;
+	if (http_add_uwsgi_var(h_session, "SERVER_PORT", 11, h_session->port, h_session->port_len)) return -1;
 
 	// UWSGI_ROUTER
-	h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "UWSGI_ROUTER", 12, "http", 4, &c);
+	if (http_add_uwsgi_var(h_session, "UWSGI_ROUTER", 12, "http", 4)) return -1;
+
+	// stud HTTPS
+	if (h_session->stud_prefix_pos > 0) {
+		if (http_add_uwsgi_var(h_session, "HTTPS", 5, "on", 2)) return -1;
+	}
+
+#ifdef UWSGI_SSL
+	// HTTPS (adapted from nginx)
+	if (h_session->cs.ugs->mode == UWSGI_HTTP_SSL) {
+		if (http_add_uwsgi_var(h_session, "HTTPS", 5, "on", 2)) return -1;
+		h_session->ssl_client_cert = SSL_get_peer_certificate(h_session->ssl);
+		if (h_session->ssl_client_cert) {
+			X509_NAME *name = X509_get_subject_name(h_session->ssl_client_cert);
+			if (name) {
+				h_session->ssl_client_dn = X509_NAME_oneline(name, NULL, 0);
+				if (http_add_uwsgi_var(h_session, "HTTPS_DN", 8, h_session->ssl_client_dn, strlen(h_session->ssl_client_dn))) return -1;
+			}
+			if (uhttp.https_export_cert) {
+			h_session->ssl_bio = BIO_new(BIO_s_mem());
+			if (h_session->ssl_bio) {
+				if (PEM_write_bio_X509(h_session->ssl_bio, h_session->ssl_client_cert) > 0) {
+					size_t cc_len = BIO_pending(h_session->ssl_bio);
+					h_session->ssl_cc = uwsgi_malloc(cc_len);
+					BIO_read(h_session->ssl_bio, h_session->ssl_cc, cc_len);
+					if (http_add_uwsgi_var(h_session, "HTTPS_CC", 8, h_session->ssl_cc, cc_len)) return -1;
+				}
+			}
+			}
+		}
+	}
+	else if (h_session->cs.ugs->mode == UWSGI_HTTP_FORCE_SSL) {
+		h_session->force_ssl = 1;
+	}
+#endif
 
 	// REMOTE_ADDR
 	if (inet_ntop(AF_INET, &h_session->ip_addr, h_session->ip, INET_ADDRSTRLEN)) {
-		h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, "REMOTE_ADDR", 11, h_session->ip, strlen(h_session->ip), &c);
+		if (http_add_uwsgi_var(h_session, "REMOTE_ADDR", 11, h_session->ip, strlen(h_session->ip))) return -1;
 	}
 	else {
 		uwsgi_error("inet_ntop()");
@@ -454,9 +411,9 @@ int http_parse(struct http_session *h_session) {
 	while (ptr < watermark) {
 		if (*ptr == '\r') {
 			if (ptr + 1 >= watermark)
-				return 0;
+				break;
 			if (*(ptr + 1) != '\n')
-				return 0;
+				break;
 			// multiline header ?
 			if (ptr + 2 < watermark) {
 				if (*(ptr + 2) == ' ' || *(ptr + 2) == '\t') {
@@ -464,19 +421,14 @@ int http_parse(struct http_session *h_session) {
 					continue;
 				}
 			}
+
+			// this is an hack with dumb/wrong/useless error checking
 			if (uhttp.manage_expect) {
 				if (!uwsgi_strncmp("Expect: 100-continue", 20, base, ptr - base)) {
-					if (send(h_session->fd, protocol, protocol_len, 0) == (ssize_t) protocol_len) {
-						if (send(h_session->fd, " 100 Continue\r\n\r\n", 17, 0) != 17) { 
-							uwsgi_error("send()");
-						}
-					}
-					else {
-						uwsgi_error("send()");
-					}
+					h_session->send_expect_100 = 1;
 				}
 			}
-			h_session->uh.pktsize += http_add_uwsgi_header(h_session, h_session->iov, h_session->uss + c, h_session->uss + c + 2, base, ptr - base, &c);
+			if (http_add_uwsgi_header(h_session, base, ptr - base)) return -1;
 			ptr++;
 			base = ptr + 1;
 		}
@@ -484,535 +436,769 @@ int http_parse(struct http_session *h_session) {
 	}
 
 	struct uwsgi_string_list *hv = uhttp.http_vars;
-	while(hv) {
+	while (hv) {
 		char *equal = strchr(hv->value, '=');
 		if (equal) {
-			h_session->uh.pktsize += http_add_uwsgi_var(h_session->iov, h_session->uss + c, h_session->uss + c + 2, hv->value, equal - hv->value, equal + 1, strlen(equal + 1), &c);
+			if (http_add_uwsgi_var(h_session, hv->value, equal - hv->value, equal + 1, strlen(equal + 1))) return -1;
 		}
 		hv = hv->next;
 	}
 
-#ifdef UWSGI_DEBUG
-	uwsgi_log("vec size: %d pkt size: %d load %d\n", c, h_session->uh.pktsize, uhttp.load);
-#endif
-
-	return c;
+	return 0;
 
 }
 
-void http_loop(int id) {
+ssize_t hr_instance_read_response(struct corerouter_session *);
+ssize_t hr_read_body(struct corerouter_session *);
+#ifdef UWSGI_SSL
+ssize_t hr_read_ssl_body(struct corerouter_session *);
 
-	int nevents;
-	int interesting_fd;
-	int new_connection;
-	ssize_t len;
-	int i, j;
+ssize_t hr_send_force_https(struct corerouter_session * cs) {
+	struct http_session *hs = (struct http_session *) cs;
 
-	char *magic_table[0xff];
-
-	char bbuf[UMAX16];
-
-	time_t delta;
-
-	struct uwsgi_rb_timer *min_timeout;
-#ifndef __sun__
-	struct msghdr msg;
-	union {
-		struct cmsghdr cmsg;
-		char control[CMSG_SPACE(sizeof(int))];
-	} msg_control;
-	struct cmsghdr *cmsg;
-#endif
-
-	union uwsgi_sockaddr uhttp_addr;
-	socklen_t uhttp_addr_len = sizeof(struct sockaddr_un);
-
-	struct http_session *uhttp_session;
-
-	struct http_session **uhttp_table;
-
-	int uhttp_queue;
-
-	int soopt;
-	socklen_t solen = sizeof(int);
-
-	uhttp_table = uwsgi_malloc(sizeof(struct http_session *) * uwsgi.max_fd);
-	for (i = 0; i < (int) uwsgi.max_fd; i++) {
-		uhttp_table[i] = NULL;
-	}
-
-	void *events = uwsgi_corerouter_setup_event_queue("uWSGI http", id, uhttp.nevents, &uhttp_queue, 0);
-
-	if (uhttp.has_subscription_sockets)
-		event_queue_add_fd_read(uhttp_queue, ushared->gateways[id].internal_subscription_pipe[1]);
-
-	if (uhttp.pattern) {
-		init_magic_table(magic_table);
-	}
-
-	uhttp.timeouts = uwsgi_init_rb_timer();
-	if (!uhttp.socket_timeout)
-		uhttp.socket_timeout = 30;
-
-	for (;;) {
-
-		min_timeout = uwsgi_min_rb_timer(uhttp.timeouts);
-		if (min_timeout == NULL) {
-			delta = -1;
+	if (!hs->force_ssl_buf) {
+		hs->force_ssl_buf = uwsgi_buffer_new(uwsgi.page_size);
+        	if (!hs->force_ssl_buf) return -1;
+		if (uwsgi_buffer_append(hs->force_ssl_buf, "HTTP/1.0 301 Moved Permanently\r\nLocation: https://", 50)) return -1;		
+		char *colon = memchr(cs->hostname, ':', cs->hostname_len);
+		if (colon) {
+			if (uwsgi_buffer_append(hs->force_ssl_buf, cs->hostname, colon-cs->hostname)) return -1;
 		}
 		else {
-			delta = min_timeout->key - time(NULL);
-			if (delta <= 0) {
-				expire_timeouts(uhttp_table);
-				delta = 0;
-			}
+			if (uwsgi_buffer_append(hs->force_ssl_buf, cs->hostname, cs->hostname_len)) return -1;
 		}
-		nevents = event_queue_wait_multi(uhttp_queue, delta, events, uhttp.nevents);
-
-		if (nevents == 0) {
-			// manage timeout
-			expire_timeouts(uhttp_table);
+		if (cs->ugs->ctx) {
+			if (uwsgi_buffer_append(hs->force_ssl_buf, ":", 1)) return -1;
+			if (uwsgi_buffer_append(hs->force_ssl_buf,cs->ugs->ctx, strlen(cs->ugs->ctx))) return -1;
 		}
-
-		for (i = 0; i < nevents; i++) {
-
-			interesting_fd = event_queue_interesting_fd(events, i);
-
-			struct uwsgi_gateway_socket *ugs = uwsgi.gateway_sockets;
-			int taken = 0;
-			while (ugs) {
-
-				if (ugs->gateway == &ushared->gateways[id] && interesting_fd == ugs->fd) {
-					if (!ugs->subscription) {
-						new_connection = accept(ugs->fd, (struct sockaddr *) &uhttp_addr, &uhttp_addr_len);
-#ifdef UWSGI_EVENT_USE_PORT
-						event_queue_add_fd_read(uhttp_queue, ugs->fd);
-#endif
-						if (new_connection < 0) {
-							taken = 1;
-							break;
-						}
-#ifndef __linux__
-						uwsgi_socket_b(new_connection);
-#endif
-
-						uhttp_table[new_connection] = alloc_uhttp_session();
-						uhttp_table[new_connection]->fd = new_connection;
-						uhttp_table[new_connection]->instance_fd = -1;
-						uhttp_table[new_connection]->status = HTTP_STATUS_RECV;
-						uhttp_table[new_connection]->h_pos = 0;
-						uhttp_table[new_connection]->pos = 0;
-						uhttp_table[new_connection]->rnrn = 0;
-						uhttp_table[new_connection]->parse_pos = 0;
-						uhttp_table[new_connection]->pass_fd = 0;
-						uhttp_table[new_connection]->ptr = uhttp_table[new_connection]->buffer;
-						uhttp_table[new_connection]->instance_address_len = 0;
-						uhttp_table[new_connection]->uh.modifier1 = uhttp.modifier1;
-						uhttp_table[new_connection]->uh.pktsize = 0;
-						uhttp_table[new_connection]->uh.modifier2 = 0;
-						uhttp_table[new_connection]->ip_addr = ((struct sockaddr_in *) &uhttp_addr)->sin_addr.s_addr;
-						uhttp_table[new_connection]->instance_failed = 0;
-
-						uhttp_table[new_connection]->content_length = 0;
-						uhttp_table[new_connection]->received_body = 0;
-
-						uhttp_table[new_connection]->port = ugs->port;
-						uhttp_table[new_connection]->port_len = ugs->port_len;
-
-						uhttp_table[new_connection]->timeout = add_timeout(uhttp_table[new_connection]);
-
-						uhttp.load++;
-
-						event_queue_add_fd_read(uhttp_queue, new_connection);
-					}
-					else {
-						uwsgi_corerouter_manage_subscription("uWSGI http", id, ugs, uhttp_queue, &uhttp.subscriptions,
-							uhttp.subscription_regexp, http_manage_subscription, 0, &uhttp.i_am_cheap);
-					}
-
-					taken = 1;
-					break;
-
-				}
-
-				ugs = ugs->next;
-			}
-
-			if (taken)
-				continue;
-
-			if (interesting_fd == ushared->gateways[id].internal_subscription_pipe[1]) {
-				uwsgi_corerouter_manage_internal_subscription("uWSGI http", uhttp_queue, interesting_fd, &uhttp.subscriptions,
-                                        uhttp.subscription_regexp, http_manage_subscription, 0, &uhttp.i_am_cheap);
-			} 
-
-			// process already active sessions;
-
-			uhttp_session = uhttp_table[interesting_fd];
-
-			// something is going wrong...
-			if (uhttp_session == NULL)
-				continue;
-
-			if (event_queue_interesting_fd_has_error(events, i)) {
-				close_session(uhttp_table, uhttp_session);
-				continue;
-			}
-
-			uhttp_session->timeout = reset_timeout(uhttp_session);
-
-			switch (uhttp_session->status) {
-
-
-			case HTTP_STATUS_RECV:
-				len = recv(uhttp_session->fd, uhttp_session->buffer + uhttp_session->h_pos, UMAX16 - uhttp_session->h_pos, 0);
-#ifdef UWSGI_EVENT_USE_PORT
-				event_queue_add_fd_read(uhttp_queue, uhttp_session->fd);
-#endif
-				if (len <= 0) {
-					if (len < 0)
-						uwsgi_error("recv()");
-					close_session(uhttp_table, uhttp_session);
-					break;
-				}
-
-
-				uhttp_session->h_pos += len;
-
-				for (j = 0; j < len; j++) {
-					//uwsgi_log("%d %d %d\n", j, *uhttp_session->ptr, uhttp_session->rnrn);
-					if (*uhttp_session->ptr == '\r' && (uhttp_session->rnrn == 0 || uhttp_session->rnrn == 2)) {
-						uhttp_session->rnrn++;
-					}
-					else if (*uhttp_session->ptr == '\r') {
-						uhttp_session->rnrn = 1;
-					}
-					else if (*uhttp_session->ptr == '\n' && uhttp_session->rnrn == 1) {
-						uhttp_session->rnrn = 2;
-					}
-					else if (*uhttp_session->ptr == '\n' && uhttp_session->rnrn == 3) {
-						uhttp_session->ptr++;
-						uhttp_session->remains = len - (j + 1);
-						uhttp_session->iov_len = http_parse(uhttp_session);
-
-						if (uhttp_session->iov_len == 0) {
-							close_session(uhttp_table, uhttp_session);
-							break;
-						}
-
-
-						if (uhttp.use_cluster) {
-							uhttp_session->instance_address = uwsgi_cluster_best_node();
-							if (uhttp_session->instance_address) {
-								uhttp_session->instance_address_len = strlen(uhttp_session->instance_address);
-							}
-						}
-						else if (uhttp.use_cache) {
-							uhttp_session->instance_address = uwsgi_cache_get(uhttp_session->hostname, uhttp_session->hostname_len, &uhttp_session->instance_address_len);
-						}
-						else if (uhttp.base) {
-							uhttp_session->instance_address = uwsgi_concat2n(uhttp.base, uhttp.base_len, uhttp_session->hostname, uhttp_session->hostname_len);
-							uhttp_session->instance_address_len = uhttp.base_len + uhttp_session->hostname_len;
-						}
-						else if (uhttp.pattern) {
-							magic_table['s'] = uwsgi_concat2n(uhttp_session->hostname, uhttp_session->hostname_len, "", 0);
-							int tmp_addr_len = 0;
-							uhttp_session->instance_address = magic_sub(uhttp.pattern, uhttp.pattern_len, &tmp_addr_len, magic_table);
-							uhttp_session->instance_address_len = tmp_addr_len;
-							free(magic_table['s']);
-						}
-						else if (uhttp.to) {
-							uhttp_session->instance_address = uhttp.to;
-							uhttp_session->instance_address_len = uhttp.to_len;
-						}
-						else if (uhttp.has_subscription_sockets) {
-							uhttp_session->un = uwsgi_get_subscribe_node(&uhttp.subscriptions, uhttp_session->hostname, uhttp_session->hostname_len, uhttp.subscription_regexp);
-							if (uhttp_session->un && uhttp_session->un->len) {
-								uhttp_session->instance_address = uhttp_session->un->name;
-								uhttp_session->instance_address_len = uhttp_session->un->len;
-							}
-						}
-						else if (uwsgi.sockets) {
-							uhttp_session->instance_address = uwsgi.sockets->name;
-							uhttp_session->instance_address_len = strlen(uwsgi.sockets->name);
-						}
-
-						if (!uhttp_session->instance_address_len) {
-							close_session(uhttp_table, uhttp_session);
-							break;
-						}
-
-
-
-						uhttp_session->pass_fd = is_unix(uhttp_session->instance_address, uhttp_session->instance_address_len);
-
-						uhttp_session->instance_fd = uwsgi_connectn(uhttp_session->instance_address, uhttp_session->instance_address_len, 0, 1);
-
-#ifdef UWSGI_DEBUG
-						uwsgi_log("uwsgi backend: %.*s\n", (int) uhttp_session->instance_address_len, uhttp_session->instance_address);
-#endif
-
-						if (uhttp.pattern || uhttp.base) {
-							free(uhttp_session->instance_address);
-						}
-
-						if (uhttp_session->instance_fd < 0) {
-							uhttp_session->instance_failed = 1;
-							close_session(uhttp_table, uhttp_session);
-							break;
-						}
-
-
-						uhttp_session->status = HTTP_STATUS_CONNECTING;
-						uhttp_table[uhttp_session->instance_fd] = uhttp_session;
-						event_queue_add_fd_write(uhttp_queue, uhttp_session->instance_fd);
-						break;
-					}
-					else {
-						uhttp_session->rnrn = 0;
-					}
-					uhttp_session->ptr++;
-				}
-
-
-				break;
-
-
-			case HTTP_STATUS_CONNECTING:
-
-				if (interesting_fd == uhttp_session->instance_fd) {
-
-					if (getsockopt(uhttp_session->instance_fd, SOL_SOCKET, SO_ERROR, (void *) (&soopt), &solen) < 0) {
-						uwsgi_error("getsockopt()");
-						uhttp_session->instance_failed = 1;
-						close_session(uhttp_table, uhttp_session);
-						break;
-					}
-
-					if (soopt) {
-						uwsgi_log("unable to connect() to uwsgi instance: %s\n", strerror(soopt));
-						uhttp_session->instance_failed = 1;
-						close_session(uhttp_table, uhttp_session);
-						break;
-					}
-
-#ifdef __BIG_ENDIAN__
-					uhttp_session->uh.pktsize = uwsgi_swap16(uhttp_session->uh.pktsize);
-#endif
-
-					uhttp_session->iov[0].iov_base = &uhttp_session->uh;
-					uhttp_session->iov[0].iov_len = 4;
-
-					if (uhttp_session->remains > 0) {
-						uhttp_session->iov[uhttp_session->iov_len].iov_base = uhttp_session->ptr;
-						if (uhttp_session->remains > uhttp_session->content_length) {
-							uhttp_session->remains = uhttp_session->content_length;
-						}
-						uhttp_session->iov[uhttp_session->iov_len].iov_len = uhttp_session->remains;
-						uhttp_session->received_body += uhttp_session->remains;
-						uhttp_session->iov_len++;
-					}
-
-
-#ifndef __sun__
-					// fd passing: PERFORMANCE EXTREME BOOST !!!
-					if (uhttp_session->pass_fd && !uhttp_session->remains && !uwsgi.no_fd_passing) {
-						msg.msg_name = NULL;
-						msg.msg_namelen = 0;
-						msg.msg_iov = uhttp_session->iov;
-						msg.msg_iovlen = uhttp_session->iov_len;
-						msg.msg_flags = 0;
-						msg.msg_control = &msg_control;
-						msg.msg_controllen = sizeof(msg_control);
-
-						cmsg = CMSG_FIRSTHDR(&msg);
-						cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-						cmsg->cmsg_level = SOL_SOCKET;
-						cmsg->cmsg_type = SCM_RIGHTS;
-
-						memcpy(CMSG_DATA(cmsg), &uhttp_session->fd, sizeof(int));
-
-						if (sendmsg(uhttp_session->instance_fd, &msg, 0) < 0) {
-							uwsgi_error("sendmsg()");
-						}
-
-						close(uhttp_session->fd);
-						close(uhttp_session->instance_fd);
-						uhttp_table[uhttp_session->fd] = NULL;
-						uhttp_table[uhttp_session->instance_fd] = NULL;
-						uhttp.load--;
-						del_timeout(uhttp_session);
-						free(uhttp_session);
-						break;
-					}
-
-#endif
-#ifdef __sun__
-					if (uhttp_session->iov_len > IOV_MAX) {
-						int remains = uhttp_session->iov_len;
-						int iov_len;
-						while (remains) {
-							if (remains > IOV_MAX) {
-								iov_len = IOV_MAX;
-							}
-							else {
-								iov_len = remains;
-							}
-							if (writev(uhttp_session->instance_fd, uhttp_session->iov + (uhttp_session->iov_len - remains), iov_len) <= 0) {
-								uwsgi_error("writev()");
-								close_session(uhttp_table, uhttp_session);
-								break;
-							}
-							remains -= iov_len;
-						}
-					}
-#else
-					if (writev(uhttp_session->instance_fd, uhttp_session->iov, uhttp_session->iov_len) <= 0) {
-						uwsgi_error("writev()");
-						close_session(uhttp_table, uhttp_session);
-						break;
-					}
-#endif
-
-					event_queue_fd_write_to_read(uhttp_queue, uhttp_session->instance_fd);
-					uhttp_session->status = HTTP_STATUS_RESPONSE;
-				}
-
-				break;
-
-			case HTTP_STATUS_RESPONSE:
-
-				// data from instance
-				if (interesting_fd == uhttp_session->instance_fd) {
-					len = recv(uhttp_session->instance_fd, bbuf, UMAX16, 0);
-#ifdef UWSGI_EVENT_USE_PORT
-					event_queue_add_fd_read(uhttp_queue, uhttp_session->instance_fd);
-#endif
-					if (len <= 0) {
-						if (len < 0)
-							uwsgi_error("recv()");
-						close_session(uhttp_table, uhttp_session);
-						break;
-					}
-
-					ssize_t s_len = send(uhttp_session->fd, bbuf, len, 0);
-					if (s_len <= 0) {
-						if (s_len < 0)
-							uwsgi_error("send()");
-						close(uhttp_session->fd);
-						close(uhttp_session->instance_fd);
-						uhttp_table[uhttp_session->fd] = NULL;
-						uhttp_table[uhttp_session->instance_fd] = NULL;
-						uhttp.load--;
-						del_timeout(uhttp_session);
-						free(uhttp_session);
-						break;
-					}
-				}
-				// body from client
-				else if (interesting_fd == uhttp_session->fd) {
-
-					len = recv(uhttp_session->fd, bbuf, UMAX16, 0);
-#ifdef UWSGI_EVENT_USE_PORT
-					event_queue_add_fd_read(uhttp_queue, uhttp_session->fd);
-#endif
-					if (len <= 0) {
-						if (len < 0)
-							uwsgi_error("recv()");
-						close(uhttp_session->fd);
-						close(uhttp_session->instance_fd);
-						uhttp_table[uhttp_session->fd] = NULL;
-						uhttp_table[uhttp_session->instance_fd] = NULL;
-						uhttp.load--;
-						del_timeout(uhttp_session);
-						free(uhttp_session);
-						break;
-					}
-
-
-					if (uhttp_session->received_body >= uhttp_session->content_length) {
-						break;
-					}
-
-					if (len + uhttp_session->received_body > uhttp_session->content_length) {
-						len = uhttp_session->content_length - uhttp_session->received_body;
-					}
-
-					len = send(uhttp_session->instance_fd, bbuf, len, 0);
-
-					if (len <= 0) {
-						if (len < 0)
-							uwsgi_error("send()");
-						close_session(uhttp_table, uhttp_session);
-						break;
-					}
-
-					uhttp_session->received_body += len;
-
-				}
-
-				break;
-
-
-
-				// fallback to destroy !!!
-			default:
-				uwsgi_log("default action\n");
-				close(uhttp_session->fd);
-				uhttp_table[uhttp_session->fd] = NULL;
-				if (uhttp_session->instance_fd != -1) {
-					close(uhttp_session->instance_fd);
-					uhttp_table[uhttp_session->instance_fd] = NULL;
-				}
-				uhttp.load--;
-				del_timeout(uhttp_session);
-				free(uhttp_session);
-				break;
-
-			}
-
-		}
+		if (uwsgi_buffer_append(hs->force_ssl_buf, hs->request_uri, hs->request_uri_len)) return -1;
+		if (uwsgi_buffer_append(hs->force_ssl_buf, "\r\n\r\n", 4)) return -1;
 	}
+
+        ssize_t len = write(cs->fd, hs->force_ssl_buf->buf + cs->buffer_pos, hs->force_ssl_buf->pos - cs->buffer_pos);
+        if (len < 0) {
+        	cr_try_again;
+                uwsgi_error("hr_send_force_https()");
+                return -1;
+	}
+
+        cs->buffer_pos += len;
+	if (cs->buffer_pos == hs->force_ssl_buf->pos) {
+		return 0;
+	}
+	return len;
 }
 
-int http_init() {
+#endif
 
-	int i;
+ssize_t hr_write_body(struct corerouter_session * cs) {
+	struct http_session *hs = (struct http_session *) cs;
+        ssize_t len = write(cs->instance_fd, hs->post_buf->buf + hs->post_buf_pos, hs->post_buf_len - hs->post_buf_pos);
+        if (len < 0) {
+                cr_try_again;
+                uwsgi_error("hr_write_body()");
+                return -1;
+        }
 
-	if (uhttp.has_sockets) {
+        hs->post_buf_pos += len;
 
-		if (uhttp.use_cache && !uwsgi.cache_max_items) {
-			uwsgi_log("you need to create a uwsgi cache to use the http (add --cache <n>)\n");
-			exit(1);
+        // the body chunk has been sent, start again reading from client and instance
+        if (hs->post_buf_pos == (ssize_t) hs->post_buf_len) {
+                uwsgi_cr_hook_instance_write(cs, NULL);
+                uwsgi_cr_hook_instance_read(cs, hr_instance_read_response);
+#ifdef UWSGI_SSL
+		if (!hs->ssl) {
+#endif
+                	uwsgi_cr_hook_read(cs, hr_read_body);
+#ifdef UWSGI_SSL
 		}
-
-		if (!uhttp.nevents)
-			uhttp.nevents = 64;
-
-		if (!uhttp.base && !uhttp.use_cache && !uhttp.to && !uwsgi.sockets && !uhttp.has_subscription_sockets && !uhttp.use_cluster) {
-			uwsgi_new_socket(uwsgi_concat2("127.0.0.1:0", ""));
+		else {
+                	uwsgi_cr_hook_read(cs, hr_read_ssl_body);
 		}
+#endif
+        }
 
-		uwsgi_corerouter_setup_sockets("uWSGI http");	
+        return len;
+}
 
-		if (uhttp.processes < 1)
-			uhttp.processes = 1;
-		for (i = 0; i < uhttp.processes; i++) {
-			if (register_gateway("uWSGI http", http_loop) == NULL) {
-				uwsgi_log("unable to register the http gateway\n");
-				exit(1);
+#ifdef UWSGI_SSL
+ssize_t hr_read_ssl_body(struct corerouter_session * cs) {
+        struct http_session *hs = (struct http_session *) cs;
+        int ret = SSL_read(hs->ssl, hs->post_buf->buf, hs->post_buf_max);
+        if (ret > 0) {
+		int ret2 = SSL_pending(hs->ssl);
+                if (ret2 > 0) {
+			if (uwsgi_buffer_fix(hs->post_buf, hs->post_buf->len + ret2 )) {
+				uwsgi_log("[uwsgi-https] cannot fix the buffer to %d\n", hs->post_buf->len + ret2);
+				return -1;
 			}
-		}
+                        if (SSL_read(hs->ssl, hs->post_buf->buf + ret, ret2) != ret2) {
+				uwsgi_log("[uwsgi-https] SSL_read() on %d bytes of pending data failed\n", ret2);
+                                return -1;
+                        }
+                        ret += ret2;
+                }
+		hs->post_buf_len = ret;
+        	hs->post_buf_pos = 0;
+                uwsgi_cr_hook_read(cs, NULL);
+		uwsgi_cr_hook_instance_read(cs, NULL);
+        	uwsgi_cr_hook_instance_write(cs, hr_write_body);
+		return ret;
+        }
+        if (ret == 0) return 0;
+        int err = SSL_get_error(hs->ssl, ret);
 
+        if (err == SSL_ERROR_WANT_READ) {
+                if (cs->event_hook_write) {
+                        uwsgi_cr_hook_write(cs, NULL);
+                        uwsgi_cr_hook_read(cs, hr_read_ssl_body);
+                }
+                errno = EINPROGRESS;
+                return -1;
+        }
+
+        else if (err == SSL_ERROR_WANT_WRITE) {
+                if (cs->event_hook_read) {
+                        uwsgi_cr_hook_read(cs, NULL);
+                        uwsgi_cr_hook_write(cs, hr_read_ssl_body);
+                }
+                errno = EINPROGRESS;
+                return -1;
+        }
+
+        else if (err == SSL_ERROR_SYSCALL) {
+                uwsgi_error("hr_read_ssl_body()");
+        }
+
+        else if (err == SSL_ERROR_SSL && uwsgi.ssl_verbose) {
+                ERR_print_errors_fp(stderr);
+        }
+
+        return -1;
+}
+#endif
+
+
+
+ssize_t hr_read_body(struct corerouter_session * cs) {
+        struct http_session *hs = (struct http_session *) cs;
+        ssize_t len = read(cs->fd, hs->post_buf->buf, hs->post_buf_max);
+        if (len < 0) {
+                cr_try_again;
+                uwsgi_error("hr_read_body()");
+                return -1;
+        }
+
+        // connection closed
+        if (len == 0)
+                return 0;
+
+        hs->post_buf_len = len;
+        hs->post_buf_pos = 0;
+
+        // ok we have a body, stop reading from the client and the instance and start writing to the instance
+        uwsgi_cr_hook_read(cs, NULL);
+        uwsgi_cr_hook_instance_read(cs, NULL);
+        uwsgi_cr_hook_instance_write(cs, hr_write_body);
+
+        return len;
+}
+
+#ifdef UWSGI_SSL
+ssize_t hr_write_ssl_response(struct corerouter_session * cs) {
+	struct http_session *hs = (struct http_session *) cs;
+        int ret = SSL_write(hs->ssl, cs->buffer->buf + cs->buffer_pos, cs->buffer_len - cs->buffer_pos);
+
+	if (ret > 0) {
+        	cs->buffer_pos += ret;
+		// could be a partial write
+		uwsgi_cr_hook_write(cs, hr_write_ssl_response);
+        	// ok this response chunk is sent, let's wait for another one
+        	if (cs->buffer_pos == (ssize_t) cs->buffer_len) {
+                	uwsgi_cr_hook_write(cs, NULL);
+                	uwsgi_cr_hook_instance_read(cs, hr_instance_read_response);
+        	}
+		return ret;
 	}
 
+	int err = SSL_get_error(hs->ssl, ret);
+        if (err == SSL_ERROR_WANT_READ) {
+		if (cs->event_hook_write) {
+			uwsgi_cr_hook_write(cs, NULL);
+			uwsgi_cr_hook_read(cs, hr_write_ssl_response);
+		}
+                errno = EINPROGRESS;
+                return -1;
+        }
+        else if (err == SSL_ERROR_WANT_WRITE) {
+		if (cs->event_hook_read) {
+			uwsgi_cr_hook_read(cs, NULL);
+			uwsgi_cr_hook_write(cs, hr_write_ssl_response);
+		}
+                errno = EINPROGRESS;
+                return -1;
+        }
+
+        else if (err == SSL_ERROR_SYSCALL) {
+                uwsgi_error("hr_write_ssl_response()");
+        }
+
+        else if (err == SSL_ERROR_SSL && uwsgi.ssl_verbose) {
+                ERR_print_errors_fp(stderr);
+        }
+
+        else if (err == SSL_ERROR_ZERO_RETURN) {
+                return 0;
+        }
+
+        return -1;
+}
+#endif
+
+ssize_t hr_write_response(struct corerouter_session * cs) {
+        ssize_t len = write(cs->fd, cs->buffer->buf + cs->buffer_pos, cs->buffer_len - cs->buffer_pos);
+        if (len < 0) {
+                cr_try_again;
+                uwsgi_error("hr_write_response()");
+                return -1;
+        }
+
+        cs->buffer_pos += len;
+
+        // ok this response chunk is sent, let's wait for another one
+        if (cs->buffer_pos == (ssize_t) cs->buffer_len) {
+                uwsgi_cr_hook_write(cs, NULL);
+                uwsgi_cr_hook_instance_read(cs, hr_instance_read_response);
+        }
+
+        return len;
+}
+
+
+ssize_t hr_instance_read_response(struct corerouter_session * cs) {
+        ssize_t len = read(cs->instance_fd, cs->buffer->buf, cs->buffer->len);
+        if (len < 0) {
+                cr_try_again;
+                uwsgi_error("hr_instance_read_response()");
+                return -1;
+        }
+
+        // end of the response
+        if (len == 0) {
+                return 0;
+        }
+
+        cs->buffer_pos = 0;
+        cs->buffer_len = len;
+        // ok stop reading from the instance, and start writing to the client
+        uwsgi_cr_hook_instance_read(cs, NULL);
+#ifdef UWSGI_SSL
+	struct http_session *hs = (struct http_session *) cs;
+	if (!hs->ssl) {
+#endif
+        	uwsgi_cr_hook_write(cs, hr_write_response);
+#ifdef UWSGI_SSL
+	}
+	else {
+        	uwsgi_cr_hook_write(cs, hr_write_ssl_response);
+	}
+#endif
+        return len;
+}
+
+int hr_start_waiting(struct corerouter_session * cs) {
+	struct http_session *hs = (struct http_session *) cs;
+	// stop writing to the instance
+                uwsgi_cr_hook_instance_write(cs, NULL);
+                // start reading from the instance
+                uwsgi_cr_hook_instance_read(cs, hr_instance_read_response);
+                // re-start reading from the client (for body or connection close)
+                // allocate a buffer for client body (could be delimited or dynamic)
+                hs->post_buf_max = UMAX16;
+                if (cs->post_cl > 0) {
+                        hs->post_buf_max = UMIN(UMAX16, cs->post_cl);
+                }
+                hs->post_buf = uwsgi_buffer_new(hs->post_buf_max);
+                if (!hs->post_buf)
+                        return -1;
+#ifdef UWSGI_SSL
+		if (!hs->ssl) {
+#endif
+               		uwsgi_cr_hook_read(cs, hr_read_body);
+#ifdef UWSGI_SSL
+		}
+		else {
+               		uwsgi_cr_hook_read(cs, hr_read_ssl_body);
+		}
+#endif
 	return 0;
 }
 
+ssize_t hr_post_remains(struct corerouter_session * cs) {
+	char *ptr = (cs->buffer->buf + cs->buffer->pos) - cs->post_remains;
+	ssize_t len = write(cs->instance_fd, ptr + cs->buffer_pos, cs->post_remains - cs->buffer_pos);
+	if (len < 0) {
+                cr_try_again;
+                uwsgi_error("hr_post_remains()");
+                return -1;
+        }
+
+	cs->buffer_pos += len;
+	if (cs->buffer_pos == (ssize_t) cs->post_remains) {
+		if (hr_start_waiting(cs)) return -1;
+	}
+
+	return len;
+}
+
+ssize_t hr_instance_send_request(struct corerouter_session * cs) {
+	struct http_session *hs = (struct http_session *) cs;
+        ssize_t len = write(cs->instance_fd, hs->uwsgi_req->buf + cs->buffer_pos, cs->uh.pktsize - cs->buffer_pos);
+        if (len < 0) {
+                cr_try_again;
+                uwsgi_error("hr_instance_send_request()");
+                return -1;
+        }
+
+        cs->buffer_pos += len;
+
+        // ok the request is sent, we can start sending client body (if any) and we can start waiting
+        // for response
+        if (cs->buffer_pos == cs->uh.pktsize) {
+                cs->buffer_pos = 0;
+		// some HTTP body left ?
+		if (cs->post_remains > 0) {
+			uwsgi_cr_hook_instance_write(cs, hr_post_remains);
+			return len;
+		}
+		if (hr_start_waiting(cs)) return -1;
+        }
+
+        return len;
+}
+
+
+ssize_t hr_instance_send_request_header(struct corerouter_session * cs) {
+#ifdef __BIG_ENDIAN__
+	// on the first round fix endianess
+	if (cs->buffer_pos == 0) {
+		cs->uh.pktsize = uwsgi_swap16(cs->uh.pktsize);
+	}
+#endif
+        ssize_t len = write(cs->instance_fd, &cs->uh + cs->buffer_pos, 4 - cs->buffer_pos);
+        if (len < 0) {
+                cr_try_again;
+                uwsgi_error("hr_instance_send_request_header()");
+                return -1;
+        }
+
+        cs->buffer_pos += len;
+
+        // ok the request is sent, we can start sending client body (if any) and we can start waiting
+        // for response
+        if (cs->buffer_pos == 4) {
+                cs->buffer_pos = 0;
+#ifdef __BIG_ENDIAN__
+	// on the last round restore endianess
+		cs->uh.pktsize = uwsgi_swap16(cs->uh.pktsize);
+#endif
+                uwsgi_cr_hook_instance_write(cs, hr_instance_send_request);
+        }
+
+        return len;
+}
+
+ssize_t hr_send_expect_continue(struct corerouter_session * cs) {
+	char *msg = "HTTP/1.0 100 Continue\r\n\r\n" ;
+	ssize_t len;
+
+#ifdef UWSGI_SSL
+	struct http_session *hs = (struct http_session *) cs;
+	if (!hs->ssl) {
+#endif
+		len = write(cs->fd, msg + cs->buffer_pos, 25 - cs->buffer_pos);
+		if (len < 0) {
+			cr_try_again;
+                	uwsgi_error("hr_send_expect_continue()");
+                	return -1;
+		}
+
+		cs->buffer_pos += len;
+#ifdef UWSGI_SSL
+	}
+	else {
+		int ret = SSL_write(hs->ssl, msg + cs->buffer_pos, 25 - cs->buffer_pos);
+		if (ret > 0) {
+			len = ret;
+			cs->buffer_pos += ret;
+                	// could be a partial write
+                	uwsgi_cr_hook_write(cs, hr_send_expect_continue);
+			goto done;
+		}
+		int err = SSL_get_error(hs->ssl, ret);
+        	if (err == SSL_ERROR_WANT_READ) {
+                	if (cs->event_hook_write) {
+                        	uwsgi_cr_hook_write(cs, NULL);
+                        	uwsgi_cr_hook_read(cs, hr_write_ssl_response);
+                	}
+                	errno = EINPROGRESS;
+                	return -1;
+        	}
+        	else if (err == SSL_ERROR_WANT_WRITE) {
+                	if (cs->event_hook_read) {
+                        	uwsgi_cr_hook_read(cs, NULL);
+                        	uwsgi_cr_hook_write(cs, hr_write_ssl_response);
+                	}
+                	errno = EINPROGRESS;
+                	return -1;
+        	}
+
+        	else if (err == SSL_ERROR_SYSCALL) {
+                	uwsgi_error("hr_write_ssl_response()");
+        	}
+
+        	else if (err == SSL_ERROR_SSL && uwsgi.ssl_verbose) {
+                	ERR_print_errors_fp(stderr);
+        	}
+
+        	else if (err == SSL_ERROR_ZERO_RETURN) {
+                	return 0;
+        	}
+
+        	return -1;
+	}
+done:
+#endif
+
+	if (cs->buffer_pos == 25) {
+		cs->buffer_pos = 0;
+		uwsgi_cr_hook_write(cs, NULL);
+		uwsgi_cr_hook_instance_write(cs, hr_instance_send_request_header);
+	}
+
+	return len;
+}
+
+ssize_t hr_instance_connected(struct corerouter_session * cs) {
+
+	cs->connecting = 0;
+	socklen_t solen = sizeof(int);
+
+        // first check for errors
+        if (getsockopt(cs->instance_fd, SOL_SOCKET, SO_ERROR, (void *) (&cs->soopt), &solen) < 0) {
+                uwsgi_error("hr_instance_connected()/getsockopt()");
+                cs->instance_failed = 1;
+                return -1;
+        }
+
+        if (cs->soopt) {
+                cs->instance_failed = 1;
+                return -1;
+        }
+
+        cs->buffer_pos = 0;
+	cs->uh.modifier1 = cs->modifier1;
+	cs->uh.modifier2 = 0;
+	struct http_session *hs = (struct http_session *) cs;
+	cs->uh.pktsize = hs->uwsgi_req->pos;
+
+	// check for expect/continue
+	if (hs->send_expect_100) {
+        	uwsgi_cr_hook_write(cs, hr_send_expect_continue);
+		return 1;
+	}
+        // ok instance is connected, wait for write again
+	if (cs->static_node) cs->static_node->custom2++;
+        if (cs->un) cs->un->requests++;
+        uwsgi_cr_hook_instance_write(cs, hr_instance_send_request_header);
+        // return a value > 0
+        return 1;
+}
+
+ssize_t hs_http_manage(struct corerouter_session *, ssize_t);
+
+#ifdef UWSGI_SSL
+ssize_t hr_recv_http_ssl(struct corerouter_session * cs) {
+	// be sure buffer does not grow over 64k
+        cs->buffer->limit = UMAX16;
+        // try to always leave 4k available
+        if (uwsgi_buffer_ensure(cs->buffer, uwsgi.page_size))  {
+		uwsgi_log("[uwsgi-https] cannot ensure the buffer (size: %d)\n", cs->buffer->len);	 
+		return -1;
+	}
+	struct http_session *hs = (struct http_session *) cs;
+	int ret = SSL_read(hs->ssl, cs->buffer->buf + cs->buffer_pos, cs->buffer->len - cs->buffer_pos);
+	if (ret > 0) {
+		int ret2 = SSL_pending(hs->ssl);
+		if (ret2 > 0) {
+			if (uwsgi_buffer_fix(cs->buffer, cs->buffer->len + ret2 )) {
+				uwsgi_log("[uwsgi-https] cannot fix the buffer to %d\n", cs->buffer->len + ret2 );
+				return -1;
+			}
+			if (SSL_read(hs->ssl, cs->buffer->buf + cs->buffer_pos + ret, ret2) != ret2) {
+				uwsgi_log("[uwsgi-https] SSL_read() on %d bytes of pending data failed\n", ret2);
+				return -1;
+			}
+			ret += ret2;
+		}
+		return hs_http_manage(cs, ret);
+	}
+	if (ret == 0) return 0;
+	int err = SSL_get_error(hs->ssl, ret);
+	
+	if (err == SSL_ERROR_WANT_READ) {
+                if (cs->event_hook_write) {
+                        uwsgi_cr_hook_write(cs, NULL);
+                        uwsgi_cr_hook_read(cs, hr_recv_http_ssl);
+                }
+                errno = EINPROGRESS;
+                return -1;
+        }
+
+        else if (err == SSL_ERROR_WANT_WRITE) {
+                if (cs->event_hook_read) {
+                        uwsgi_cr_hook_read(cs, NULL);
+                        uwsgi_cr_hook_write(cs, hr_recv_http_ssl);
+                }
+                errno = EINPROGRESS;
+                return -1;
+        }
+
+        else if (err == SSL_ERROR_SYSCALL) {
+                uwsgi_error("hr_recv_http_ssl()");
+        }
+
+        else if (err == SSL_ERROR_SSL && uwsgi.ssl_verbose) {
+                ERR_print_errors_fp(stderr);
+        }
+
+        return -1;
+}
+#endif
+
+ssize_t hr_recv_http(struct corerouter_session * cs) {
+	// be sure buffer does not grow over 64k
+	cs->buffer->limit = UMAX16;
+	// try to always leave 4k available
+	if (uwsgi_buffer_ensure(cs->buffer, uwsgi.page_size)) return -1;
+	ssize_t len = read(cs->fd, cs->buffer->buf + cs->buffer_pos, cs->buffer->len - cs->buffer_pos);
+	if (len < 0) {
+		cr_try_again;
+                uwsgi_error("hr_recv_http()");
+                return -1;
+        }
+	return hs_http_manage(cs, len);
+}
+
+ssize_t hs_http_manage(struct corerouter_session * cs, ssize_t len) {
+	// fix buffer usage (TODO a bit ugly...)
+	cs->buffer->pos += len;
+
+	// read until \r\n\r\n is found
+	int j;
+	char *ptr = cs->buffer->buf + cs->buffer_pos;
+	struct http_session *hs = (struct http_session *) cs;
+	cs->buffer_pos += len;
+	for (j = 0; j < len; j++) {
+		if (*ptr == '\r' && (hs->rnrn == 0 || hs->rnrn == 2)) {
+			hs->rnrn++;
+		}
+		else if (*ptr == '\r') {
+			hs->rnrn = 1;
+		}
+		else if (*ptr == '\n' && hs->rnrn == 1) {
+			hs->rnrn = 2;
+		}
+		else if (*ptr == '\n' && hs->rnrn == 3) {
+			cs->post_remains = len - (j + 1);
+			// parse HTTP request
+			size_t http_req_len = (cs->buffer_pos-len)+j;
+			if (http_parse(hs, http_req_len)) return -1;
+			// check for a valid hostname
+			if (cs->hostname_len == 0) return -1;
+
+#ifdef UWSGI_SSL
+			if (hs->force_ssl) {
+				cs->buffer_pos = 0;
+                		uwsgi_cr_hook_read(cs, NULL);
+                		uwsgi_cr_hook_write(cs, hr_send_force_https);
+				break;
+			}
+#endif
+
+			// get instance name
+			if (cs->corerouter->mapper(cs->corerouter, cs))
+				return -1;
+
+			struct uwsgi_corerouter *ucr = cs->corerouter;
+
+			if (cs->instance_address_len == 0) {
+                        	// if fallback nodes are configured, trigger them
+                        	if (ucr->fallback) {
+                                	cs->instance_failed = 1;
+                        	}
+                        	return -1;
+                	}
+
+                	// stop receiving from the client
+                	uwsgi_cr_hook_read(cs, NULL);
+
+			// start async connect
+                	cs->instance_fd = uwsgi_connectn(cs->instance_address, cs->instance_address_len, 0, 1);
+                	if (cs->instance_fd < 0) {
+                        	cs->instance_failed = 1;
+                        	cs->soopt = errno;
+                        	return -1;
+                	}
+                	// map the instance
+                	cs->corerouter->cr_table[cs->instance_fd] = cs;
+                	// wait for connection
+			cs->connecting = 1;
+                	uwsgi_cr_hook_instance_write(cs, hr_instance_connected);
+			break;
+		}
+		else {
+			hs->rnrn = 0;
+		}
+		ptr++;
+	}
+	
+	return len;
+}
+
+void hr_session_close(struct corerouter_session *cs) {
+	struct http_session *hs = (struct http_session *) cs;
+	if (hs->path_info) {
+		free(hs->path_info);
+	}
+	if (hs->uwsgi_req) {
+		uwsgi_buffer_destroy(hs->uwsgi_req);
+	}
+	if (hs->post_buf) {
+		uwsgi_buffer_destroy(hs->post_buf);
+	}
+}
+
+static ssize_t hr_recv_stud4(struct corerouter_session * cs) {
+	struct http_session *hs = (struct http_session *) cs;
+	ssize_t len = read(cs->fd, hs->stud_prefix + hs->stud_prefix_pos, hs->stud_prefix_remains - hs->stud_prefix_pos);
+	if (len < 0) {
+                cr_try_again;
+                uwsgi_error("hr_recv_stud4()");
+                return -1;
+        }
+
+	hs->stud_prefix_pos += len;
+
+        if (hs->stud_prefix_pos == hs->stud_prefix_remains) {
+		if (hs->stud_prefix[0] != AF_INET) {
+			uwsgi_log("[uwsgi-http] invalid stud prefix\n");
+			return -1;
+		}
+		// set the passed ip address
+		memcpy(&hs->ip_addr, hs->stud_prefix + 1, 4);
+		uwsgi_cr_hook_read(cs, hr_recv_http);
+        }
+
+        return len;
+
+}
+
+#ifdef UWSGI_SSL
+void hr_session_ssl_close(struct corerouter_session *cs) {
+	hr_session_close(cs);
+	struct http_session *hs = (struct http_session *) cs;
+	SSL_shutdown(hs->ssl);
+	if (hs->ssl_client_dn) {
+                OPENSSL_free(hs->ssl_client_dn);
+        }
+
+        if (hs->ssl_cc) {
+                free(hs->ssl_cc);
+        }
+
+        if (hs->ssl_bio) {
+                BIO_free(hs->ssl_bio);
+        }
+
+        if (hs->ssl_client_cert) {
+                X509_free(hs->ssl_client_cert);
+        }
+
+        SSL_free(hs->ssl);
+}
+#endif
+
+void http_alloc_session(struct uwsgi_corerouter *ucr, struct uwsgi_gateway_socket *ugs, struct corerouter_session *cs, struct sockaddr *sa, socklen_t s_len) {
+	struct http_session *hs = (struct http_session *) cs;
+	cs->modifier1 = uhttp.modifier1;
+	if (sa && sa->sa_family == AF_INET) {
+		hs->ip_addr = ((struct sockaddr_in *) sa)->sin_addr.s_addr;
+
+		struct uwsgi_string_list *usl = uhttp.stud_prefix;
+		while(usl) {
+			if (!memcmp(&hs->ip_addr, usl->value, 4)) {
+				hs->stud_prefix_remains = 5;
+				uwsgi_cr_hook_read(cs, hr_recv_stud4);
+				break;
+			}
+			usl = usl->next;
+		}
+
+	}
+
+	hs->rnrn = 0;
+
+	hs->port = ugs->port;
+	hs->port_len = ugs->port_len;
+#ifdef UWSGI_SSL
+	if (ugs->mode == UWSGI_HTTP_SSL) {
+		if (ugs->mode == UWSGI_HTTP_FORCE_SSL) {
+			uwsgi_cr_hook_write(cs, hr_send_force_https);
+			cs->close = hr_session_close;
+			return;
+		}
+		hs->ssl = SSL_new(ugs->ctx);		
+		SSL_set_fd(hs->ssl, cs->fd);
+		SSL_set_accept_state(hs->ssl);
+		uwsgi_cr_hook_read(cs, hr_recv_http_ssl);
+		cs->close = hr_session_ssl_close;
+	}
+	else {
+#endif
+		if (!cs->event_hook_read) {
+			uwsgi_cr_hook_read(cs, hr_recv_http);
+		}
+		cs->close = hr_session_close;
+#ifdef UWSGI_SSL
+	}
+#endif
+}
+
+void http_setup() {
+	uhttp.cr.name = uwsgi_str("uWSGI http");
+	uhttp.cr.short_name = uwsgi_str("http");
+}
+
+
+int http_init() {
+
+	uhttp.cr.session_size = sizeof(struct http_session);
+	uhttp.cr.alloc_session = http_alloc_session;
+	if (uhttp.cr.has_sockets && !uwsgi.sockets && !uwsgi_corerouter_has_backends(&uhttp.cr)) {
+		uwsgi_new_socket(uwsgi_concat2("127.0.0.1:0", ""));
+		uhttp.cr.use_socket = 1;
+		uhttp.cr.socket_num = 0;
+	}
+	uwsgi_corerouter_init((struct uwsgi_corerouter *) &uhttp);
+
+	return 0;
+}
 
 struct uwsgi_plugin http_plugin = {
 
 	.name = "http",
 	.options = http_options,
 	.init = http_init,
+	.on_load = http_setup,
 };

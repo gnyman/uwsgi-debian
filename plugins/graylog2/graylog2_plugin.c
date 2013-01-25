@@ -19,7 +19,7 @@ ssize_t uwsgi_graylog2_logger(struct uwsgi_logger *ul, char *message, size_t len
 
 	if (!ul->configured) {
 
-		if (!uwsgi.choosen_logger_arg) {
+		if (!ul->arg) {
 			uwsgi_log_safe("invalid graylog2 syntax\n");
 			exit(1);
 		}
@@ -32,7 +32,7 @@ ssize_t uwsgi_graylog2_logger(struct uwsgi_logger *ul, char *message, size_t len
 
 		uwsgi_socket_nb(ul->fd);
 
-		char *comma = strchr(uwsgi.choosen_logger_arg, ',');
+		char *comma = strchr(ul->arg, ',');
 		if (!comma) {
 			uwsgi_log_safe("invalid graylog2 syntax\n");
                         exit(1);
@@ -42,13 +42,13 @@ ssize_t uwsgi_graylog2_logger(struct uwsgi_logger *ul, char *message, size_t len
 
 		*comma = 0;
 
-		char *colon = strchr(uwsgi.choosen_logger_arg, ':');
+		char *colon = strchr(ul->arg, ':');
 		if (!colon) {
 			uwsgi_log_safe("invalid graylog2 syntax\n");
                         exit(1);
 		}
 
-		ul->addr_len = socket_to_in_addr(uwsgi.choosen_logger_arg, colon, 0, &ul->addr.sa_in);
+		ul->addr_len = socket_to_in_addr(ul->arg, colon, 0, &ul->addr.sa_in);
 
 		*comma = ',';
 
@@ -87,7 +87,7 @@ ssize_t uwsgi_graylog2_logger(struct uwsgi_logger *ul, char *message, size_t len
 	else (truncated = g2c.escaped_len);
 
 	int rlen = snprintf(g2c.json_buf, MAX_GELF, "{ \"version\": \"1.0\", \"host\": \"%s\", \"short_message\": \"%.*s\", \"full_message\": \"%.*s\", \"timestamp\": %d, \"level\": 5, \"facility\": \"uWSGI-%s\" }",
-		g2c.host, truncated, g2c.escaped_buf, (int)g2c.escaped_len, g2c.escaped_buf, (int) time(NULL), UWSGI_VERSION);
+		g2c.host, truncated, g2c.escaped_buf, (int)g2c.escaped_len, g2c.escaped_buf, (int) uwsgi_now(), UWSGI_VERSION);
 
 	if (rlen > 0) {
 		if (compressBound((uLong) rlen) <= MAX_GELF) {

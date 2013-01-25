@@ -6,6 +6,7 @@ extern PyTypeObject uwsgi_InputType;
 
 void *uwsgi_request_subhandler_wsgi(struct wsgi_request *wsgi_req, struct uwsgi_app *wi) {
 
+
 	PyObject *zero;
 	int i;
 	PyObject *pydictkey, *pydictvalue;
@@ -51,7 +52,7 @@ void *uwsgi_request_subhandler_wsgi(struct wsgi_request *wsgi_req, struct uwsgi_
         // if async_post is mapped as a file, directly use it as wsgi.input
         if (wsgi_req->async_post) {
 #ifdef PYTHREE
-                wsgi_req->async_input = PyFile_FromFd(fileno(wsgi_req->async_post), "wsgi_input", "rb", 0, NULL, NULL, NULL, 0);
+                wsgi_req->async_input = PyFile_FromFd(fileno((FILE *)wsgi_req->async_post), "wsgi_input", "rb", 0, NULL, NULL, NULL, 0);
 #else
                 wsgi_req->async_input = PyFile_FromFile(wsgi_req->async_post, "wsgi_input", "r", NULL);
 #endif
@@ -69,9 +70,7 @@ void *uwsgi_request_subhandler_wsgi(struct wsgi_request *wsgi_req, struct uwsgi_
 
         PyDict_SetItemString(wsgi_req->async_environ, "wsgi.input", wsgi_req->async_input);
 
-#ifdef UWSGI_SENDFILE
 	PyDict_SetItemString(wsgi_req->async_environ, "wsgi.file_wrapper", wi->sendfile);
-#endif
 
 #ifdef UWSGI_ASYNC
 	if (uwsgi.async > 1) {
@@ -150,7 +149,6 @@ void *uwsgi_request_subhandler_wsgi(struct wsgi_request *wsgi_req, struct uwsgi_
 	PyDict_SetItemString(wsgi_req->async_environ, "uwsgi.node", wi->uwsgi_node);
 
 	// call
-
 	PyTuple_SetItem(wsgi_req->async_args, 0, wsgi_req->async_environ);
 	return python_call(wsgi_req->async_app, wsgi_req->async_args, uwsgi.catch_exceptions, wsgi_req);
 }
@@ -158,22 +156,17 @@ void *uwsgi_request_subhandler_wsgi(struct wsgi_request *wsgi_req, struct uwsgi_
 int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 
 	PyObject *pychunk;
-#ifdef UWSGI_SENDFILE
 	ssize_t sf_len = 0;
-#endif
 
 	// return or yield ?
 	if (PyString_Check((PyObject *)wsgi_req->async_result)) {
-		char *content = PyString_AsString(wsgi_req->async_result);
-		size_t content_len = PyString_Size(wsgi_req->async_result);
+		size_t content_len = PyString_Size((PyObject *)wsgi_req->async_result);
 		if (content_len > 0 && !wsgi_req->headers_sent) {
 			if (uwsgi_python_do_send_headers(wsgi_req)) {
 				goto clear;
 			}
 		}
-		UWSGI_RELEASE_GIL
-		wsgi_req->response_size += wsgi_req->socket->proto_write(wsgi_req, content, content_len);
-		UWSGI_GET_GIL
+		up.hook_write_string(wsgi_req, (PyObject *) wsgi_req->async_result);
 		uwsgi_py_check_write_errors {
 			uwsgi_py_write_exception(wsgi_req);
 		}
@@ -181,16 +174,15 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 	}
 
 
-#ifdef UWSGI_SENDFILE
 #ifdef __FreeBSD__
 	if ( ((wsgi_req->sendfile_obj == wsgi_req->async_result) || ( wsgi_req->sendfile_fd_size > 0 && wsgi_req->response_size < wsgi_req->sendfile_fd_size)) && wsgi_req->sendfile_fd != -1) {
 #else
 	if (wsgi_req->sendfile_obj == wsgi_req->async_result && wsgi_req->sendfile_fd != -1) {
 #endif
-		// send the headers if not already sent 
- 	       	if (!wsgi_req->headers_sent && wsgi_req->headers_hvec > 0) { 
- 			uwsgi_python_do_send_headers(wsgi_req); 
- 		} 
+		// send the headers if not already sent
+        	if (!wsgi_req->headers_sent && wsgi_req->headers_hvec > 0) {
+                	uwsgi_python_do_send_headers(wsgi_req);
+        	}
 		sf_len = uwsgi_sendfile(wsgi_req);
 		if (sf_len < 1) goto clear;
 		wsgi_req->response_size += sf_len;
@@ -203,14 +195,12 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 #endif
 		goto clear;
 	}
-#endif
-
 
 	// ok its a yield
 	if (!wsgi_req->async_placeholder) {
 		wsgi_req->async_placeholder = PyObject_GetIter(wsgi_req->async_result);
 		if (!wsgi_req->async_placeholder) {
-			goto clear2;
+			goto exception;
 		}
 #ifdef UWSGI_ASYNC
 		if (uwsgi.async > 1) {
@@ -219,13 +209,10 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 #endif
 	}
 
-
-
-
 	pychunk = PyIter_Next(wsgi_req->async_placeholder);
 
-
 	if (!pychunk) {
+exception:
 		if (PyErr_Occurred()) { 
 			int do_exit = uwsgi_python_manage_exceptions();
 		        if (PyErr_ExceptionMatches(PyExc_MemoryError)) {
@@ -238,20 +225,6 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
                         	exit(UWSGI_EXCEPTION_CODE);
                 	}
 		}	
-		if (PyObject_HasAttrString((PyObject *)wsgi_req->async_result, "close")) {
-			PyObject *close_method = PyObject_GetAttrString((PyObject *)wsgi_req->async_result, "close");
-			PyObject *close_method_args = PyTuple_New(0);
-#ifdef UWSGI_DEBUG
-			uwsgi_log("calling close() for %.*s %p %p\n", wsgi_req->uri_len, wsgi_req->uri, close_method, close_method_args);
-#endif
-			PyObject *close_method_output = PyEval_CallObject(close_method, close_method_args);
-			if (PyErr_Occurred()) {
-				PyErr_Print();
-			}
-			Py_DECREF(close_method_args);
-			Py_XDECREF(close_method_output);
-			Py_DECREF(close_method);
-		}
 		goto clear;
 	}
 
@@ -259,16 +232,13 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 
 
 	if (PyString_Check(pychunk)) {
-		char *content = PyString_AsString(pychunk);
 		size_t content_len = PyString_Size(pychunk);
 		if (content_len > 0 && !wsgi_req->headers_sent) {
                         if (uwsgi_python_do_send_headers(wsgi_req)) {
                                 goto clear;
                         }
                 }
-		UWSGI_RELEASE_GIL
-		wsgi_req->response_size += wsgi_req->socket->proto_write(wsgi_req, content, content_len);
-		UWSGI_GET_GIL
+		up.hook_write_string(wsgi_req, pychunk);
 		uwsgi_py_check_write_errors {
 			uwsgi_py_write_exception(wsgi_req);
 			Py_DECREF(pychunk);
@@ -276,17 +246,15 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 		}
 	}
 
-#ifdef UWSGI_SENDFILE
 	else if (wsgi_req->sendfile_obj == pychunk && wsgi_req->sendfile_fd != -1) {
-		// send the headers if not already sent 
-                if (!wsgi_req->headers_sent && wsgi_req->headers_hvec > 0) {          
-                        uwsgi_python_do_send_headers(wsgi_req);
-                }  
+		// send the headers if not already sent
+        	if (!wsgi_req->headers_sent && wsgi_req->headers_hvec > 0) {
+                	uwsgi_python_do_send_headers(wsgi_req);
+        	}
 		sf_len = uwsgi_sendfile(wsgi_req);
 		if (sf_len < 1) goto clear;
 		wsgi_req->response_size += sf_len;
 	}
-#endif
 
 
 	Py_DECREF(pychunk);
@@ -297,12 +265,29 @@ clear:
 	if (wsgi_req->sendfile_fd != -1) {
 		Py_DECREF((PyObject *)wsgi_req->async_sendfile);
 	}
-	Py_XDECREF((PyObject *)wsgi_req->async_placeholder);
-clear2:
 
 	// send the headers if not already sent
 	if (!wsgi_req->headers_sent && wsgi_req->headers_hvec > 0) {
 		uwsgi_python_do_send_headers(wsgi_req);
+	}
+
+	if (wsgi_req->async_placeholder) {
+		// CALL close() ALWAYS if we are working with an iterator !!!
+		if (PyObject_HasAttrString((PyObject *)wsgi_req->async_result, "close")) {
+                        PyObject *close_method = PyObject_GetAttrString((PyObject *)wsgi_req->async_result, "close");
+                        PyObject *close_method_args = PyTuple_New(0);
+#ifdef UWSGI_DEBUG
+                        uwsgi_log("calling close() for %.*s %p %p\n", wsgi_req->uri_len, wsgi_req->uri, close_method, close_method_args);
+#endif
+                        PyObject *close_method_output = PyEval_CallObject(close_method, close_method_args);
+                        if (PyErr_Occurred()) {
+                                PyErr_Print();
+                        }
+                        Py_DECREF(close_method_args);
+                        Py_XDECREF(close_method_output);
+                        Py_DECREF(close_method);
+                }
+		Py_DECREF((PyObject *)wsgi_req->async_placeholder);
 	}
 
 	Py_DECREF((PyObject *)wsgi_req->async_result);
