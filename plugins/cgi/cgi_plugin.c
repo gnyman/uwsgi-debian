@@ -838,9 +838,15 @@ clear2:
 			uwsgi_error("setenv()");
 		}
 
-		
-		if (setenv("PATH_TRANSLATED", uwsgi_concat3n(docroot, docroot_len, path_info, pi_len, "", 0) , 1)) {
-			uwsgi_error("setenv()");
+		if (wsgi_req->document_root_len > 0) {
+			if (setenv("PATH_TRANSLATED", uwsgi_concat3n(wsgi_req->document_root, wsgi_req->document_root_len, path_info, pi_len, "", 0) , 1)) {
+				uwsgi_error("setenv()");
+			}
+		}
+		else {
+			if (setenv("PATH_TRANSLATED", uwsgi_concat3n(docroot, docroot_len, path_info, pi_len, "", 0) , 1)) {
+				uwsgi_error("setenv()");
+			}
 		}
 
 	}
@@ -965,8 +971,7 @@ clear2:
 
 void uwsgi_cgi_after_request(struct wsgi_request *wsgi_req) {
 
-	if (uwsgi.shared->options[UWSGI_OPTION_LOGGING])
-		log_request(wsgi_req);
+	log_request(wsgi_req);
 }
 
 

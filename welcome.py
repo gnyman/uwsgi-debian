@@ -44,7 +44,8 @@ def xsendfile(e, sr):
 def serve_logo(e, sr):
     # use raw facilities
     uwsgi.send("%s 200 OK\r\nContent-Type: image/png\r\n\r\n" % e['SERVER_PROTOCOL'])
-    return uwsgi.sendfile('logo_uWSGI.png')
+    uwsgi.sendfile('logo_uWSGI.png')
+    return ''
 
 def serve_options(e, sr):
     sr('200 OK', [('Content-Type', 'text/html')])
@@ -87,7 +88,6 @@ def application(env, start_response):
     if env['PATH_INFO'] in routes:
         return routes[env['PATH_INFO']](env, start_response)
 
-    start_response('200 OK', [('Content-Type', 'text/html')])
 
     if DEBUG:
         print(env['wsgi.input'].fileno())
@@ -134,6 +134,8 @@ Workers and applications<br/>
 </table>
 
     """ % (uwsgi.version, uwsgi.hostname, env.get('REMOTE_USER','None'), workers)
+
+    start_response('200 OK', [('Content-Type', 'text/html'), ('Content-Length', str(len(output)) )])
 
     #return bytes(output.encode('latin1'))
     return output

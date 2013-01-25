@@ -4,23 +4,7 @@
 
 #ifndef RUBY19
 #include <st.h>
-        #define rb_errinfo() ruby_errinfo
-        #define RUBY_GVL_LOCK
-        #define RUBY_GVL_UNLOCK
-#else
-        void fiber_loop(void);
-        #ifdef UWSGI_THREADING
-                #define RUBY_GVL_LOCK if (uwsgi.threads > 1) {\
-                        pthread_mutex_lock(&ur.gvl);\
-                        }
-
-                #define RUBY_GVL_UNLOCK if (uwsgi.threads > 1) {\
-                        pthread_mutex_unlock(&ur.gvl);\
-                        }
-        #else
-                #define RUBY_GVL_LOCK
-                #define RUBY_GVL_UNLOCK
-        #endif
+#define rb_errinfo() ruby_errinfo
 #endif
 
 #ifndef RARRAY_LEN
@@ -67,9 +51,12 @@ struct uwsgi_rack {
 	int unprotected;
 
 	struct uwsgi_string_list *rbrequire;
+	struct uwsgi_string_list *shared_rbrequire;
 	struct uwsgi_string_list *rvm_path;
 
 	char *gemset;
+
+	int rb_threads;
 
 };
 

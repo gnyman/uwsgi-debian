@@ -9,6 +9,12 @@ extern struct http_status_codes hsc[];
 
 extern PyTypeObject uwsgi_InputType;
 
+void python_simple_hook_write_string(struct wsgi_request *wsgi_req, PyObject *str) {
+	UWSGI_RELEASE_GIL
+        wsgi_req->response_size += wsgi_req->socket->proto_write(wsgi_req, PyString_AsString(str), PyString_Size(str));
+	UWSGI_GET_GIL
+}
+
 void uwsgi_opt_pythonpath(char *opt, char *value, void *foobar) {
 
 	int i;
@@ -71,6 +77,8 @@ struct uwsgi_option uwsgi_python_options[] = {
 	{"virtualenv", required_argument, 'H', "set PYTHONHOME/virtualenv", uwsgi_opt_set_str, &up.home, 0},
 	{"venv", required_argument, 'H', "set PYTHONHOME/virtualenv", uwsgi_opt_set_str, &up.home, 0},
 	{"pyhome", required_argument, 'H', "set PYTHONHOME/virtualenv", uwsgi_opt_set_str, &up.home, 0},
+	{"py-programname", required_argument, 0, "set python program name", uwsgi_opt_set_str, &up.programname, 0},
+	{"py-program-name", required_argument, 0, "set python program name", uwsgi_opt_set_str, &up.programname, 0},
 
 	{"pythonpath", required_argument, 0, "add directory (or glob) to pythonpath", uwsgi_opt_pythonpath, NULL,  0},
 	{"python-path", required_argument, 0, "add directory (or glob) to pythonpath", uwsgi_opt_pythonpath, NULL, 0},
@@ -120,6 +128,9 @@ struct uwsgi_option uwsgi_python_options[] = {
 	{"pyrun", required_argument, 0, "run a python script in the uWSGI environment", uwsgi_opt_pyrun, NULL, 0},
 
 #ifdef UWSGI_THREADING
+#ifndef UWSGI_PYPY
+	{"py-tracebacker", required_argument, 0, "enable the uWSGI python tracebacker", uwsgi_opt_set_str, &up.tracebacker, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
+#endif
 	{"py-auto-reload", required_argument, 0, "monitor python modules mtime to trigger reload (use only in development)", uwsgi_opt_set_int, &up.auto_reload, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
 	{"py-autoreload", required_argument, 0, "monitor python modules mtime to trigger reload (use only in development)", uwsgi_opt_set_int, &up.auto_reload, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
 	{"python-auto-reload", required_argument, 0, "monitor python modules mtime to trigger reload (use only in development)", uwsgi_opt_set_int, &up.auto_reload, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
@@ -127,6 +138,8 @@ struct uwsgi_option uwsgi_python_options[] = {
 	{"py-auto-reload-ignore", required_argument, 0, "ignore the specified module during auto-reload scan (can be specified multiple times)", uwsgi_opt_add_string_list, &up.auto_reload_ignore, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
 #endif
 
+	{"wsgi-env-behaviour", required_argument, 0, "set the strategy for allocating/deallocating the WSGI env", uwsgi_opt_set_str, &up.wsgi_env_behaviour, 0},
+	{"wsgi-env-behavior", required_argument, 0, "set the strategy for allocating/deallocating the WSGI env", uwsgi_opt_set_str, &up.wsgi_env_behaviour, 0},
 	{"start_response-nodelay", no_argument, 0, "send WSGI http headers as soon as possible (PEP violation)", uwsgi_opt_true, &up.start_response_nodelay, 0},
 
 	{0, 0, 0, 0, 0, 0, 0},
@@ -164,29 +177,51 @@ int uwsgi_python_init() {
 
 	if (up.home != NULL) {
 #ifdef PYTHREE
+		// check for PEP 405 virtualenv (starting from python 3.3)
+		char *pep405_env = uwsgi_concat2(up.home, "/pyvenv.cfg");
+		if (uwsgi_file_exists(pep405_env)) {
+			uwsgi_log("PEP 405 virtualenv detected: %s\n", up.home);
+			free(pep405_env);
+			goto pep405;
+		}
+		free(pep405_env);
+
+		// build the PYTHONHOME wchar path
 		wchar_t *wpyhome;
-		wpyhome = malloc((sizeof(wchar_t) * strlen(up.home)) + sizeof(wchar_t) );
+		size_t len = strlen(up.home) + 1; 
+		wpyhome = uwsgi_calloc(sizeof(wchar_t) * len );
 		if (!wpyhome) {
 			uwsgi_error("malloc()");
 			exit(1);
 		}
-		mbstowcs(wpyhome, up.home, strlen(up.home));
+		mbstowcs(wpyhome, up.home, len);
 		Py_SetPythonHome(wpyhome);
 		// do not free this memory !!!
 		//free(wpyhome);
+pep405:
 #else
 		Py_SetPythonHome(up.home);
 #endif
 		uwsgi_log("Set PythonHome to %s\n", up.home);
 	}
 
+	char *program_name = up.programname;
+	if (!program_name) {
+		program_name = uwsgi.binary_path;
+	}
 
 #ifdef PYTHREE
-	wchar_t pname[6];
-	mbstowcs(pname, "uWSGI", 6);
+	if (!up.programname) {
+		if (up.home) {
+			program_name = uwsgi_concat2(up.home, "/bin/python");
+		}
+	}
+
+	wchar_t *pname = uwsgi_calloc(sizeof(wchar_t) * (strlen(program_name)+1));
+	mbstowcs(pname, program_name, strlen(program_name)+1);
 	Py_SetProgramName(pname);
 #else
-	Py_SetProgramName("uWSGI");
+	Py_SetProgramName(program_name);
 #endif
 
 
@@ -197,11 +232,15 @@ int uwsgi_python_init() {
 	Py_Initialize();
 
 	if (!uwsgi.has_threads) {
-		uwsgi_log("*** Python threads support is disabled. You can enable it with --enable-threads ***\n");
+		uwsgi_log_initial("*** Python threads support is disabled. You can enable it with --enable-threads ***\n");
 	}
 
 	up.wsgi_spitout = PyCFunction_New(uwsgi_spit_method, NULL);
 	up.wsgi_writeout = PyCFunction_New(uwsgi_write_method, NULL);
+
+	up.hook_write_string = python_simple_hook_write_string;
+	up.hook_wsgi_input_read = uwsgi_python_hook_simple_input_read;
+	up.hook_wsgi_input_readline = uwsgi_python_hook_simple_input_readline;
 
 	up.main_thread = PyThreadState_Get();
 
@@ -248,6 +287,8 @@ void uwsgi_python_reset_random_seed() {
 
 void uwsgi_python_atexit() {
 
+	if (uwsgi.mywid == -1) goto realstuff;
+
 	// if hijacked do not run atexit hooks
 	if (uwsgi.workers[uwsgi.mywid].hijacked)
 		return;
@@ -262,6 +303,8 @@ void uwsgi_python_atexit() {
 		return;
 #endif
 
+realstuff:
+
 	// this time we use this higher level function
 	// as this code can be executed in a signal handler
 
@@ -269,9 +312,11 @@ void uwsgi_python_atexit() {
 		return;
 	}
 
-	if (uwsgi.has_threads)
-		PyGILState_Ensure();
+	// always call it
+	PyGILState_Ensure();
+
 	// no need to worry about freeing memory
+#ifdef UWSGI_EMBEDDED
 	PyObject *uwsgi_dict = get_uwsgi_pydict("uwsgi");
 	if (uwsgi_dict) {
 		PyObject *ae = PyDict_GetItemString(uwsgi_dict, "atexit");
@@ -279,6 +324,7 @@ void uwsgi_python_atexit() {
 			python_call(ae, PyTuple_New(0), 0, NULL);
 		}
 	}
+#endif
 
 	// this part is a 1:1 copy of mod_wsgi 3.x
         // it is required to fix some atexit bug with python 3
@@ -323,6 +369,13 @@ void uwsgi_python_post_fork() {
 			pthread_t par_tid;
 			pthread_create(&par_tid, NULL, uwsgi_python_autoreloader_thread, NULL);
 		}
+#ifndef UWSGI_PYPY
+		if (up.tracebacker) {
+			// spawn the tracebacker thread
+			pthread_t ptb_tid;
+			pthread_create(&ptb_tid, NULL, uwsgi_python_tracebacker_thread, NULL);
+		}
+#endif
 #endif
 	}
 
@@ -353,6 +406,7 @@ PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
 		}
 
 		if (fstat(fileno(pyfile), &pystat)) {
+			fclose(pyfile);
 			uwsgi_error("fstat()");
 			return NULL;
 		}
@@ -508,8 +562,8 @@ next:
 
 
 
+#ifdef UWSGI_EMBEDDED
 PyDoc_STRVAR(uwsgi_py_doc, "uWSGI api module.");
-
 
 #ifdef PYTHREE
 static PyModuleDef uwsgi_module3 = {
@@ -524,7 +578,6 @@ PyObject *init_uwsgi3(void) {
 }
 #endif
 
-#ifdef UWSGI_EMBEDDED
 void init_uwsgi_embedded_module() {
 	PyObject *new_uwsgi_module, *zero;
 	int i;
@@ -845,7 +898,7 @@ int uwsgi_python_magic(char *mountpoint, char *lazy) {
 
 }
 
-int uwsgi_python_mount_app(char *mountpoint, char *app, int regexp) {
+int uwsgi_python_mount_app(char *mountpoint, char *app) {
 
 	int id;
 
@@ -858,21 +911,6 @@ int uwsgi_python_mount_app(char *mountpoint, char *app, int regexp) {
 		else {
 			id = init_uwsgi_app(LOADER_MOUNT, app, uwsgi.wsgi_req, NULL, PYTHON_APP_TYPE_WSGI);
 		}
-
-#ifdef UWSGI_PCRE
-	int i;
-	if (regexp && id != -1) {
-		struct uwsgi_app *ua = &uwsgi_apps[id];
-		uwsgi_regexp_build(mountpoint, &ua->pattern, &ua->pattern_extra);
-		if (uwsgi.mywid == 0) {
-			for(i=1;i<=uwsgi.numproc;i++) {
-				uwsgi.workers[i].apps[id].pattern = ua->pattern;
-				uwsgi.workers[i].apps[id].pattern_extra = ua->pattern_extra;
-			}
-		}
-	}
-#endif
-
 		return id;
 	}
 	return -1;
@@ -937,6 +975,57 @@ void uwsgi_python_spooler_init(void) {
 
 }
 
+// this is the default (fake) allocator for WSGI's env
+// the dictionary is created on app loading (one for each async core/thread) and reused (clearing it after each request, constantly)
+//
+// from a python-programmer point of view it is a hack/cheat but it does not violate the WSGI standard
+// and it is a bit faster than the "holy" allocator
+void *uwsgi_python_create_env_cheat(struct wsgi_request *wsgi_req, struct uwsgi_app *wi) {
+#ifdef UWSGI_ASYNC
+        wsgi_req->async_args = wi->args[wsgi_req->async_id];
+	Py_INCREF((PyObject *)wi->environ[wsgi_req->async_id]);
+	return wi->environ[wsgi_req->async_id];
+#else
+        wsgi_req->async_args = wi->args;
+	Py_INCREF((PyObject *)wi->environ);
+	return wi->environ;
+#endif
+}
+
+void uwsgi_python_destroy_env_cheat(struct wsgi_request *wsgi_req) {
+	PyDict_Clear((PyObject *)wsgi_req->async_environ);
+}
+
+// this is the "holy" allocator for WSGI's env
+// Armin Ronacher told me this is what most of python programmers expect
+// I cannot speak for that as i am a perl guy, and i expect only black-magic things :P
+//
+// this should be the default one, but changing default behaviours (even if they are wrong)
+// always make my customers going berserk...
+//
+// it is only slightly (better: irrelevant) slower, so no fear in enabling it...
+
+
+void *uwsgi_python_create_env_holy(struct wsgi_request *wsgi_req, struct uwsgi_app *wi) {
+	wsgi_req->async_args = PyTuple_New(2);
+	// set start_response()
+	Py_INCREF(up.wsgi_spitout);
+	PyTuple_SetItem((PyObject *)wsgi_req->async_args, 1, up.wsgi_spitout);
+	PyObject *env = PyDict_New();
+	Py_INCREF(env);
+	return env;
+}
+
+void uwsgi_python_destroy_env_holy(struct wsgi_request *wsgi_req) {
+	Py_DECREF((PyObject *)wsgi_req->async_environ);
+	Py_DECREF((PyObject *) wsgi_req->async_args);
+	// in non-multithread modes, we set uwsgi.env incrementing the refcount of the environ
+	if (uwsgi.threads < 2) {
+		Py_DECREF((PyObject *)wsgi_req->async_environ);
+	}
+}
+
+
 // this hook will be executed by master (or worker1 when master is not requested, so COW is in place)
 void uwsgi_python_preinit_apps() {
 
@@ -959,6 +1048,19 @@ void uwsgi_python_preinit_apps() {
                 exit(1);
         }
 
+	if (!up.wsgi_env_behaviour) {
+		up.wsgi_env_create = uwsgi_python_create_env_cheat;
+		up.wsgi_env_destroy = uwsgi_python_destroy_env_cheat;
+	}
+	else if (!strcmp(up.wsgi_env_behaviour, "holy")) {
+		up.wsgi_env_create = uwsgi_python_create_env_holy;
+		up.wsgi_env_destroy = uwsgi_python_destroy_env_holy;
+	}
+	else if (!strcmp(up.wsgi_env_behaviour, "cheat")) {
+		up.wsgi_env_create = uwsgi_python_create_env_cheat;
+		up.wsgi_env_destroy = uwsgi_python_destroy_env_cheat;
+	}
+
         init_uwsgi_vars();
 
 	// load shared imports
@@ -980,6 +1082,11 @@ void uwsgi_python_preinit_apps() {
 void uwsgi_python_init_apps() {
 
 	struct http_status_codes *http_sc;
+
+	// lazy ?
+	if (uwsgi.mywid > 0) {
+		UWSGI_GET_GIL;
+	}
 
 #ifndef UWSGI_PYPY
 	// prepare for stack suspend/resume
@@ -1091,6 +1198,7 @@ next:
 	}
 #endif
 
+#ifdef UWSGI_EMBEDDED
 	PyObject *uwsgi_dict = get_uwsgi_pydict("uwsgi");
         if (uwsgi_dict) {
                 up.after_req_hook = PyDict_GetItemString(uwsgi_dict, "after_req_hook");
@@ -1099,6 +1207,12 @@ next:
 			up.after_req_hook_args = PyTuple_New(0);
 			Py_INCREF(up.after_req_hook_args);
 		}
+	}
+#endif
+
+	// lazy ?
+	if (uwsgi.mywid > 0) {
+		UWSGI_RELEASE_GIL;
 	}
 
 }
@@ -1153,7 +1267,7 @@ void uwsgi_python_enable_threads() {
 		up.reset_ts = threaded_reset_ts;
 	}
 
-	uwsgi_log("threads support enabled\n");
+	uwsgi_log("python threads support enabled\n");
 	
 
 }
@@ -1224,25 +1338,26 @@ int uwsgi_check_python_mtime(PyObject *times_dict, char *filename) {
 	}
 	return 0;
 }
-void *uwsgi_python_autoreloader_thread(void *foobar) {
 
-	PyObject *modules;
+PyObject *uwsgi_python_setup_thread(char *name) {
 
 	// block signals on this thread
-	sigset_t smask;
+        sigset_t smask;
         sigfillset(&smask);
 #ifndef UWSGI_DEBUG
         sigdelset(&smask, SIGSEGV);
 #endif
         pthread_sigmask(SIG_BLOCK, &smask, NULL);
 
-	PyThreadState *pts = PyThreadState_New(up.main_thread->interp);
-	pthread_setspecific(up.upt_save_key, (void *) pts);
+        PyThreadState *pts = PyThreadState_New(up.main_thread->interp);
+        pthread_setspecific(up.upt_save_key, (void *) pts);
         pthread_setspecific(up.upt_gil_key, (void *) pts);
-	UWSGI_GET_GIL;
-	PyObject *threading_module = PyImport_ImportModule("threading");
-	if (threading_module) {
-		PyObject *threading_module_dict = PyModule_GetDict(threading_module);
+
+        UWSGI_GET_GIL;
+
+        PyObject *threading_module = PyImport_ImportModule("threading");
+        if (threading_module) {
+                PyObject *threading_module_dict = PyModule_GetDict(threading_module);
                 if (threading_module_dict) {
 #ifdef PYTHREE
                         PyObject *threading_current = PyDict_GetItemString(threading_module_dict, "current_thread");
@@ -1256,20 +1371,30 @@ void *uwsgi_python_autoreloader_thread(void *foobar) {
                                         PyErr_Clear();
                                 }
                                 else {
-                                        PyObject_SetAttrString(current_thread, "name", PyString_FromString("uWSGIAutoReloader"));
+                                        PyObject_SetAttrString(current_thread, "name", PyString_FromString(name));
                                         Py_INCREF(current_thread);
-					modules = PyImport_GetModuleDict();
-					goto cycle;
+					return current_thread;
                                 }
                         }
                 }
 
-	}
-	return NULL;
-cycle:
+        }
+
+        return NULL;
+}
+
+
+void *uwsgi_python_autoreloader_thread(void *foobar) {
+
+	PyObject *new_thread = uwsgi_python_setup_thread("uWSGIAutoReloader");
+	if (!new_thread) return NULL;
+
+	PyObject *modules = PyImport_GetModuleDict();
+
 	if (uwsgi.mywid == 1) {
 		uwsgi_log("Python auto-reloader enabled\n");
 	}
+
 	PyObject *times_dict = PyDict_New();
 	char *filename;
 	for(;;) {
@@ -1335,7 +1460,9 @@ cycle:
 #ifndef UWSGI_PYPY
 void uwsgi_python_suspend(struct wsgi_request *wsgi_req) {
 
+	PyGILState_STATE pgst = PyGILState_Ensure();
 	PyThreadState *tstate = PyThreadState_GET();
+	PyGILState_Release(pgst);
 
 	if (wsgi_req) {
 		up.current_recursion_depth[wsgi_req->async_id] = tstate->recursion_depth;
@@ -1545,7 +1672,9 @@ int uwsgi_python_spooler(char *filename, char *buf, uint16_t len, char *body, si
 #ifndef UWSGI_PYPY
 void uwsgi_python_resume(struct wsgi_request *wsgi_req) {
 
+	PyGILState_STATE pgst = PyGILState_Ensure();
 	PyThreadState *tstate = PyThreadState_GET();
+	PyGILState_Release(pgst);
 
 	if (wsgi_req) {
 		tstate->recursion_depth = up.current_recursion_depth[wsgi_req->async_id];
@@ -1663,6 +1792,72 @@ int uwsgi_python_mule_msg(char *message, size_t len) {
 	return 1;
 }
 
+void uwsgi_python_harakiri(int wid) {
+
+	if (up.tracebacker) {
+
+        	char buf[8192];
+		char *address = uwsgi_concat2(up.tracebacker, uwsgi_num2str(wid));
+
+        	int fd = uwsgi_connect(address, -1, 0);
+        	for (;;) {
+                	int ret = uwsgi_waitfd(fd, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
+                	if (ret <= 0) {
+				break;
+                	}
+                	ssize_t len = read(fd, buf, 8192);
+                	if (len <= 0) {
+				break;
+                	}
+                	uwsgi_log("%.*s", (int) len, buf);
+        	}
+
+		free(address);
+	}
+
+}
+
+ssize_t uwsgi_python_logger(struct uwsgi_logger *ul, char *message, size_t len) {
+	if (!Py_IsInitialized()) return -1;
+
+	UWSGI_GET_GIL
+
+	if (!ul->configured) {
+		PyObject *py_logging = PyImport_ImportModule("logging");
+		if (!py_logging) goto clear;
+		PyObject *py_logging_dict = PyModule_GetDict(py_logging);
+		if (!py_logging_dict) goto clear;
+		PyObject *py_getLogger = PyDict_GetItemString(py_logging_dict, "getLogger");
+		if (!py_getLogger) goto clear;
+		PyObject *py_getLogger_args = NULL;
+		if (ul->arg) {
+			py_getLogger_args = PyTuple_New(1);
+			PyTuple_SetItem(py_getLogger_args, 0, PyString_FromString(ul->arg));
+		}
+                ul->data = (void *) PyEval_CallObject(py_getLogger, py_getLogger_args);
+                if (PyErr_Occurred()) {
+                	PyErr_Clear();
+                }
+		Py_XDECREF(py_getLogger_args);
+		if (!ul->data) goto clear;
+		ul->configured = 1;
+	}
+
+	PyObject_CallMethod((PyObject *) ul->data, "error", "(s#)", message, len);
+        if (PyErr_Occurred()) {
+        	PyErr_Clear();
+        }
+	UWSGI_RELEASE_GIL
+	return len;
+clear:
+
+	UWSGI_RELEASE_GIL
+	return -1;
+}
+
+void uwsgi_python_on_load() {
+	uwsgi_register_logger("python", uwsgi_python_logger);
+}
 
 #ifndef UWSGI_PYPY
 struct uwsgi_plugin python_plugin = {
@@ -1697,6 +1892,8 @@ struct uwsgi_plugin pypy_plugin = {
 	.resume = uwsgi_python_resume,
 #endif
 
+	.harakiri = uwsgi_python_harakiri,
+
 	.hijack_worker = uwsgi_python_hijack,
 	.spooler_init = uwsgi_python_spooler_init,
 
@@ -1705,6 +1902,8 @@ struct uwsgi_plugin pypy_plugin = {
 
 	.mule = uwsgi_python_mule,
 	.mule_msg = uwsgi_python_mule_msg,
+
+	.on_load = uwsgi_python_on_load,
 
 	.spooler = uwsgi_python_spooler,
 

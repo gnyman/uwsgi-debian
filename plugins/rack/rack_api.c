@@ -3,6 +3,7 @@
 extern struct uwsgi_server uwsgi;
 
 extern struct uwsgi_rack ur;
+extern struct uwsgi_plugin rack_plugin;
 
 #define uwsgi_rack_api(x, y, z) rb_define_module_function(rb_uwsgi_embedded, x, y, z)
 
@@ -487,6 +488,7 @@ VALUE rack_uwsgi_add_file_monitor(VALUE *class, VALUE rbsignum, VALUE rbfilename
 }
 
 
+#ifdef UWSGI_ASYNC
 VALUE uwsgi_ruby_wait_fd_read(VALUE *class, VALUE arg1, VALUE arg2) {
 
 	Check_Type(arg1, T_FIXNUM);
@@ -521,6 +523,7 @@ VALUE uwsgi_ruby_wait_fd_write(VALUE *class, VALUE arg1, VALUE arg2) {
 
         return Qtrue;
 }
+#endif
 
 
 
@@ -534,6 +537,7 @@ VALUE uwsgi_ruby_async_connect(VALUE *class, VALUE arg) {
 }
 
 
+#ifdef UWSGI_ASYNC
 VALUE uwsgi_ruby_async_sleep(VALUE *class, VALUE arg) {
 
 	Check_Type(arg, T_FIXNUM);
@@ -547,6 +551,7 @@ VALUE uwsgi_ruby_async_sleep(VALUE *class, VALUE arg) {
 
         return Qtrue;
 }
+#endif
 
 VALUE uwsgi_ruby_masterpid(VALUE *class) {
 
@@ -572,7 +577,7 @@ VALUE uwsgi_ruby_signal_wait(int argc, VALUE *argv, VALUE *class) {
         struct wsgi_request *wsgi_req = current_wsgi_req();
         int wait_for_specific_signal = 0;
         uint8_t uwsgi_signal = 0;
-        uint8_t received_signal;
+        int received_signal;
 
         wsgi_req->signal_received = -1;
 
@@ -589,7 +594,12 @@ VALUE uwsgi_ruby_signal_wait(int argc, VALUE *argv, VALUE *class) {
                 received_signal = uwsgi_signal_wait(-1);
         }
 
-        wsgi_req->signal_received = received_signal;
+	if (received_signal < 0) {
+		rb_raise(rb_eRuntimeError, "unable to call rpc function");
+	}
+	else {
+        	wsgi_req->signal_received = received_signal;
+	}
 
         return Qnil;
 }
@@ -653,6 +663,7 @@ VALUE uwsgi_ruby_do_rpc(int argc, VALUE *rpc_argv, VALUE *class) {
                 argvs[i] = RSTRING_LEN(rpc_str);
         }
 
+	// response must always be freed
         char *response = uwsgi_do_rpc(node, func, argc - 2, argv, argvs, &size);
 
         if (size > 0) {
@@ -660,7 +671,7 @@ VALUE uwsgi_ruby_do_rpc(int argc, VALUE *rpc_argv, VALUE *class) {
                 free(response);
                 return ret;
         }
-
+	free(response);
 
 clear:
 
@@ -683,7 +694,7 @@ VALUE uwsgi_ruby_register_rpc(int argc, VALUE *argv, VALUE *class) {
         void *func = (void *) argv[1];
 
 
-        if (uwsgi_register_rpc(name, 7, rb_argc, func)) {
+        if (uwsgi_register_rpc(name, rack_plugin.modifier1, rb_argc, func)) {
 clear:
                 rb_raise(rb_eRuntimeError, "unable to register rpc function");
                 return Qnil;
@@ -702,7 +713,7 @@ VALUE uwsgi_ruby_register_signal(VALUE *class, VALUE signum, VALUE sigkind, VALU
         uint8_t uwsgi_signal = NUM2INT(signum);
         char *signal_kind = RSTRING_PTR(sigkind);
 
-        if (uwsgi_register_signal(uwsgi_signal, signal_kind, (void *) rbhandler, 7)) {
+        if (uwsgi_register_signal(uwsgi_signal, signal_kind, (void *) rbhandler, rack_plugin.modifier1)) {
                 rb_raise(rb_eRuntimeError, "unable to register signal %d", uwsgi_signal);
                 return Qnil;
         }
@@ -866,9 +877,11 @@ void uwsgi_rack_init_api() {
 	VALUE rb_uwsgi_embedded = rb_define_module("UWSGI");
         uwsgi_rack_api("suspend", uwsgi_ruby_suspend, 0);
         uwsgi_rack_api("masterpid", uwsgi_ruby_masterpid, 0);
+#ifdef UWSGI_ASYNC
         uwsgi_rack_api("async_sleep", uwsgi_ruby_async_sleep, 1);
         uwsgi_rack_api("wait_fd_read", uwsgi_ruby_wait_fd_read, 2);
         uwsgi_rack_api("wait_fd_write", uwsgi_ruby_wait_fd_write, 2);
+#endif
         uwsgi_rack_api("async_connect", uwsgi_ruby_async_connect, 1);
         uwsgi_rack_api("signal", uwsgi_ruby_signal, -1);
         uwsgi_rack_api("register_signal", uwsgi_ruby_register_signal, 3);

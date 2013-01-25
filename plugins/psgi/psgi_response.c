@@ -59,6 +59,11 @@ int psgi_response(struct wsgi_request *wsgi_req, AV *response) {
 	}
 #endif
 
+	if (SvTYPE(response) != SVt_PVAV) {
+		uwsgi_log("invalid PSGI response type\n");
+		return UWSGI_OK;
+	}
+
 	status_code = av_fetch(response, 0, 0);
 	if (!status_code) { uwsgi_log("invalid PSGI status code\n"); return UWSGI_OK;}
 
@@ -104,7 +109,10 @@ int psgi_response(struct wsgi_request *wsgi_req, AV *response) {
 
         // put them in hvec
         for(i=0; i<=av_len(headers); i++) {
-
+		if (wsgi_req->header_cnt+1 > uwsgi.max_vars) {
+			uwsgi_log("no more space in iovec. consider increasing max-vars...\n");
+			break;
+		}
                 vi = (i*2)+base;
                 hitem = av_fetch(headers,i,0);
                 chitem = SvPV(*hitem, hlen);
@@ -123,10 +131,26 @@ int psgi_response(struct wsgi_request *wsgi_req, AV *response) {
                 i++;
         }
 
-	vi = (i*2)+base;
-        wsgi_req->hvec[vi].iov_base = "\r\n"; wsgi_req->hvec[vi].iov_len = 2;
+	int j = (i*2)+base;
+	struct uwsgi_string_list *ah = uwsgi.additional_headers;
+        while(ah) {
+		if (wsgi_req->header_cnt+1 > uwsgi.max_vars) {
+			uwsgi_log("no more space in iovec. consider increasing max-vars...\n");
+			break;
+		}
+                wsgi_req->header_cnt++;
+                wsgi_req->hvec[j].iov_base = ah->value;
+                wsgi_req->hvec[j].iov_len = ah->len;
+                j++;
+                wsgi_req->hvec[j].iov_base = "\r\n";
+                wsgi_req->hvec[j].iov_len = 2;
+                j++;
+                ah = ah->next;
+ 	}
 
-        wsgi_req->headers_size += wsgi_req->socket->proto_writev_header(wsgi_req, wsgi_req->hvec, vi+1);
+        wsgi_req->hvec[j].iov_base = "\r\n"; wsgi_req->hvec[j].iov_len = 2;
+
+        wsgi_req->headers_size += wsgi_req->socket->proto_writev_header(wsgi_req, wsgi_req->hvec, j+1);
 
         hitem = av_fetch(response, 2, 0);
 
@@ -141,21 +165,21 @@ int psgi_response(struct wsgi_request *wsgi_req, AV *response) {
 		// respond to fileno ?
 		if (uwsgi.async < 2) {
 			// check for fileno() method, IO class or GvIO
-			if (uwsgi_perl_obj_can(*hitem, "fileno", 6) || uwsgi_perl_obj_isa(*hitem, "IO") || (uwsgi_perl_obj_isa(*hitem, "GLOB") && GvIO(SvRV(*hitem)))  ) { 
+			if (uwsgi_perl_obj_can(*hitem, "fileno", 6) || uwsgi_perl_obj_isa(*hitem, "IO") || (uwsgi_perl_obj_isa(*hitem, "GLOB") && GvIO(SvRV(*hitem)))  ) {
 				SV *fn = uwsgi_perl_obj_call(*hitem, "fileno");
-				if (fn) { 
- 		                                        if (SvTYPE(fn) == SVt_IV && SvIV(fn) >= 0) { 
- 		                                                wsgi_req->sendfile_fd = SvIV(fn); 
- 		                                                SvREFCNT_dec(fn);        
- 		                                                wsgi_req->response_size += uwsgi_sendfile(wsgi_req); 
- 		                                                // no need to close here as perl GC will do the close() 
- 		                                                return UWSGI_OK; 
- 		                                        } 
- 		                                        SvREFCNT_dec(fn);        
- 		                                } 
+				if (fn) {
+					if (SvTYPE(fn) == SVt_IV && SvIV(fn) >= 0) {
+						wsgi_req->sendfile_fd = SvIV(fn);
+						SvREFCNT_dec(fn);	
+						wsgi_req->response_size += uwsgi_sendfile(wsgi_req);
+						// no need to close here as perl GC will do the close()
+						return UWSGI_OK;
+					}
+					SvREFCNT_dec(fn);	
+				}
 			}
 			
-			// check for path method 
+			// check for path method
 			if (uwsgi_perl_obj_can(*hitem, "path", 4)) {
 				SV *p = uwsgi_perl_obj_call(*hitem, "path");
 				wsgi_req->sendfile_fd = open(SvPV_nolen(p), O_RDONLY);
@@ -174,6 +198,7 @@ int psgi_response(struct wsgi_request *wsgi_req, AV *response) {
 				internal_server_error(wsgi_req, "exception raised");
 				break;
 			}
+
                         chitem = SvPV( chunk, hlen);
 #ifdef UWSGI_ASYNC
 			if (uwsgi.async > 1 && wsgi_req->async_force_again) {
@@ -197,6 +222,7 @@ int psgi_response(struct wsgi_request *wsgi_req, AV *response) {
 			}
 #endif
                 }
+
 
 		SV *closed = uwsgi_perl_obj_call(*hitem, "close");
 		if (closed) {
