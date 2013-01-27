@@ -4,3 +4,4 @@
 000000_04_strip_uwsgi_shebang_from_examples.patch
 110515_01_add_overriding_of_JVM_PATH_into_buildscript_of_jwsgi_plugin.patch
 remove-pg_config_cflags-in-probepg.patch
+fix-reload-process-name.patch

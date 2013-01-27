@@ -3,7 +3,6 @@ uwsgi (1.4.4+dfsg-1) UNRELEASED; urgency=low
   * New upstream release. (Closes: #698691)
   * Remove upstream applied patches:
     - fixed-a-leak-in-uwsgi.workers.patch
-    - fix-reload-process-name.patch
     - fixed-magic_table-usage-in-http-and-fastrouter-plugins.patch
     - security-check-in-the-http-router.patch
     - threading-issue-with-uwsgi-send.patch
@@ -21,6 +20,8 @@ uwsgi (1.4.4+dfsg-1) UNRELEASED; urgency=low
     - fixed-fastcgi-support-for-response-bigger-than-64k.patch
     - disable-SIGSTOP-SIGTSTP-in-gateways.patch
     - fixed-idle-mode.patch
+  * Update patches:
+    - fix-reload-process-name.patch
   * debian/rules:
     - Update path for example configuration files.
   * Update my email address.
