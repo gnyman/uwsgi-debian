@@ -14,7 +14,7 @@ Copyright: 2009-2010, Roger Florkowski <rflorkowski@mypublisher.com>
 License: GPL-2+
 
 Files: apache2/mod_uwsgi.c
-Copyright: 2009-2011 Unbit S.a.s. <info@unbit.it>
+Copyright: 2009-2012 Unbit S.a.s. <info@unbit.it>
 License: GPL-2+
 
 Files: lib/rbtree.c
@@ -48,7 +48,7 @@ License: BSD
  SUCH DAMAGE.
 
 Files: debian/*
-Copyright: 2012, Janos Guljas <janos@resenje.org>
+Copyright: 2012-2013, Janos Guljas <janos@debian.org>
  2010, Leonid Borisenko <leo.borisenko@gmail.com>
 License: GPL-2+
 

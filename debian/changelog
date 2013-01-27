@@ -24,6 +24,7 @@ uwsgi (1.4.4+dfsg-1) UNRELEASED; urgency=low
   * debian/rules:
     - Update path for example configuration files.
   * Update my email address.
+  * Update debian/copyright.
 
  -- Janos Guljas <janos@debian.org>  Fri, 25 Jan 2013 18:32:46 +0100
 
