@@ -207,6 +207,7 @@ clean::
 	)
 	# stampfiles
 	$(RM) $(CURDIR)/debian/stamp-*
+	$(RM) $(CURDIR)/uwsgibuild.*
 
 # uwsgi package
 # -------------

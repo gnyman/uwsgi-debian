@@ -24,6 +24,7 @@ uwsgi (1.4.4+dfsg-1) UNRELEASED; urgency=low
     - fix-reload-process-name.patch
   * debian/rules:
     - Update path for example configuration files.
+    - Remove uwsgibuild.* files on clean.
   * Update my email address.
   * Update debian/copyright.
   * debian/control:
