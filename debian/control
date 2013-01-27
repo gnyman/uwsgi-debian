@@ -1,7 +1,7 @@
 Source: uwsgi
 Section: web
 Priority: extra
-Maintainer: Janos Guljas <janos@resenje.org>
+Maintainer: Janos Guljas <janos@debian.org>
 DM-Upload-Allowed: yes
 Build-Depends:
  cdbs,
