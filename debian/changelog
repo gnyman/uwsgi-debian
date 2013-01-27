@@ -1,6 +1,6 @@
 uwsgi (1.4.4+dfsg-1) UNRELEASED; urgency=low
 
-  * New upstream release (Closes #698691).
+  * New upstream release. (Closes: #698691)
   * Remove upstream applied patches:
     - fixed-a-leak-in-uwsgi.workers.patch
     - fix-reload-process-name.patch
