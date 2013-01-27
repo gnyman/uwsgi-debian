@@ -1,4 +1,4 @@
-uwsgi (1.4.4+dfsg-1) UNRELEASED; urgency=low
+uwsgi (1.4.4+dfsg-1) experimental; urgency=low
 
   * New upstream release. (Closes: #698691)
   * Remove upstream applied patches:
@@ -32,7 +32,7 @@ uwsgi (1.4.4+dfsg-1) UNRELEASED; urgency=low
     - Raise standards version to 3.9.4.
     - Update VCS fields to contain canonical URL forms.
 
- -- Janos Guljas <janos@debian.org>  Fri, 25 Jan 2013 18:32:46 +0100
+ -- Janos Guljas <janos@debian.org>  Sun, 27 Jan 2013 02:46:36 +0100
 
 uwsgi (1.2.3+dfsg-5) unstable; urgency=low
 
