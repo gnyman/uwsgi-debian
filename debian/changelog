@@ -1,3 +1,31 @@
+uwsgi (1.4.4+dfsg-1) UNRELEASED; urgency=low
+
+  * New upstream release (Closes #698691).
+  * Remove upstream applied patches:
+    - fixed-a-leak-in-uwsgi.workers.patch
+    - fix-reload-process-name.patch
+    - fixed-magic_table-usage-in-http-and-fastrouter-plugins.patch
+    - security-check-in-the-http-router.patch
+    - threading-issue-with-uwsgi-send.patch
+    - fixed-ruby-rvm-support.patch
+    - fixed-spooler-with-chdir.patch
+    - fixed-async+threading.patch
+    - skip-headers-sending-when-no-headers-are-defined.patch
+    - fixed-logfile-inheritance.patch
+    - fixed-waitpid-usage-in-cheap-cheaper-lazy-modes.patch
+    - fixed-casting-in-wsgi-input.patch
+    - fixed-casting-in-wsgi-input-web3-pump-part.patch
+    - fixed-env-clear-in-plain-async-mode.patch
+    - allows-ugreen-with-threads.patch
+    - fix-mod_uwsgi-authenticated-but-authentication-typeless-requests.patch
+    - fixed-fastcgi-support-for-response-bigger-than-64k.patch
+    - disable-SIGSTOP-SIGTSTP-in-gateways.patch
+    - fixed-idle-mode.patch
+  * debian/rules:
+    - Update path for example configuration files.
+
+ -- Janos Guljas <janos@debian.org>  Fri, 25 Jan 2013 18:32:46 +0100
+
 uwsgi (1.2.3+dfsg-5) unstable; urgency=low
 
   * debian/patches/remove-pg_config_cflags-in-probepg.patch
