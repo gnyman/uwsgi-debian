@@ -2,7 +2,6 @@ Source: uwsgi
 Section: web
 Priority: extra
 Maintainer: Janos Guljas <janos@debian.org>
-DM-Upload-Allowed: yes
 Build-Depends:
  cdbs,
  debhelper (>= 8),
@@ -32,7 +31,7 @@ Build-Depends:
  ruby1.9.1,
  ruby1.9.1-dev,
  uuid-dev
-Standards-Version: 3.9.3
+Standards-Version: 3.9.4
 Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://git.debian.org/collab-maint/uwsgi.git
 Vcs-Browser: http://git.debian.org/?p=collab-maint/uwsgi.git
