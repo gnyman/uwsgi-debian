@@ -1023,7 +1023,7 @@ void emperor_loop() {
 					else if (byte == 30 && uwsgi.emperor_broodlord > 0 && uwsgi.emperor_broodlord_count < uwsgi.emperor_broodlord) {
 						uwsgi_log("[emperor] going in broodlord mode: launching zergs for %s\n", ui_current->name);
 						char *zerg_name = uwsgi_concat3(ui_current->name, ":", "zerg");
-						emperor_add(NULL, zerg_name, uwsgi_now(), NULL, 0, ui_current->uid, ui_current->gid);
+						emperor_add(ui_current->scanner, zerg_name, uwsgi_now(), NULL, 0, ui_current->uid, ui_current->gid);
 						free(zerg_name);
 					}
 				}
@@ -1324,13 +1324,21 @@ end:
 void uwsgi_emperor_start() {
 
 	if (!uwsgi.sockets && !ushared->gateways_cnt && !uwsgi.master_process) {
+		if (uwsgi.emperor_procname) {
+			uwsgi_set_processname(uwsgi.emperor_procname);
+		}
 		uwsgi_notify_ready();
 		emperor_loop();
 		// never here
 		exit(1);
 	}
 
-	uwsgi.emperor_pid = uwsgi_fork("uWSGI Emperor");
+	if (uwsgi.emperor_procname) {
+		uwsgi.emperor_pid = uwsgi_fork(uwsgi.emperor_procname);
+	}
+	else {
+		uwsgi.emperor_pid = uwsgi_fork("uWSGI Emperor");
+	}
 	if (uwsgi.emperor_pid < 0) {
 		uwsgi_error("pid()");
 		exit(1);

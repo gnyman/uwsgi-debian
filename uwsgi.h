@@ -395,6 +395,25 @@ struct uwsgi_regexp_list {
 };
 #endif
 
+struct uwsgi_rbtree {
+        struct uwsgi_rb_timer *root;
+        struct uwsgi_rb_timer *sentinel;
+};
+
+struct uwsgi_rb_timer {
+        uint8_t color;
+        struct uwsgi_rb_timer *parent;
+        struct uwsgi_rb_timer *left;
+        struct uwsgi_rb_timer *right;
+        uint64_t value;
+        void *data;
+};
+
+struct uwsgi_rbtree *uwsgi_init_rb_timer(void);
+struct uwsgi_rb_timer *uwsgi_min_rb_timer(struct uwsgi_rbtree *, struct uwsgi_rb_timer *);
+struct uwsgi_rb_timer *uwsgi_add_rb_timer(struct uwsgi_rbtree *, uint64_t, void *);
+void uwsgi_del_rb_timer(struct uwsgi_rbtree *, struct uwsgi_rb_timer *);
+
 
 union uwsgi_sockaddr {
 	struct sockaddr sa;
@@ -995,6 +1014,12 @@ struct wsgi_request {
 	char *authorization;
 	uint16_t authorization_len;
 
+	char *user_agent;
+	uint16_t user_agent_len;
+
+	char *referer;
+	uint16_t referer_len;
+
 	char *script;
 	uint16_t script_len;
 	char *module;
@@ -1293,6 +1318,7 @@ struct uwsgi_server {
 
 	// true if run under the emperor
 	int has_emperor;
+	char *emperor_procname;
 	int emperor_fd;
 	int emperor_queue;
 	int emperor_tyrant;
@@ -1550,7 +1576,7 @@ struct uwsgi_server {
 	struct uwsgi_async_request *async_runqueue_last;
 	int async_runqueue_cnt;
 
-	struct rb_root *rb_async_timeouts;
+	struct uwsgi_rbtree *rb_async_timeouts;
 
 	int async_queue_unused_ptr;
 	struct wsgi_request **async_queue_unused;
@@ -2591,74 +2617,6 @@ struct uwsgi_subscribe_req {
 	uint16_t base_len;
 };
 
-#ifndef _NO_UWSGI_RB
-
-/*
-
-  *** uWSGI, stripped down version of Linux rbtree ***
-
-
-  Red Black Trees
-  (C) 1999  Andrea Arcangeli <andrea@suse.de>
-  
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
-
-*/
-
-struct rb_node
-{
-        unsigned long  rb_parent_color;
-#define RB_RED          0
-#define RB_BLACK        1
-        struct rb_node *rb_right;
-        struct rb_node *rb_left;
-} __attribute__((aligned(sizeof(long))));
-    /* The alignment might seem pointless, but allegedly CRIS needs it */
-
-struct rb_root
-{
-        struct rb_node *rb_node;
-};
-
-#define rb_parent(r)   ((struct rb_node *)((r)->rb_parent_color & ~3))
-#define rb_color(r)   ((r)->rb_parent_color & 1)
-#define rb_is_red(r)   (!rb_color(r))
-#define rb_is_black(r) rb_color(r)
-#define rb_set_red(r)  do { (r)->rb_parent_color &= ~1; } while (0)
-#define rb_set_black(r)  do { (r)->rb_parent_color |= 1; } while (0)
-
-void rb_insert_color(struct rb_node *, struct rb_root *);
-void rb_erase(struct rb_node *, struct rb_root *);
-
-void rb_link_node(struct rb_node *, struct rb_node *,
-                                struct rb_node **);
-
-struct uwsgi_rb_timer {
-
-	struct rb_node rbt;
-
-	time_t key;
-	void *data;
-};
-
-struct rb_root *uwsgi_init_rb_timer(void);
-struct uwsgi_rb_timer *uwsgi_add_rb_timer(struct rb_root *, time_t, void *);
-struct uwsgi_rb_timer *uwsgi_min_rb_timer(struct rb_root *);
-
-#endif
-
 void uwsgi_nuclear_blast();
 
 void uwsgi_unix_signal(int, void (*)(int));
@@ -3221,6 +3179,7 @@ void manage_cluster_message(char *, int);
 void uwsgi_opt_add_custom_option(char *, char *, void *);
 void uwsgi_opt_cflags(char *, char *, void *);
 void uwsgi_opt_connect_and_read(char *, char *, void *);
+void uwsgi_opt_extract(char *, char *, void *);
 
 struct uwsgi_string_list *uwsgi_string_list_has_item(struct uwsgi_string_list *, char *, size_t);
 

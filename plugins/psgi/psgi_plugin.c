@@ -16,6 +16,9 @@ struct uwsgi_option uwsgi_perl_options[] = {
         {"psgi", required_argument, 0, "load a psgi app", uwsgi_opt_set_str, &uperl.psgi, 0},
         {"perl-no-die-catch", no_argument, 0, "do not catch $SIG{__DIE__}", uwsgi_opt_true, &uperl.no_die_catch, 0},
         {"perl-local-lib", required_argument, 0, "set perl locallib path", uwsgi_opt_set_str, &uperl.locallib, 0},
+#ifdef PERL_VERSION_STRING
+        {"perl-version", no_argument, 0, "print perl version", uwsgi_opt_print, PERL_VERSION_STRING, UWSGI_OPT_IMMEDIATE},
+#endif
         {0, 0, 0, 0, 0, 0, 0},
 
 };
@@ -554,6 +557,10 @@ void uwsgi_perl_post_fork() {
 		sv_setiv(GvSV(tmpgv), (IV)getpid());
 		SvREADONLY_on(GvSV(tmpgv));
 	}
+
+	if (uperl.postfork) {
+		uwsgi_perl_run_hook(uperl.postfork);
+	}
 }
 
 int uwsgi_perl_mount_app(char *mountpoint, char *app) {
@@ -621,6 +628,51 @@ int uwsgi_perl_signal_handler(uint8_t sig, void *handler) {
 	return ret;
 }
 
+void uwsgi_perl_run_hook(SV *hook) {
+	dSP;
+        ENTER;
+        SAVETMPS;
+        PUSHMARK(SP);
+        XPUSHs( hook );
+        PUTBACK;
+
+        call_sv( SvRV(hook), G_DISCARD);
+
+        if(SvTRUE(ERRSV)) {
+                uwsgi_log("[uwsgi-perl error] %s\n", SvPV_nolen(ERRSV));
+		return;
+        }
+
+        SPAGAIN;
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+}
+
+static void uwsgi_perl_atexit() {
+	if (uwsgi.mywid == -1) goto realstuff;
+
+        // if hijacked do not run atexit hooks
+        if (uwsgi.workers[uwsgi.mywid].hijacked)
+                return;
+
+        // if busy do not run atexit hooks
+        if (uwsgi.workers[uwsgi.mywid].busy)
+                return;
+
+#ifdef UWSGI_ASYNC
+        // managing atexit in async mode is a real pain...skip it for now
+        if (uwsgi.async > 1)
+                return;
+#endif
+
+realstuff:
+
+	if (uperl.atexit) {
+		uwsgi_perl_run_hook(uperl.atexit);
+	}
+}
+
 struct uwsgi_plugin psgi_plugin = {
 
 	.name = "psgi",
@@ -640,6 +692,8 @@ struct uwsgi_plugin psgi_plugin = {
 	.request = uwsgi_perl_request,
 	.after_request = uwsgi_perl_after_request,
 	.enable_threads = uwsgi_perl_enable_threads,
+
+	.atexit = uwsgi_perl_atexit,
 
 	.magic = uwsgi_perl_magic,
 };
