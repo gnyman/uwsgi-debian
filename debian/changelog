@@ -3,6 +3,10 @@ uwsgi (1.4.5+dfsg-1) UNRELEASED; urgency=low
   * New upstream release.
   * Update debian/copyright:
     - Remove references to removed files lib/rbtree.c and lib/rbtree.h.
+  * debian/control:
+    - New binary package uwsgi-plugin-corerouter.
+    - uwsgi-plugin-fastrouter and uwsgi-plugin-http depend on
+      uwsgi-plugin-corerouter.
 
  -- Janos Guljas <janos@debian.org>  Wed, 06 Feb 2013 20:10:31 +0100
 
