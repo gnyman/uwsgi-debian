@@ -17,12 +17,6 @@ Files: apache2/mod_uwsgi.c
 Copyright: 2009-2012 Unbit S.a.s. <info@unbit.it>
 License: GPL-2+
 
-Files: lib/rbtree.c
- lib/rbtree.h
-Copyright: 1999, Andrea Arcangeli <andrea@suse.de>
- 2002, David Woodhouse <dwmw2@infradead.org>
-License: GPL-2+
-
 Files: nginx/ngx_http_uwsgi_module.c
 Copyright: 2009-2010, Unbit S.a.s <info@unbit.it>
 License: BSD
