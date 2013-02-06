@@ -7,6 +7,8 @@ uwsgi (1.4.5+dfsg-1) UNRELEASED; urgency=low
     - New binary package uwsgi-plugin-corerouter.
     - uwsgi-plugin-fastrouter and uwsgi-plugin-http depend on
       uwsgi-plugin-corerouter.
+  * Patch Python plugin to remove assignments to environment variable
+    LD_RUN_PATH which leads to setting RPATH in compiled binary/shared library.
 
  -- Janos Guljas <janos@debian.org>  Wed, 06 Feb 2013 20:10:31 +0100
 
