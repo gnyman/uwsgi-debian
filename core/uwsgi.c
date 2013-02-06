@@ -2,7 +2,7 @@
 
  *** uWSGI ***
 
- Copyright (C) 2009-2012 Unbit S.a.s. <info@unbit.it>
+ Copyright (C) 2009-2013 Unbit S.a.s. <info@unbit.it>
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -105,7 +105,8 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"suspend", required_argument, 0, "suspend an instance", uwsgi_opt_pidfile_signal, (void *) SIGTSTP, UWSGI_OPT_IMMEDIATE},
 	{"resume", required_argument, 0, "resume an instance", uwsgi_opt_pidfile_signal, (void *) SIGTSTP, UWSGI_OPT_IMMEDIATE},
 
-	{"connect-and-read", required_argument, 0, "connect to a scoekt and wait for data from it", uwsgi_opt_connect_and_read, NULL, UWSGI_OPT_IMMEDIATE},
+	{"connect-and-read", required_argument, 0, "connect to a socket and wait for data from it", uwsgi_opt_connect_and_read, NULL, UWSGI_OPT_IMMEDIATE},
+	{"extract", required_argument, 0, "fetch/dump any supported address to stdout", uwsgi_opt_extract, NULL, UWSGI_OPT_IMMEDIATE},
 
 	{"listen", required_argument, 'l', "set the socket listen queue size", uwsgi_opt_set_int, &uwsgi.listen_queue, 0},
 	{"max-vars", required_argument, 'v', "set the amount of internal iovec/vars structures", uwsgi_opt_max_vars, NULL, 0},
@@ -139,6 +140,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"need-app", no_argument, 0, "exit if no app can be loaded", uwsgi_opt_true, &uwsgi.need_app, 0},
 	{"master", no_argument, 'M', "enable master process", uwsgi_opt_true, &uwsgi.master_process, 0},
 	{"emperor", required_argument, 0, "run the Emperor", uwsgi_opt_add_string_list, &uwsgi.emperor, 0},
+	{"emperor-procname", required_argument, 0, "set the Emperor process name", uwsgi_opt_set_str, &uwsgi.emperor_procname, 0},
 	{"emperor-freq", required_argument, 0, "set the Emperor scan frequency (default 3 seconds)", uwsgi_opt_set_int, &uwsgi.emperor_freq, 0},
 	{"emperor-required-heartbeat", required_argument, 0, "set the Emperor tolerance about heartbeats", uwsgi_opt_set_int, &uwsgi.emperor_heartbeat, 0},
 	{"emperor-pidfile", required_argument, 0, "write the Emperor pid in the specified file", uwsgi_opt_set_str, &uwsgi.emperor_pidfile, 0},
@@ -2888,7 +2890,7 @@ wait_for_call_of_duty:
 		uwsgi_ignition();
 	}
 	// never here
-	pthread_exit(NULL);
+	end_me(0);
 }
 
 /*
@@ -3902,4 +3904,19 @@ void uwsgi_opt_connect_and_read(char *opt, char *address, void *foobar) {
 		}
 		uwsgi_log("%.*s", (int) len, buf);
 	}
+}
+
+void uwsgi_opt_extract(char *opt, char *address, void *foobar) {
+
+	int len = 0;
+	char *buf;
+
+	buf = uwsgi_open_and_read(address, &len, 0, NULL);
+	if (len > 0) {
+		if (write(1, buf, len) != len) {
+			uwsgi_error("write()");
+			exit(1);
+		};
+	};
+	exit(0);
 }
