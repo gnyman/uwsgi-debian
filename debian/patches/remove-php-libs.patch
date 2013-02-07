@@ -1,0 +1,14 @@
+Description: Remove PHP libraries when building PHP plugin.
+Author: Janos Guljas <janos@debian.org>
+Last-Update: 2013-02-07
+
+--- a/plugins/php/uwsgiplugin.py
++++ b/plugins/php/uwsgiplugin.py
+@@ -24,6 +24,6 @@
+     LDFLAGS.append('-L%s' % ld_run_path)
+     os.environ['LD_RUN_PATH'] = ld_run_path
+ 
+-LIBS = [os.popen(PHPPATH + ' --libs').read().rstrip(), '-lphp5']
++LIBS = ['-lphp5']
+ 
+ GCC_LIST = ['php_plugin']

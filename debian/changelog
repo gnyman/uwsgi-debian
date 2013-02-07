@@ -9,6 +9,13 @@ uwsgi (1.4.5+dfsg-1) UNRELEASED; urgency=low
       uwsgi-plugin-corerouter.
   * Patch Python plugin to remove assignments to environment variable
     LD_RUN_PATH which leads to setting RPATH in compiled binary/shared library.
+  * New binary package uwsgi-plugin-php. (Closes: #699174)
+     - New Build-Depends libphp5-embed, php5-dev, libonig-dev, libdb-dev,
+       libqdbm-dev and libbz2-dev. 
+  * debian/pathces/fix-php-ldflags.patch
+     - Include php5-embed ld library path when building PHP plugin.
+  * debian/patches/remove-php-libs.patch
+     - Remove PHP libraries when building PHP plugin.
 
  -- Janos Guljas <janos@debian.org>  Wed, 06 Feb 2013 20:10:31 +0100
 

@@ -20,6 +20,12 @@ Build-Depends:
  libxml2-dev,
  libyaml-dev,
  libzmq-dev,
+ libphp5-embed,
+ php5-dev,
+ libonig-dev,
+ libdb-dev,
+ libqdbm-dev,
+ libbz2-dev,
  pkg-config,
  python,
  python-all-dev,
@@ -111,6 +117,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version})
    [amd64 i386 mips powerpc s390],
+ uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-probeconnect (= ${binary:Version}),
  uwsgi-plugin-probepg (= ${binary:Version}),
  uwsgi-plugin-pyerl-python (= ${binary:Version}),
@@ -167,6 +174,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
  uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
+ uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
  uwsgi-plugin-python3 (= ${binary:Version}),
@@ -614,6 +622,19 @@ Description: uGreen plugin for uWSGI
  the same core.
  .
  This package provides uGreen plugin for uWSGI.
+
+Package: uwsgi-plugin-php
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
+ phpapi-20100525
+Description: PHP plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides PHP plugin for uWSGI.
 
 Package: libapache2-mod-uwsgi
 Architecture: any
