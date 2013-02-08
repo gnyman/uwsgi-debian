@@ -120,6 +120,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version})
    [amd64 i386 mips powerpc s390],
+ uwsgi-plugin-notfound (= ${binary:Version}),
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-probeconnect (= ${binary:Version}),
  uwsgi-plugin-probepg (= ${binary:Version}),
@@ -463,6 +464,19 @@ Description: Nagios plugin for uWSGI
  the same core.
  .
  This package provides Nagios plugin for uWSGI.
+
+Package: uwsgi-plugin-notfound
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: notfound plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides notfound plugin for uWSGI which always returns HTTP
+ response with Not Found 404 Code.
 
 Package: uwsgi-plugin-ping
 Architecture: any
