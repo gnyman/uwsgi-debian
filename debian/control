@@ -168,7 +168,8 @@ Depends: ${misc:Depends},
  uwsgi-plugin-rsyslog (= ${binary:Version}),
  uwsgi-plugin-spooler (= ${binary:Version}),
  uwsgi-plugin-syslog (= ${binary:Version}),
- uwsgi-plugin-systemd-logger (= ${binary:Version})
+ uwsgi-plugin-systemd-logger (= ${binary:Version}),
+ uwsgi-plugin-zergpool (= ${binary:Version})
 Description: infrastructure plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -179,7 +180,7 @@ Description: infrastructure plugins for uWSGI
  This dependency package provides infrastructure plugins for uWSGI:
    * admin, alarm curl, alarm XMPP, cache, echo, fastrouter, graylog2,
      HTTP serving, logfile, logsocket, mongodblog, Nagios, pam, ping, redislog,
-     RPC, RRDTool, rsyslog, spooler, syslog, systemd_logger
+     RPC, RRDTool, rsyslog, spooler, syslog, systemd_logger, zergpool
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -772,6 +773,18 @@ Description: PHP plugin for uWSGI
  the same core.
  .
  This package provides PHP plugin for uWSGI.
+
+Package: uwsgi-plugin-zergpool
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: zergpool plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides zergpool plugin for uWSGI.
 
 Package: libapache2-mod-uwsgi
 Architecture: any
