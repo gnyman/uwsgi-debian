@@ -167,6 +167,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-nagios (= ${binary:Version}),
  uwsgi-plugin-pam (= ${binary:Version}),
  uwsgi-plugin-ping (= ${binary:Version}),
+ uwsgi-plugin-rawrouter (= ${binary:Version}),
  uwsgi-plugin-redislog (= ${binary:Version}),
  uwsgi-plugin-rpc (= ${binary:Version}),
  uwsgi-plugin-rrdtool (= ${binary:Version}),
@@ -185,8 +186,8 @@ Description: infrastructure plugins for uWSGI
  This dependency package provides infrastructure plugins for uWSGI:
    * admin, alarm curl, alarm XMPP, cache, echo, emperor_amqp, emperor_mongodb,
      emperor_pg, fastrouter, graylog2, HTTP serving, logfile, logsocket,
-     mongodblog, Nagios, pam, ping, redislog, RPC, RRDTool, rsyslog, spooler,
-     stats_pusher_mongodb, syslog, zergpool
+     mongodblog, Nagios, pam, ping, rawrouter, redislog, RPC, RRDTool, rsyslog,
+     spooler, stats_pusher_mongodb, syslog, zergpool
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -681,6 +682,19 @@ Description: Rack plugin for uWSGI (Ruby 1.9.1)
  the same core.
  .
  This package provides Rack plugin for uWSGI (linked with Ruby 1.9.1 runtime).
+
+Package: uwsgi-plugin-rawrouter
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
+ uwsgi-plugin-corerouter (= ${binary:Version})
+Description: rawrouter plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides rawrouter plugin for uWSGI.
 
 Package: uwsgi-plugin-redislog
 Architecture: any
