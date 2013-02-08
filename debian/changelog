@@ -34,6 +34,9 @@ uwsgi (1.4.5+dfsg-1) UNRELEASED; urgency=low
   * New binary package uwsgi-plugin-stats-pusher-mongodb:
      - New Build-Depends mongodb-dev, libboost-thread-dev and
        libboost-filesystem-dev.
+  * New binary package uwsgi-plugin-emperor-amqp.
+  * New binary package uwsgi-plugin-emperor-mongodb.
+  * New binary package uwsgi-plugin-emperor-pg.
 
  -- Janos Guljas <janos@debian.org>  Wed, 06 Feb 2013 20:10:31 +0100
 
