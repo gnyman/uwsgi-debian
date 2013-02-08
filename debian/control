@@ -30,6 +30,8 @@ Build-Depends:
  libqdbm-dev,
  libbz2-dev,
  mongodb-dev,
+ libboost-thread-dev,
+ libboost-filesystem-dev,
  pkg-config,
  python,
  python-all-dev,
