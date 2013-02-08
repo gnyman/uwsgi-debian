@@ -29,6 +29,7 @@ Build-Depends:
  libdb-dev,
  libqdbm-dev,
  libbz2-dev,
+ mongodb-dev,
  pkg-config,
  python,
  python-all-dev,
@@ -166,6 +167,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-rrdtool (= ${binary:Version}),
  uwsgi-plugin-rsyslog (= ${binary:Version}),
  uwsgi-plugin-spooler (= ${binary:Version}),
+ uwsgi-plugin-stats-pusher-mongodb (= ${binary:Version}),
  uwsgi-plugin-syslog (= ${binary:Version}),
  uwsgi-plugin-zergpool (= ${binary:Version})
 Description: infrastructure plugins for uWSGI
@@ -178,7 +180,7 @@ Description: infrastructure plugins for uWSGI
  This dependency package provides infrastructure plugins for uWSGI:
    * admin, alarm curl, alarm XMPP, cache, echo, fastrouter, graylog2,
      HTTP serving, logfile, logsocket, mongodblog, Nagios, pam, ping, redislog,
-     RPC, RRDTool, rsyslog, spooler, syslog, zergpool
+     RPC, RRDTool, rsyslog, spooler, stats_pusher_mongodb, syslog, zergpool
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -710,6 +712,18 @@ Description: spooler plugin for uWSGI
  .
  This package provides spooler plugin for uWSGI, which allows remote spooling
  of jobs.
+
+Package: uwsgi-plugin-stats-pusher-mongodb
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: MongoDB stats pusher plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides stats_pusher_mongodb plugin for uWSGI.
 
 Package: uwsgi-plugin-symcall
 Architecture: any
