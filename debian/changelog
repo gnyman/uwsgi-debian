@@ -16,6 +16,12 @@ uwsgi (1.4.5+dfsg-1) UNRELEASED; urgency=low
      - Include php5-embed ld library path when building PHP plugin.
   * debian/patches/remove-php-libs.patch
      - Remove PHP libraries when building PHP plugin.
+  * New binary package uwsgi-plugin-alarm-curl:
+     - New Build-Depends libcurl4-openssl-dev.
+     - Add alarm option to buildconf/uwsgi-core.ini.
+     - Set pcre option to true in: buildconf/uwsgi-core.ini.
+  * New binary package uwsgi-plugin-alarm-xmpp:
+     - New Build-Depends libgloox-dev.
 
  -- Janos Guljas <janos@debian.org>  Wed, 06 Feb 2013 20:10:31 +0100
 
