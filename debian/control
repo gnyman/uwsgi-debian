@@ -416,7 +416,7 @@ Description: JWSGI plugin for uWSGI (OpenJDK 6)
  This package provides JWSGI plugin for uWSGI (linked with OpenJDK Java 6
  runtime).
 
-Package: uwsgi-plugin-logsfile
+Package: uwsgi-plugin-logfile
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: logfile plugin for uWSGI
