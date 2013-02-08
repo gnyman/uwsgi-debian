@@ -116,6 +116,7 @@ Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
  uwsgi-plugin-carbon (= ${binary:Version}),
+ uwsgi-plugin-cheaper-busyness (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version})
    [amd64 i386 mips powerpc s390],
@@ -268,6 +269,18 @@ Description: CGI plugin for uWSGI
  the same core.
  .
  This package provides CGI plugin for uWSGI.
+
+Package: uwsgi-plugin-cheaper-busyness
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Cheaper busyness algorithm plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides cheaper_busyness plugin for uWSGI.
 
 Package: uwsgi-plugin-echo
 Architecture: any
