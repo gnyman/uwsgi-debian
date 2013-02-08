@@ -29,6 +29,7 @@ uwsgi (1.4.5+dfsg-1) UNRELEASED; urgency=low
   * New binary package uwsgi-plugin-mongodblog.
   * New binary package uwsgi-plugin-pam:
      - New Build-Depends libpam0g-dev.
+  * New binary package uwsgi-plugin-redislog.
 
  -- Janos Guljas <janos@debian.org>  Wed, 06 Feb 2013 20:10:31 +0100
 
