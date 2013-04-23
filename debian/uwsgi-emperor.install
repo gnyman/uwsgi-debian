@@ -1,0 +1,2 @@
+debian/uwsgi-emperor-files/emperor.ini etc/uwsgi-emperor
+debian/uwsgi-emperor-files/README etc/uwsgi-emperor/vassals
