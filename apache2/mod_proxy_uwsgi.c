@@ -1,6 +1,36 @@
 /*
+        
+*** mod_proxy_uwsgi ***
 
-	 apxs2 -i -c mod_proxy_uwsgi.c
+Copyright 2009-2013 Unbit S.a.s. <info@unbit.it>
+     
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+To build:
+
+apxs2 -i -c mod_proxy_uwsgi.c
+
+To use:
+
+LoadModule proxy_uwsgi_module /usr/lib/apache2/modules/mod_proxy_uwsgi.so
+ProxyPass / uwsgi://127.0.0.1:3031/
+
+Docs:
+
+http://uwsgi-docs.readthedocs.org/en/latest/Apache.html#mod-proxy-uwsgi
 
 */
 #define APR_WANT_MEMFUNC
@@ -156,7 +186,7 @@ static int uwsgi_send_headers(request_rec *r, proxy_conn_rec *conn)
     buf[0] = 0;
     buf[1] = (uint8_t) (pktsize & 0xff);
     buf[2] = (uint8_t) ((pktsize >> 8) & 0xff);
-    buf[0] = 0;
+    buf[3] = 0;
 
     return uwsgi_send(conn, buf, headerlen, r);
 }
@@ -187,27 +217,44 @@ static int uwsgi_send_body(request_rec *r, proxy_conn_rec *conn)
     return OK;
 }
 
-static
-apr_status_t ap_proxygetline(apr_bucket_brigade *bb, char *s, int n, request_rec *r,
-                             int fold, int *writen)
+#if AP_MODULE_MAGIC_AT_LEAST(20111130,0)
+static request_rec *ap_proxy_make_fake_req(conn_rec *c, request_rec *r)
 {
-    char *tmp_s = s;
-    apr_status_t rv;
-    apr_size_t len;
+    apr_pool_t *pool;
+    request_rec *rp;
 
-    rv = ap_rgetline(&tmp_s, n, &len, r, fold, bb);
-    apr_brigade_cleanup(bb);
+    apr_pool_create(&pool, c->pool);
 
-    if (rv == APR_SUCCESS) {
-        *writen = (int) len;
-    } else if (rv == APR_ENOSPC) {
-        *writen = n;
-    } else {
-        *writen = -1;
-    }
+    rp = apr_pcalloc(pool, sizeof(*r));
 
-    return rv;
+    rp->pool            = pool;
+    rp->status          = HTTP_OK;
+
+    rp->headers_in      = apr_table_make(pool, 50);
+    rp->subprocess_env  = apr_table_make(pool, 50);
+    rp->headers_out     = apr_table_make(pool, 12);
+    rp->err_headers_out = apr_table_make(pool, 5);
+    rp->notes           = apr_table_make(pool, 5);
+
+    rp->server = r->server;
+    rp->log = r->log;
+    rp->proxyreq = r->proxyreq;
+    rp->request_time = r->request_time;
+    rp->connection      = c;
+    rp->output_filters  = c->output_filters;
+    rp->input_filters   = c->input_filters;
+    rp->proto_output_filters  = c->output_filters;
+    rp->proto_input_filters   = c->input_filters;
+    rp->useragent_ip = c->client_ip;
+    rp->useragent_addr = c->client_addr;
+
+    rp->request_config  = ap_create_request_config(pool);
+    proxy_run_create_req(r, rp);
+
+    return rp;
 }
+#endif
+
 
 static int uwsgi_response(request_rec *r, proxy_conn_rec *backend, proxy_server_conf *conf)
 {
@@ -228,11 +275,7 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec *backend, proxy_server_
 
 	apr_bucket_brigade *bb = apr_brigade_create(r->pool, c->bucket_alloc);
 
-
-	rc = ap_proxygetline(bb, buffer, sizeof(buffer), rp, 0, &len);
-	if (len == 0) {
-		rc = ap_proxygetline(bb, buffer, sizeof(buffer), rp, 0, &len);
-	}
+	len = ap_getline(buffer, sizeof(buffer), rp, 1);
 
 	if (len <= 0) {
 		// oops
@@ -241,24 +284,10 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec *backend, proxy_server_
 
 	backend->worker->s->read += len;
 
-	if (!apr_date_checkmask(buffer, "HTTP/#.# ###*")) {
+	if (!apr_date_checkmask(buffer, "HTTP/#.# ###*") || len >= sizeof(buffer)-1) {
 		// oops
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
-
-        int major, minor;
-
-        major = buffer[5] - '0';
-        minor = buffer[7] - '0';
-
-        /* If not an HTTP/1 message or
-        * if the status line was > 8192 bytes
-         */
-        if ((major != 1) || (len >= sizeof(buffer)-1)) {
-        	return ap_proxyerror(r, HTTP_BAD_GATEWAY,
-                apr_pstrcat(r->pool, "Corrupt status line returned by remote "
-                            "server: ", buffer, NULL));
-        }
 
         char keepchar = buffer[12];
         buffer[12] = '\0';
@@ -347,11 +376,22 @@ static int uwsgi_handler(request_rec *r, proxy_worker *worker,
     }
 
     // ADD PATH_INFO
+#if AP_MODULE_MAGIC_AT_LEAST(20111130,0)
+    size_t w_len = strlen(worker->s->name);
+#else
     size_t w_len = strlen(worker->name);
+#endif
     char *u_path_info = r->filename + 6 + w_len;
     int delta = 0;
     if (u_path_info[0] != '/') {
         delta = 1;
+    }
+    int decode_status = ap_unescape_url(url+w_len-delta);
+    if (decode_status) {
+       ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "unable to decode uri: %s",
+                      url+w_len-delta);
+        return HTTP_INTERNAL_SERVER_ERROR;
     }
     apr_table_add(r->subprocess_env, "PATH_INFO", url+w_len-delta);
 

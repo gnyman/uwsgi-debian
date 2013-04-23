@@ -1,6 +1,4 @@
-#ifdef UWSGI_INI
-
-#include "uwsgi.h"
+#include <uwsgi.h>
 
 extern struct uwsgi_server uwsgi;
 
@@ -8,6 +6,8 @@ extern struct uwsgi_server uwsgi;
    ini file must be read ALL into memory.
    This memory must not be freed for all the server lifecycle
    */
+
+static char *last_file = NULL;
 
 void ini_rstrip(char *line) {
 
@@ -54,9 +54,9 @@ char *ini_get_key(char *key) {
 	return ptr;
 }
 
-char *ini_get_line(char *ini, off_t size) {
+char *ini_get_line(char *ini, size_t size) {
 
-	off_t i;
+	size_t i;
 	char *ptr = ini;
 
 	for (i = 0; i < size; i++) {
@@ -78,7 +78,7 @@ char *ini_get_line(char *ini, off_t size) {
 
 void uwsgi_ini_config(char *file, char *magic_table[]) {
 
-	int len = 0;
+	size_t len = 0;
 	char *ini;
 
 	char *ini_line;
@@ -106,13 +106,23 @@ void uwsgi_ini_config(char *file, char *magic_table[]) {
 		if (colon[1] != 0) {
 			section_asked = colon + 1;
 		}
+
+		if (colon == file) {
+			file = last_file;
+		}
 	}
 
-	if (file[0] != 0) {
-		uwsgi_log("[uWSGI] getting INI configuration from %s\n", file);
+	if (file[0] != 0 && file != last_file) {
+		uwsgi_log_initial("[uWSGI] getting INI configuration from %s\n", file);
 	}
 
 	ini = uwsgi_open_and_read(file, &len, 1, magic_table);
+	if (file != last_file) {
+		if (last_file) {
+			free(last_file);
+		}
+		last_file = uwsgi_str(file);
+	}
 
 	while (len) {
 		ini_line = ini_get_line(ini, len);
@@ -157,5 +167,3 @@ void uwsgi_ini_config(char *file, char *magic_table[]) {
 
 
 }
-
-#endif

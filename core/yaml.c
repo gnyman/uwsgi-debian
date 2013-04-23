@@ -61,9 +61,9 @@ int yaml_get_depth(char *line) {
 	return depth;
 }
 
-char *yaml_get_line(char *yaml, off_t size) {
+char *yaml_get_line(char *yaml, size_t size) {
 
-	off_t i;
+	size_t i;
 	char *ptr = yaml;
 	int comment = 0;
 
@@ -96,7 +96,7 @@ char *yaml_get_line(char *yaml, off_t size) {
 
 void uwsgi_yaml_config(char *file, char *magic_table[]) {
 
-	int len = 0;
+	size_t len = 0;
 	char *yaml;
 
 	int in_uwsgi_section = 0;
@@ -122,7 +122,7 @@ void uwsgi_yaml_config(char *file, char *magic_table[]) {
 		}
 	}
 
-	uwsgi_log("[uWSGI] getting YAML configuration from %s\n", file);
+	uwsgi_log_initial("[uWSGI] getting YAML configuration from %s\n", file);
 
 	yaml = uwsgi_open_and_read(file, &len, 1, magic_table);
 

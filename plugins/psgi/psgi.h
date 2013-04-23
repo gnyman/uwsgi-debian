@@ -8,6 +8,11 @@
 #include <perl.h>
 #include "XSUB.h"
 
+#define uwsgi_pl_check_write_errors if (wsgi_req->write_errors > 0 && uwsgi.write_errors_exception_only) {\
+                        croak("error writing to client");\
+                }\
+                else if (wsgi_req->write_errors > uwsgi.write_errors_tolerance)\
+
 
 struct uwsgi_perl {
 
@@ -22,6 +27,9 @@ struct uwsgi_perl {
 	// check for Devel::StackTrace
 	int no_die_catch;
 	int stacktrace_available;
+
+	char *argv_items;
+	struct uwsgi_string_list *argv_item;
 
 	// this is a pointer to the main list of interpreters (required for signals, rpc....);
         PerlInterpreter **main;
@@ -40,6 +48,8 @@ struct uwsgi_perl {
 	
 	SV *postfork;
 	SV *atexit;
+
+	int loaded;
 };
 
 void init_perl_embedded_module(void);

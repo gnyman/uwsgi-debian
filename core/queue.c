@@ -47,6 +47,7 @@ void uwsgi_init_queue() {
 		// fix header
 		uwsgi.queue_header = uwsgi.queue;
 		uwsgi.queue += 16;
+		close(queue_fd);
 	}
 	else {
 		uwsgi.queue = mmap(NULL, (uwsgi.queue_blocksize * uwsgi.queue_size) + 16, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
@@ -65,7 +66,7 @@ void uwsgi_init_queue() {
 
 	uwsgi.queue_lock = uwsgi_rwlock_init("queue");
 
-	uwsgi_log("*** Queue subsystem initialized: %dMB preallocated ***\n", (uwsgi.queue_blocksize * uwsgi.queue_size) / (1024 * 1024));
+	uwsgi_log("*** Queue subsystem initialized: %luMB preallocated ***\n", (uwsgi.queue_blocksize * uwsgi.queue_size) / (1024 * 1024));
 }
 
 char *uwsgi_queue_get(uint64_t index, uint64_t * size) {

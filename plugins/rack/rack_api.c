@@ -36,14 +36,21 @@ VALUE rack_uwsgi_log(VALUE *class, VALUE msg) {
 }
 
 VALUE rack_uwsgi_i_am_the_spooler(VALUE *class) {
-#ifdef UWSGI_SPOOLER
         if (uwsgi.i_am_a_spooler) {
                 return Qtrue;
         }
-#endif
-
         return Qfalse;
 }
+
+#ifdef UWSGI_SSL
+VALUE rack_uwsgi_i_am_the_lord(VALUE *class, VALUE legion_name) {
+	Check_Type(legion_name, T_STRING);
+        if (uwsgi_legion_i_am_the_lord(RSTRING_PTR(legion_name))) {
+                return Qtrue;
+        }
+        return Qfalse;
+}
+#endif
 
 
 
@@ -261,144 +268,217 @@ VALUE rack_uwsgi_unlock(int argc, VALUE *argv, VALUE *class) {
 
 
 
-VALUE rack_uwsgi_cache_set(VALUE *class, VALUE rbkey, VALUE rbvalue) {
+VALUE rack_uwsgi_cache_set(int argc, VALUE *argv, VALUE *class) {
 
+	if (argc < 2) goto error;
 
-	Check_Type(rbkey, T_STRING);
-	Check_Type(rbvalue, T_STRING);
+	Check_Type(argv[0], T_STRING);
+	Check_Type(argv[1], T_STRING);
 
-        char *key = RSTRING_PTR(rbkey);
-	uint64_t keylen = RSTRING_LEN(rbkey);
-        char *value = RSTRING_PTR(rbvalue);
-	uint64_t vallen = RSTRING_LEN(rbvalue);
-
-        uint64_t expires = 0;
-
-        if (vallen > uwsgi.cache_blocksize) {
-                rb_raise(rb_eRuntimeError, "uWSGI cache items size must be < %llu, requested %llu bytes", (unsigned long long)uwsgi.cache_blocksize, (unsigned long long) vallen);
-		return Qnil;
-        }
-
-        uwsgi_wlock(uwsgi.cache_lock);
-        if (uwsgi_cache_set(key, keylen, value, vallen, expires, 0)) {
-        	uwsgi_rwunlock(uwsgi.cache_lock);
-		return Qnil;
-        }
-
-        uwsgi_rwunlock(uwsgi.cache_lock);
-        return Qtrue;
-
-}
-VALUE rack_uwsgi_cache_update(VALUE *class, VALUE rbkey, VALUE rbvalue) {
-
-
-	Check_Type(rbkey, T_STRING);
-	Check_Type(rbvalue, T_STRING);
-
-        char *key = RSTRING_PTR(rbkey);
-	uint64_t keylen = RSTRING_LEN(rbkey);
-        char *value = RSTRING_PTR(rbvalue);
-	uint64_t vallen = RSTRING_LEN(rbvalue);
+        char *key = RSTRING_PTR(argv[0]);
+	uint16_t keylen = RSTRING_LEN(argv[0]);
+        char *value = RSTRING_PTR(argv[1]);
+	uint64_t vallen = RSTRING_LEN(argv[1]);
 
         uint64_t expires = 0;
+	char *cache = NULL;
 
-        if (vallen > uwsgi.cache_blocksize) {
-                rb_raise(rb_eRuntimeError, "uWSGI cache items size must be < %llu, requested %llu bytes", (unsigned long long)uwsgi.cache_blocksize, (unsigned long long) vallen);
+	if (argc > 2) {
+		Check_Type(argv[2], T_FIXNUM);
+		expires = NUM2INT(argv[2]);
+		if (argc > 3) {
+			Check_Type(argv[3], T_STRING);
+			cache = RSTRING_PTR(argv[3]);
+		}
+	}
+
+        if (uwsgi_cache_magic_set(key, keylen, value, vallen, expires, 0, cache)) {
 		return Qnil;
         }
 
-        uwsgi_wlock(uwsgi.cache_lock);
-        if (uwsgi_cache_set(key, keylen, value, vallen, expires, UWSGI_CACHE_FLAG_UPDATE)) {
-        	uwsgi_rwunlock(uwsgi.cache_lock);
-		return Qnil;
-        }
-
-        uwsgi_rwunlock(uwsgi.cache_lock);
         return Qtrue;
+
+error:
+        rb_raise(rb_eArgError, "you need to specify a cache key and a cache value");
+        return Qnil;
 
 }
 
-VALUE rack_uwsgi_cache_set_exc(VALUE *class, VALUE rbkey, VALUE rbvalue) {
-	VALUE ret;
-	ret = rack_uwsgi_cache_set(class, rbkey, rbvalue);
+VALUE rack_uwsgi_cache_update(int argc, VALUE *argv, VALUE *class) {
+
+        if (argc < 2) goto error;
+
+        Check_Type(argv[0], T_STRING);
+        Check_Type(argv[1], T_STRING);
+
+        char *key = RSTRING_PTR(argv[0]);
+        uint16_t keylen = RSTRING_LEN(argv[0]);
+        char *value = RSTRING_PTR(argv[1]);
+        uint64_t vallen = RSTRING_LEN(argv[1]);
+
+        uint64_t expires = 0;
+        char *cache = NULL;
+
+        if (argc > 2) {
+                Check_Type(argv[2], T_FIXNUM);
+                expires = NUM2INT(argv[2]);
+                if (argc > 3) {
+                        Check_Type(argv[3], T_STRING);
+                        cache = RSTRING_PTR(argv[3]);
+                }
+        }
+
+        if (uwsgi_cache_magic_set(key, keylen, value, vallen, expires, UWSGI_CACHE_FLAG_UPDATE, cache)) {
+                return Qnil;
+        }
+
+        return Qtrue;
+
+error:
+        rb_raise(rb_eArgError, "you need to specify a cache key and a cache value");
+        return Qnil;
+
+}
+
+
+VALUE rack_uwsgi_cache_set_exc(int argc, VALUE *argv, VALUE *class) {
+	VALUE ret = rack_uwsgi_cache_set(argc, argv, class);
 	if (ret == Qnil) {
 		rb_raise(rb_eRuntimeError, "unable to set value in uWSGI cache");
 	}	
 	return ret;
 }
 
-VALUE rack_uwsgi_cache_update_exc(VALUE *class, VALUE rbkey, VALUE rbvalue) {
-	VALUE ret;
-	ret = rack_uwsgi_cache_update(class, rbkey, rbvalue);
+VALUE rack_uwsgi_cache_update_exc(int argc, VALUE *argv, VALUE *class) {
+	VALUE ret = rack_uwsgi_cache_update(argc, argv, class);
 	if (ret == Qnil) {
 		rb_raise(rb_eRuntimeError, "unable to update value in uWSGI cache");
 	}	
 	return ret;
 }
 
+VALUE rack_uwsgi_cache_del(int argc, VALUE *argv, VALUE *class) {
 
+        if (argc == 0) goto error;
 
+        Check_Type(argv[0], T_STRING);
+        char *key = RSTRING_PTR(argv[0]);
+        uint16_t keylen = RSTRING_LEN(argv[0]);
 
+        char *cache = NULL;
 
-VALUE rack_uwsgi_cache_del(VALUE *class, VALUE rbkey) {
-
-	Check_Type(rbkey, T_STRING);
-
-        char *key = RSTRING_PTR(rbkey);
-	size_t keylen = RSTRING_LEN(rbkey);
-	
-        uwsgi_wlock(uwsgi.cache_lock);
-        if (uwsgi_cache_del(key, keylen, 0)) {
-        	uwsgi_rwunlock(uwsgi.cache_lock);
-		return Qfalse;
+        if (argc > 1) {
+                Check_Type(argv[0], T_STRING);
+                cache = RSTRING_PTR(argv[0]);
         }
 
-        uwsgi_rwunlock(uwsgi.cache_lock);
-        return Qtrue;
-
-}
-
-
-VALUE rack_uwsgi_cache_exists(VALUE *class, VALUE rbkey) {
-
-	Check_Type(rbkey, T_STRING);
-
-        char *key = RSTRING_PTR(rbkey);
-	size_t keylen = RSTRING_LEN(rbkey);
-
-        if (uwsgi_cache_exists(key, keylen)) {
+        if (!uwsgi_cache_magic_del(key, keylen, cache)) {
                 return Qtrue;
         }
 
-        return Qfalse;
+        return Qnil;
 
+error:
+        rb_raise(rb_eArgError, "you need to specify a cache key");
+        return Qnil;
 }
 
-
-VALUE rack_uwsgi_cache_get(VALUE *class, VALUE rbkey) {
-
-	Check_Type(rbkey, T_STRING);
-
-        char *key = RSTRING_PTR(rbkey);
-	size_t keylen = RSTRING_LEN(rbkey);
-
-        uint64_t valsize;
-        char *value = NULL;
-
-        uwsgi_rlock(uwsgi.cache_lock);
-        value = uwsgi_cache_get(key, keylen, &valsize);
-        if (!value) {
-        	uwsgi_rwunlock(uwsgi.cache_lock);
-        	return Qnil;
+VALUE rack_uwsgi_cache_del_exc(int argc, VALUE *argv, VALUE *class) {
+        VALUE ret = rack_uwsgi_cache_del(argc, argv, class);
+        if (ret == Qnil) {
+                rb_raise(rb_eRuntimeError, "unable to delete object from uWSGI cache");
         }
-        VALUE res = rb_str_new(value, valsize);
-        uwsgi_rwunlock(uwsgi.cache_lock);
-        return res;
+        return ret;
+}
+
+
+
+VALUE rack_uwsgi_cache_exists(int argc, VALUE *argv, VALUE *class) {
+
+	if (argc == 0) goto error;
+
+	Check_Type(argv[0], T_STRING);
+	char *key = RSTRING_PTR(argv[0]);
+        uint16_t keylen = RSTRING_LEN(argv[0]);
+
+        char *cache = NULL;
+
+        if (argc > 1) {
+                Check_Type(argv[0], T_STRING);
+                cache = RSTRING_PTR(argv[0]);
+        }
+
+        if (uwsgi_cache_magic_exists(key, keylen, cache)) {
+                return Qtrue;
+        }
+
+        return Qnil;
+
+error:
+	rb_raise(rb_eArgError, "you need to specify a cache key");
+	return Qnil;
+}
+
+
+
+VALUE rack_uwsgi_cache_clear(int argc, VALUE *argv, VALUE *class) {
+
+	char *cache = NULL;
+
+	if (argc > 0) {
+		Check_Type(argv[0], T_STRING);
+		cache = RSTRING_PTR(argv[0]);
+	}
+
+        if (!uwsgi_cache_magic_clear(cache)) {
+                return Qtrue;
+        }
+
+        return Qnil;
+}
+
+VALUE rack_uwsgi_cache_clear_exc(int argc, VALUE *argv, VALUE *class) {
+        VALUE ret = rack_uwsgi_cache_clear(argc, argv, class);
+        if (ret == Qnil) {
+                rb_raise(rb_eRuntimeError, "unable to clear the uWSGI cache");
+        }
+        return ret;
+}
+
+
+
+VALUE rack_uwsgi_cache_get(int argc, VALUE *argv, VALUE *class) {
+
+	if (argc == 0) goto error;
+
+	Check_Type(argv[0], T_STRING);
+        char *key = RSTRING_PTR(argv[0]);
+        uint16_t keylen = RSTRING_LEN(argv[0]);
+
+	char *cache = NULL;
+
+	if (argc > 1) {
+		Check_Type(argv[1], T_STRING);
+                cache = RSTRING_PTR(argv[1]);
+	}
+
+        uint64_t vallen = 0;;
+        char *value = uwsgi_cache_magic_get(key, keylen, &vallen, NULL, cache);
+	if (value) {
+        	VALUE res = rb_str_new(value, vallen);
+		free(value);
+        	return res;
+	}
+	return Qnil;
+
+error:
+	rb_raise(rb_eArgError, "you need to specify a cache key");
+	return Qnil;
 
 }
-VALUE rack_uwsgi_cache_get_exc(VALUE *class, VALUE rbkey) {
-	VALUE ret;
-	ret = rack_uwsgi_cache_get(class, rbkey);
+
+VALUE rack_uwsgi_cache_get_exc(int argc, VALUE *argv, VALUE *class) {
+	VALUE ret = rack_uwsgi_cache_get(argc, argv, class);
 	if (ret == Qnil) {
 		rb_raise(rb_eRuntimeError, "unable to get value from uWSGI cache");
 	}	
@@ -470,6 +550,15 @@ VALUE rack_uwsgi_add_rb_timer(VALUE *class, VALUE rbsignum, VALUE secs) {
 }
 
 
+VALUE rack_uwsgi_alarm(VALUE *class, VALUE alarm, VALUE msg) {
+
+	Check_Type(alarm, T_STRING);
+	Check_Type(msg, T_STRING);
+
+	uwsgi_alarm_trigger(RSTRING_PTR(alarm), RSTRING_PTR(msg), RSTRING_LEN(msg));
+
+	return Qnil;
+}
 
 VALUE rack_uwsgi_add_file_monitor(VALUE *class, VALUE rbsignum, VALUE rbfilename) {
 
@@ -488,7 +577,6 @@ VALUE rack_uwsgi_add_file_monitor(VALUE *class, VALUE rbsignum, VALUE rbfilename
 }
 
 
-#ifdef UWSGI_ASYNC
 VALUE uwsgi_ruby_wait_fd_read(VALUE *class, VALUE arg1, VALUE arg2) {
 
 	Check_Type(arg1, T_FIXNUM);
@@ -500,8 +588,8 @@ VALUE uwsgi_ruby_wait_fd_read(VALUE *class, VALUE arg1, VALUE arg2) {
         int fd = NUM2INT(arg1);
         int timeout = NUM2INT(arg2);
 
-        if (fd >= 0) {
-                async_add_fd_read(wsgi_req, fd, timeout);
+        if (async_add_fd_read(wsgi_req, fd, timeout)) {
+		rb_raise(rb_eRuntimeError, "unable to add fd %d to the event queue", fd);
         }
 
         return Qtrue;
@@ -517,15 +605,12 @@ VALUE uwsgi_ruby_wait_fd_write(VALUE *class, VALUE arg1, VALUE arg2) {
         int fd = NUM2INT(arg1);
         int timeout = NUM2INT(arg2);
 
-        if (fd >= 0) {
-                async_add_fd_write(wsgi_req, fd, timeout);
+        if (async_add_fd_write(wsgi_req, fd, timeout)) {
+		rb_raise(rb_eRuntimeError, "unable to add fd %d to the event queue", fd);
         }
 
         return Qtrue;
 }
-#endif
-
-
 
 VALUE uwsgi_ruby_async_connect(VALUE *class, VALUE arg) {
 
@@ -537,7 +622,6 @@ VALUE uwsgi_ruby_async_connect(VALUE *class, VALUE arg) {
 }
 
 
-#ifdef UWSGI_ASYNC
 VALUE uwsgi_ruby_async_sleep(VALUE *class, VALUE arg) {
 
 	Check_Type(arg, T_FIXNUM);
@@ -551,7 +635,6 @@ VALUE uwsgi_ruby_async_sleep(VALUE *class, VALUE arg) {
 
         return Qtrue;
 }
-#endif
 
 VALUE uwsgi_ruby_masterpid(VALUE *class) {
 
@@ -665,14 +748,11 @@ VALUE uwsgi_ruby_do_rpc(int argc, VALUE *rpc_argv, VALUE *class) {
 
 	// response must always be freed
         char *response = uwsgi_do_rpc(node, func, argc - 2, argv, argvs, &size);
-
-        if (size > 0) {
+        if (response) {
                 VALUE ret = rb_str_new(response, size);
                 free(response);
                 return ret;
         }
-	free(response);
-
 clear:
 
         rb_raise(rb_eRuntimeError, "unable to call rpc function");
@@ -694,7 +774,7 @@ VALUE uwsgi_ruby_register_rpc(int argc, VALUE *argv, VALUE *class) {
         void *func = (void *) argv[1];
 
 
-        if (uwsgi_register_rpc(name, rack_plugin.modifier1, rb_argc, func)) {
+        if (uwsgi_register_rpc(name, &rack_plugin, rb_argc, func)) {
 clear:
                 rb_raise(rb_eRuntimeError, "unable to register rpc function");
                 return Qnil;
@@ -870,6 +950,74 @@ VALUE rack_uwsgi_send_spool(VALUE *class, VALUE args) {
 
 }
 
+VALUE uwsgi_ruby_websocket_handshake(int argc, VALUE *argv, VALUE *class) {
+
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+	if (argc < 1) {
+		rb_raise(rb_eRuntimeError, "you neeto specify a valid websocket key");
+		return Qnil;
+	}
+
+        Check_Type(argv[0], T_STRING);
+        char *key = RSTRING_PTR(argv[0]);
+        size_t key_len = RSTRING_LEN(argv[0]);
+
+	char *origin = NULL;
+	size_t origin_len = 0;
+
+	if (argc > 1) {
+		Check_Type(argv[1], T_STRING);
+		origin = RSTRING_PTR(argv[1]);
+        	origin_len = RSTRING_LEN(argv[1]);
+	}
+
+	if (uwsgi_websocket_handshake(wsgi_req, key, key_len, origin, origin_len)) {
+        	rb_raise(rb_eRuntimeError, "unable to complete websocket handshake");
+        }
+	return Qnil;
+}
+
+VALUE uwsgi_ruby_websocket_send(VALUE *class, VALUE *msg) {
+	Check_Type(msg, T_STRING);
+	char *message = RSTRING_PTR(msg);
+	size_t message_len = RSTRING_LEN(msg);
+	struct wsgi_request *wsgi_req = current_wsgi_req();
+	if (uwsgi_websocket_send(wsgi_req, message, message_len)) {
+                rb_raise(rb_eRuntimeError, "unable to send websocket message");
+        }
+	return Qnil;
+}
+
+VALUE uwsgi_ruby_websocket_recv(VALUE *class) {
+
+	struct wsgi_request *wsgi_req = current_wsgi_req();
+        struct uwsgi_buffer *ub = uwsgi_websocket_recv(wsgi_req);
+        if (!ub) {
+                rb_raise(rb_eRuntimeError, "unable to receive websocket message");
+		return Qnil;
+        }
+	VALUE ret = rb_str_new(ub->buf, ub->pos);
+	uwsgi_buffer_destroy(ub);
+	return ret;
+
+}
+
+VALUE uwsgi_ruby_websocket_recv_nb(VALUE *class) {
+
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+        struct uwsgi_buffer *ub = uwsgi_websocket_recv_nb(wsgi_req);
+        if (!ub) {
+                rb_raise(rb_eRuntimeError, "unable to receive websocket message");
+                return Qnil;
+        }
+        VALUE ret = rb_str_new(ub->buf, ub->pos);
+        uwsgi_buffer_destroy(ub);
+        return ret;
+
+}
+
+
 
 
 void uwsgi_rack_init_api() {
@@ -877,11 +1025,9 @@ void uwsgi_rack_init_api() {
 	VALUE rb_uwsgi_embedded = rb_define_module("UWSGI");
         uwsgi_rack_api("suspend", uwsgi_ruby_suspend, 0);
         uwsgi_rack_api("masterpid", uwsgi_ruby_masterpid, 0);
-#ifdef UWSGI_ASYNC
         uwsgi_rack_api("async_sleep", uwsgi_ruby_async_sleep, 1);
         uwsgi_rack_api("wait_fd_read", uwsgi_ruby_wait_fd_read, 2);
         uwsgi_rack_api("wait_fd_write", uwsgi_ruby_wait_fd_write, 2);
-#endif
         uwsgi_rack_api("async_connect", uwsgi_ruby_async_connect, 1);
         uwsgi_rack_api("signal", uwsgi_ruby_signal, -1);
         uwsgi_rack_api("register_signal", uwsgi_ruby_register_signal, 3);
@@ -893,6 +1039,13 @@ void uwsgi_rack_init_api() {
         uwsgi_rack_api("add_timer", rack_uwsgi_add_timer, 2);
         uwsgi_rack_api("add_rb_timer", rack_uwsgi_add_rb_timer, 2);
         uwsgi_rack_api("add_file_monitor", rack_uwsgi_add_file_monitor, 2);
+
+        uwsgi_rack_api("alarm", rack_uwsgi_alarm, 2);
+
+        uwsgi_rack_api("websocket_handshake", uwsgi_ruby_websocket_handshake, -1);
+        uwsgi_rack_api("websocket_send", uwsgi_ruby_websocket_send, 1);
+        uwsgi_rack_api("websocket_recv", uwsgi_ruby_websocket_recv, 0);
+        uwsgi_rack_api("websocket_recv_nb", uwsgi_ruby_websocket_recv_nb, 0);
 
         uwsgi_rack_api("setprocname", rack_uwsgi_setprocname, 1);
         uwsgi_rack_api("mem", rack_uwsgi_mem, 0);
@@ -918,19 +1071,24 @@ void uwsgi_rack_init_api() {
 
         uwsgi_rack_api("rpc", uwsgi_ruby_do_rpc, -1);
 
+
+#ifdef UWSGI_SSL
+	uwsgi_rack_api("i_am_the_lord", rack_uwsgi_i_am_the_lord, 1);
+#endif
 	
 
-	if (uwsgi.cache_max_items > 0) {
-        	uwsgi_rack_api("cache_get", rack_uwsgi_cache_get, 1);
-        	uwsgi_rack_api("cache_get!", rack_uwsgi_cache_get_exc, 1);
-        	uwsgi_rack_api("cache_exists", rack_uwsgi_cache_exists, 1);
-        	uwsgi_rack_api("cache_exists?", rack_uwsgi_cache_exists, 1);
-        	uwsgi_rack_api("cache_del", rack_uwsgi_cache_del, 1);
-        	uwsgi_rack_api("cache_set", rack_uwsgi_cache_set, 2);
-        	uwsgi_rack_api("cache_set!", rack_uwsgi_cache_set_exc, 2);
-        	uwsgi_rack_api("cache_update", rack_uwsgi_cache_update, 2);
-        	uwsgi_rack_api("cache_update!", rack_uwsgi_cache_update_exc, 2);
-	}
+        uwsgi_rack_api("cache_get", rack_uwsgi_cache_get, -1);
+        uwsgi_rack_api("cache_get!", rack_uwsgi_cache_get_exc, -1);
+        uwsgi_rack_api("cache_exists", rack_uwsgi_cache_exists, -1);
+        uwsgi_rack_api("cache_exists?", rack_uwsgi_cache_exists, -1);
+        uwsgi_rack_api("cache_del", rack_uwsgi_cache_del, -1);
+        uwsgi_rack_api("cache_del!", rack_uwsgi_cache_del_exc, -1);
+        uwsgi_rack_api("cache_set", rack_uwsgi_cache_set, -1);
+        uwsgi_rack_api("cache_set!", rack_uwsgi_cache_set_exc, -1);
+        uwsgi_rack_api("cache_update", rack_uwsgi_cache_update, -1);
+        uwsgi_rack_api("cache_update!", rack_uwsgi_cache_update_exc, -1);
+        uwsgi_rack_api("cache_clear", rack_uwsgi_cache_clear, -1);
+        uwsgi_rack_api("cache_clear!", rack_uwsgi_cache_clear_exc, -1);
 
         VALUE uwsgi_rb_opt_hash = rb_hash_new();
         int i;
