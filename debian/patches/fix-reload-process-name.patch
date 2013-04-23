@@ -5,12 +5,12 @@ Description: Preserve process name on reload
  name start-stop-daemon, used in init scripts, is unable to control the
  daemon.
 Author: Janos Guljas <janos@debian.org>
-Last-Update: 2013-01-27
+Last-Update: 2013-04-23
 
 --- a/core/master_utils.c
 +++ b/core/master_utils.c
-@@ -310,7 +310,7 @@ void uwsgi_reload(char **argv) {
- #else
+@@ -425,7 +425,7 @@ void uwsgi_reload(char **argv) {
+ 
  	uwsgi_log("running %s\n", uwsgi.binary_path);
  	uwsgi_flush_logs();
 -	argv[0] = uwsgi.binary_path;
@@ -18,7 +18,7 @@ Last-Update: 2013-01-27
  	//strcpy (argv[0], uwsgi.binary_path);
  	if (uwsgi.log_master) {
  		if (uwsgi.original_log_fd > -1) {
-@@ -324,7 +324,7 @@ void uwsgi_reload(char **argv) {
+@@ -439,7 +439,7 @@ void uwsgi_reload(char **argv) {
  			close(uwsgi.shared->worker_log_pipe[1]);
  		}
  	}

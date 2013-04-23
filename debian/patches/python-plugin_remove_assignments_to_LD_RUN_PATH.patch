@@ -4,11 +4,11 @@ Description: Remove value assignments to environment variable LD_RUN_PATH
  .
  And then Lintian reports about error (E: binary-or-shlib-defines-rpath).
 Author: Janos Guljas <janos@debian.org>
-Last-Update: 2013-02-07
+Last-Update: 2013-04-23
 
 --- a/plugins/python/uwsgiplugin.py
 +++ b/plugins/python/uwsgiplugin.py
-@@ -20,10 +20,8 @@ if not 'UWSGI_PYTHON_NOLIB' in os.enviro
+@@ -48,10 +48,8 @@ if not 'UWSGI_PYTHON_NOLIB' in os.enviro
      else:
          try:
              LDFLAGS.append("-L%s" % sysconfig.get_config_var('LIBDIR'))
@@ -17,5 +17,5 @@ Last-Update: 2013-02-07
              LDFLAGS.append("-L%s/lib" % sysconfig.PREFIX)
 -            os.environ['LD_RUN_PATH'] = "%s/lib" % sysconfig.PREFIX
  
- 
-     version = sysconfig.get_config_var('VERSION')
+         LIBS.append('-lpython%s' % get_python_version())
+ else:

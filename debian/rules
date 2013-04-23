@@ -684,16 +684,3 @@ binary-install/python3-uwsgidecorators::
 		$(CURDIR)/debian/$(cdbs_curpkg)/$(PYPKG_DESTDIR)/uwsgidecorators.py
 	dh_python3 -p $(cdbs_curpkg)
 
-
-DEB_UPSTREAM_VERSION=$(shell dpkg-parsechangelog | sed -rne 's,^Version: ([^+]+).*,\1,p')
-get-orig-source:
-	uscan --noconf --force-download --rename --download-current-version --destdir=.
-	rm -rf uwsgi-$(DEB_UPSTREAM_VERSION)
-	tar -xf uwsgi_$(DEB_UPSTREAM_VERSION).orig.tar.gz
-	rm uwsgi_$(DEB_UPSTREAM_VERSION).orig.tar.gz
-	rm uwsgi-$(DEB_UPSTREAM_VERSION)/uwsgicc/static/js/jquery*.min.js
-	mv uwsgi-$(DEB_UPSTREAM_VERSION) uwsgi-$(DEB_UPSTREAM_VERSION).orig
-	GZIP=--best tar -cz --owner root --group root --mode a+rX \
-		-f uwsgi_$(DEB_UPSTREAM_VERSION)+dfsg.orig.tar.gz \
-		uwsgi-$(DEB_UPSTREAM_VERSION).orig
-	rm -r uwsgi-$(DEB_UPSTREAM_VERSION).orig

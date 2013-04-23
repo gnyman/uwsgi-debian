@@ -1,11 +1,11 @@
 Description: Include libphp5-embed ld library path when building PHP plugin.
 Author: Janos Guljas <janos@debian.org>
-Last-Update: 2012-02-07
+Last-Update: 2012-04-23
 
 --- a/plugins/php/uwsgiplugin.py
 +++ b/plugins/php/uwsgiplugin.py
-@@ -20,6 +20,7 @@
- CFLAGS = [os.popen(PHPPATH + ' --includes').read().rstrip(), '-Wno-error=sign-compare']
+@@ -20,6 +20,7 @@ except:
+ CFLAGS = [os.popen(PHPPATH + ' --includes').read().rstrip(), '-Wno-sign-compare']
  
  LDFLAGS = os.popen(PHPPATH + ' --ldflags').read().rstrip().split()
 +LDFLAGS.append('-L/usr/lib/php5')

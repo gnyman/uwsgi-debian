@@ -1,6 +1,9 @@
-uwsgi (1.4.5+dfsg-1) UNRELEASED; urgency=low
+uwsgi (1.9.8-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Upstream version does not contain minfied JavaScript files:
+    - Drop dfsg sufix from version.
+    - Remove get-orig-source target from debian/rules.
   * Update debian/copyright:
     - Remove references to removed files lib/rbtree.c and lib/rbtree.h.
   * debian/control:
@@ -16,6 +19,10 @@ uwsgi (1.4.5+dfsg-1) UNRELEASED; urgency=low
      - Include php5-embed ld library path when building PHP plugin.
   * debian/patches/remove-php-libs.patch
      - Remove PHP libraries when building PHP plugin.
+  * Update debian/patches/fix-reload-process-name.patch to apply cleanly.
+  * Update debian/patches/python-plugin_remove_assignments_to_LD_RUN_PATH.patch
+    to apply cleanly.
+  * Update debian/patches/fix-php-ldflags.patch to apply cleanly.
   * New binary package uwsgi-plugin-alarm-curl:
      - New Build-Depends libcurl4-openssl-dev.
      - Add alarm option to buildconf/uwsgi-core.ini.
