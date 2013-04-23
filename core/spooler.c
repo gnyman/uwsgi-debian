@@ -1,4 +1,3 @@
-#ifdef UWSGI_SPOOLER
 #include "uwsgi.h"
 
 extern struct uwsgi_server uwsgi;
@@ -109,7 +108,6 @@ pid_t spooler_start(struct uwsgi_spooler * uspool) {
                 signal(SIGSTOP, SIG_IGN);
                 signal(SIGTSTP, SIG_IGN);
 
-		uwsgi.mywid = -1;
 		uwsgi.mypid = getpid();
 		uspool->pid = uwsgi.mypid;
 		// avoid race conditions !!!
@@ -255,7 +253,7 @@ int spool_request(struct uwsgi_spooler *uspool, char *filename, int rn, int core
 	close(fd);
 
 	if (!uwsgi.spooler_quiet)
-		uwsgi_log("[spooler] written %d bytes to file %s\n", size + body_len + 4, filename);
+		uwsgi_log("[spooler] written %lu bytes to file %s\n", (unsigned long) size + body_len + 4, filename);
 
 	// and here waiting threads can continue
 	uwsgi_unlock(uspool->lock);
@@ -548,7 +546,7 @@ void spooler_manage_task(struct uwsgi_spooler *uspool, char *dir, char *task) {
 					uspool->tasks++;
 					if (ret == -2) {
 						if (!uwsgi.spooler_quiet)
-							uwsgi_log("[spooler %s pid: %d] done with task %s after %d seconds\n", uspool->dir, (int) uwsgi.mypid, task, uwsgi_now() - now);
+							uwsgi_log("[spooler %s pid: %d] done with task %s after %lld seconds\n", uspool->dir, (int) uwsgi.mypid, task, (long long) uwsgi_now() - now);
 						destroy_spool(dir, task);
 					}
 					// re-spool it
@@ -584,7 +582,3 @@ void spooler_manage_task(struct uwsgi_spooler *uspool, char *dir, char *task) {
 		}
 	}
 }
-
-#else
-#warning "*** Spooler support is disabled ***"
-#endif

@@ -13,7 +13,7 @@ extern struct uwsgi_server uwsgi;
 
 void uwsgi_json_config(char *file, char *magic_table[]) {
 
-	int len = 0;
+	size_t len = 0;
 	char *json_data;
 
 
@@ -45,7 +45,7 @@ void uwsgi_json_config(char *file, char *magic_table[]) {
 		}
 	}
 
-	uwsgi_log("[uWSGI] getting JSON configuration from %s\n", file);
+	uwsgi_log_initial("[uWSGI] getting JSON configuration from %s\n", file);
 
 	json_data = uwsgi_open_and_read(file, &len, 1, magic_table);
 

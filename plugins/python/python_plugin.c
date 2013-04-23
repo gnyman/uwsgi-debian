@@ -3,17 +3,9 @@
 extern struct uwsgi_server uwsgi;
 struct uwsgi_python up;
 
-extern struct http_status_codes hsc[];
-
 #include <glob.h>
 
 extern PyTypeObject uwsgi_InputType;
-
-void python_simple_hook_write_string(struct wsgi_request *wsgi_req, PyObject *str) {
-	UWSGI_RELEASE_GIL
-        wsgi_req->response_size += wsgi_req->socket->proto_write(wsgi_req, PyString_AsString(str), PyString_Size(str));
-	UWSGI_GET_GIL
-}
 
 void uwsgi_opt_pythonpath(char *opt, char *value, void *foobar) {
 
@@ -33,7 +25,12 @@ void uwsgi_opt_pythonpath(char *opt, char *value, void *foobar) {
 void uwsgi_opt_pyshell(char *opt, char *value, void *foobar) {
 
 	uwsgi.honour_stdin = 1;
-	up.pyshell = 1;
+	if (value) {
+		up.pyshell = value;
+	}
+	else {
+		up.pyshell = "";
+	}
 
 	if (!strcmp("pyshell-oneshot", opt)) {
 		up.pyshell_oneshot = 1;
@@ -63,7 +60,6 @@ void uwsgi_opt_pyver(char *opt, char *foo, void *bar) {
 }
 
 
-#ifdef UWSGI_INI
 void uwsgi_opt_ini_paste(char *opt, char *value, void *foobar) {
 
 	uwsgi_opt_load_ini(opt, value, NULL);
@@ -80,7 +76,6 @@ void uwsgi_opt_ini_paste(char *opt, char *value, void *foobar) {
 	}
 	
 }
-#endif
 
 struct uwsgi_option uwsgi_python_options[] = {
 	{"wsgi-file", required_argument, 0, "load .wsgi file", uwsgi_opt_set_str, &up.file_config, 0},
@@ -129,22 +124,21 @@ struct uwsgi_option uwsgi_python_options[] = {
 	{"web3", required_argument, 0, "load a web3 app", uwsgi_opt_set_str, &up.web3, 0},
 	{"pump", required_argument, 0, "load a pump app", uwsgi_opt_set_str, &up.pump, 0},
 	{"wsgi-lite", required_argument, 0, "load a wsgi-lite app", uwsgi_opt_set_str, &up.wsgi_lite, 0},
-#ifdef UWSGI_INI
 	{"ini-paste", required_argument, 0, "load a paste.deploy config file containing uwsgi section", uwsgi_opt_ini_paste, NULL, UWSGI_OPT_IMMEDIATE},
 	{"ini-paste-logged", required_argument, 0, "load a paste.deploy config file containing uwsgi section (load loggers too)", uwsgi_opt_ini_paste, NULL, UWSGI_OPT_IMMEDIATE},
-#endif
 	{"reload-os-env", no_argument, 0, "force reload of os.environ at each request", uwsgi_opt_true, &up.reload_os_env, 0},
+#ifndef __CYGWIN__
 #ifndef UWSGI_PYPY
 	{"no-site", no_argument, 0, "do not import site module", uwsgi_opt_true, &Py_NoSiteFlag, 0},
 #endif
-	{"pyshell", no_argument, 0, "run an interactive python shell in the uWSGI environment", uwsgi_opt_pyshell, NULL, 0},
-	{"pyshell-oneshot", no_argument, 0, "run an interactive python shell in the uWSGI environment (one-shot variant)", uwsgi_opt_pyshell, NULL, 0},
+#endif
+	{"pyshell", optional_argument, 0, "run an interactive python shell in the uWSGI environment", uwsgi_opt_pyshell, NULL, 0},
+	{"pyshell-oneshot", optional_argument, 0, "run an interactive python shell in the uWSGI environment (one-shot variant)", uwsgi_opt_pyshell, NULL, 0},
 
 	{"python", required_argument, 0, "run a python script in the uWSGI environment", uwsgi_opt_pyrun, NULL, 0},
 	{"py", required_argument, 0, "run a python script in the uWSGI environment", uwsgi_opt_pyrun, NULL, 0},
 	{"pyrun", required_argument, 0, "run a python script in the uWSGI environment", uwsgi_opt_pyrun, NULL, 0},
 
-#ifdef UWSGI_THREADING
 #ifndef UWSGI_PYPY
 	{"py-tracebacker", required_argument, 0, "enable the uWSGI python tracebacker", uwsgi_opt_set_str, &up.tracebacker, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
 #endif
@@ -153,7 +147,6 @@ struct uwsgi_option uwsgi_python_options[] = {
 	{"python-auto-reload", required_argument, 0, "monitor python modules mtime to trigger reload (use only in development)", uwsgi_opt_set_int, &up.auto_reload, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
 	{"python-autoreload", required_argument, 0, "monitor python modules mtime to trigger reload (use only in development)", uwsgi_opt_set_int, &up.auto_reload, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
 	{"py-auto-reload-ignore", required_argument, 0, "ignore the specified module during auto-reload scan (can be specified multiple times)", uwsgi_opt_add_string_list, &up.auto_reload_ignore, UWSGI_OPT_THREADS|UWSGI_OPT_MASTER},
-#endif
 
 	{"wsgi-env-behaviour", required_argument, 0, "set the strategy for allocating/deallocating the WSGI env", uwsgi_opt_set_str, &up.wsgi_env_behaviour, 0},
 	{"wsgi-env-behavior", required_argument, 0, "set the strategy for allocating/deallocating the WSGI env", uwsgi_opt_set_str, &up.wsgi_env_behaviour, 0},
@@ -257,10 +250,6 @@ pep405:
 	up.wsgi_spitout = PyCFunction_New(uwsgi_spit_method, NULL);
 	up.wsgi_writeout = PyCFunction_New(uwsgi_write_method, NULL);
 
-	up.hook_write_string = python_simple_hook_write_string;
-	up.hook_wsgi_input_read = uwsgi_python_hook_simple_input_read;
-	up.hook_wsgi_input_readline = uwsgi_python_hook_simple_input_readline;
-
 	up.main_thread = PyThreadState_Get();
 
         // by default set a fake GIL (little impact on performance)
@@ -306,22 +295,19 @@ void uwsgi_python_reset_random_seed() {
 
 void uwsgi_python_atexit() {
 
-	if (uwsgi.mywid == -1) goto realstuff;
+	if (uwsgi.mywid == 0) goto realstuff;
 
 	// if hijacked do not run atexit hooks
 	if (uwsgi.workers[uwsgi.mywid].hijacked)
 		return;
 
 	// if busy do not run atexit hooks
-	if (uwsgi.workers[uwsgi.mywid].busy)
+	if (uwsgi_worker_is_busy(uwsgi.mywid))
 		return;
 
-#ifdef UWSGI_ASYNC
 	// managing atexit in async mode is a real pain...skip it for now
 	if (uwsgi.async > 1)
 		return;
-#endif
-
 realstuff:
 
 	// this time we use this higher level function
@@ -335,7 +321,6 @@ realstuff:
 	PyGILState_Ensure();
 
 	// no need to worry about freeing memory
-#ifdef UWSGI_EMBEDDED
 	PyObject *uwsgi_dict = get_uwsgi_pydict("uwsgi");
 	if (uwsgi_dict) {
 		PyObject *ae = PyDict_GetItemString(uwsgi_dict, "atexit");
@@ -343,7 +328,6 @@ realstuff:
 			python_call(ae, PyTuple_New(0), 0, NULL);
 		}
 	}
-#endif
 
 	// this part is a 1:1 copy of mod_wsgi 3.x
         // it is required to fix some atexit bug with python 3
@@ -361,15 +345,12 @@ realstuff:
 
 void uwsgi_python_post_fork() {
 
-#ifdef UWSGI_SPOOLER
 	if (uwsgi.i_am_a_spooler) {
 		UWSGI_GET_GIL
 	}	
-#endif
 
 	uwsgi_python_reset_random_seed();
 
-#ifdef UWSGI_EMBEDDED
 	// call the post_fork_hook
 	PyObject *uwsgi_dict = get_uwsgi_pydict("uwsgi");
 	if (uwsgi_dict) {
@@ -379,10 +360,8 @@ void uwsgi_python_post_fork() {
 		}
 	}
 	PyErr_Clear();
-#endif
 
 	if (uwsgi.mywid > 0) {
-#ifdef UWSGI_THREADING
 		if (up.auto_reload) {
 			// spawn the reloader thread
 			pthread_t par_tid;
@@ -394,7 +373,6 @@ void uwsgi_python_post_fork() {
 			pthread_t ptb_tid;
 			pthread_create(&ptb_tid, NULL, uwsgi_python_tracebacker_thread, NULL);
 		}
-#endif
 #endif
 	}
 
@@ -455,7 +433,7 @@ PyObject *uwsgi_pyimport_by_filename(char *name, char *filename) {
 		fclose(pyfile);
 	}
 	else {
-		int pycontent_size = 0;
+		size_t pycontent_size = 0;
 		char *pycontent = uwsgi_open_and_read(filename, &pycontent_size, 1, NULL);
 
 		if (pycontent) {
@@ -581,7 +559,6 @@ next:
 
 
 
-#ifdef UWSGI_EMBEDDED
 PyDoc_STRVAR(uwsgi_py_doc, "uWSGI api module.");
 
 #ifdef PYTHREE
@@ -601,7 +578,11 @@ void init_uwsgi_embedded_module() {
 	PyObject *new_uwsgi_module, *zero;
 	int i;
 
-	PyType_Ready(&uwsgi_InputType);
+	if (PyType_Ready(&uwsgi_InputType) < 0) {
+		PyErr_Print();
+		uwsgi_log("could not initialize the uwsgi python module\n");
+		exit(1);
+	}
 
 	/* initialize for stats */
 	up.workers_tuple = PyTuple_New(uwsgi.numproc);
@@ -676,7 +657,6 @@ void init_uwsgi_embedded_module() {
 		}
 	}
 
-#ifdef UWSGI_SPOOLER
 	if (uwsgi.spoolers) {
 		int sc = 0;
 		struct uwsgi_spooler *uspool = uwsgi.spoolers;
@@ -698,9 +678,6 @@ void init_uwsgi_embedded_module() {
                 	exit(1);
         	}
 	}
-#endif
-
-
 
 	if (PyDict_SetItemString(up.embedded_dict, "SPOOL_RETRY", PyInt_FromLong(-1))) {
 		PyErr_Print();
@@ -848,43 +825,30 @@ void init_uwsgi_embedded_module() {
 		exit(1);
 	}
 
-	if (PyDict_SetItemString(up.embedded_dict, "message_manager_marshal", Py_None)) {
-		PyErr_Print();
-		exit(1);
-	}
-
 	init_uwsgi_module_advanced(new_uwsgi_module);
 
-#ifdef UWSGI_SPOOLER
 	if (uwsgi.spoolers) {
 		init_uwsgi_module_spooler(new_uwsgi_module);
 	}
-#endif
-
 
 	if (uwsgi.sharedareasize > 0 && uwsgi.sharedarea) {
 		init_uwsgi_module_sharedarea(new_uwsgi_module);
 	}
 
-	if (uwsgi.cache_max_items > 0) {
-		init_uwsgi_module_cache(new_uwsgi_module);
-	}
+	init_uwsgi_module_cache(new_uwsgi_module);
 
 	if (uwsgi.queue_size > 0) {
 		init_uwsgi_module_queue(new_uwsgi_module);
 	}
 
-#ifdef UWSGI_SNMP
 	if (uwsgi.snmp) {
 		init_uwsgi_module_snmp(new_uwsgi_module);
 	}
-#endif
 
 	if (up.extension) {
 		up.extension();
 	}
 }
-#endif
 
 
 
@@ -1000,15 +964,9 @@ void uwsgi_python_spooler_init(void) {
 // from a python-programmer point of view it is a hack/cheat but it does not violate the WSGI standard
 // and it is a bit faster than the "holy" allocator
 void *uwsgi_python_create_env_cheat(struct wsgi_request *wsgi_req, struct uwsgi_app *wi) {
-#ifdef UWSGI_ASYNC
         wsgi_req->async_args = wi->args[wsgi_req->async_id];
 	Py_INCREF((PyObject *)wi->environ[wsgi_req->async_id]);
 	return wi->environ[wsgi_req->async_id];
-#else
-        wsgi_req->async_args = wi->args;
-	Py_INCREF((PyObject *)wi->environ);
-	return wi->environ;
-#endif
 }
 
 void uwsgi_python_destroy_env_cheat(struct wsgi_request *wsgi_req) {
@@ -1050,14 +1008,10 @@ void uwsgi_python_preinit_apps() {
 
 	init_pyargv();
 
-#ifdef UWSGI_EMBEDDED
         init_uwsgi_embedded_module();
-#endif
 
 #ifdef __linux__
-#ifdef UWSGI_EMBEDDED
 	uwsgi_init_symbol_import();
-#endif
 #endif
 
         if (up.test_module != NULL) {
@@ -1100,8 +1054,6 @@ void uwsgi_python_preinit_apps() {
 
 void uwsgi_python_init_apps() {
 
-	struct http_status_codes *http_sc;
-
 	// lazy ?
 	if (uwsgi.mywid > 0) {
 		UWSGI_GET_GIL;
@@ -1116,9 +1068,7 @@ void uwsgi_python_init_apps() {
 #endif
 
         // setup app loaders
-#ifdef UWSGI_MINTERPRETERS
         up.loaders[LOADER_DYN] = uwsgi_dyn_loader;
-#endif
         up.loaders[LOADER_UWSGI] = uwsgi_uwsgi_loader;
         up.loaders[LOADER_FILE] = uwsgi_file_loader;
         up.loaders[LOADER_PASTE] = uwsgi_paste_loader;
@@ -1197,10 +1147,6 @@ next:
 	}
 	if (up.pump != NULL) {
 		init_uwsgi_app(LOADER_UWSGI, up.pump, uwsgi.wsgi_req, up.main_thread, PYTHON_APP_TYPE_PUMP);
-		// filling http status codes
-        	for (http_sc = hsc; http_sc->message != NULL; http_sc++) {
-                	http_sc->message_size = (int) strlen(http_sc->message);
-        	}
 	}
 	if (up.wsgi_lite != NULL) {
 		init_uwsgi_app(LOADER_UWSGI, up.wsgi_lite, uwsgi.wsgi_req, up.main_thread, PYTHON_APP_TYPE_WSGI_LITE);
@@ -1217,7 +1163,6 @@ next:
 	}
 #endif
 
-#ifdef UWSGI_EMBEDDED
 	PyObject *uwsgi_dict = get_uwsgi_pydict("uwsgi");
         if (uwsgi_dict) {
                 up.after_req_hook = PyDict_GetItemString(uwsgi_dict, "after_req_hook");
@@ -1227,8 +1172,6 @@ next:
 			Py_INCREF(up.after_req_hook_args);
 		}
 	}
-#endif
-
 	// lazy ?
 	if (uwsgi.mywid > 0) {
 		UWSGI_RELEASE_GIL;
@@ -1330,7 +1273,6 @@ void uwsgi_python_init_thread(int core_id) {
 
 }
 
-#ifdef UWSGI_THREADING
 int uwsgi_check_python_mtime(PyObject *times_dict, char *filename) {
 	struct stat st;
 
@@ -1474,7 +1416,6 @@ void *uwsgi_python_autoreloader_thread(void *foobar) {
 
 	return NULL;
 }
-#endif
 
 #ifndef UWSGI_PYPY
 void uwsgi_python_suspend(struct wsgi_request *wsgi_req) {
@@ -1752,11 +1693,17 @@ void uwsgi_python_hijack(void) {
 			}
 		}
 		UWSGI_GET_GIL;
-		PyImport_ImportModule("readline");
+		int ret = -1;
+		if (up.pyshell[0] != 0) {
+			ret = PyRun_SimpleString(up.pyshell);
+		}
+		else {
+			PyImport_ImportModule("readline");
 
 #ifndef UWSGI_PYPY
-		int ret = PyRun_InteractiveLoop(stdin, "uwsgi");
-
+			ret = PyRun_InteractiveLoop(stdin, "uwsgi");
+#endif
+		}
 		if (up.pyshell_oneshot) {
 			exit(UWSGI_DE_HIJACKED_CODE);
 		}
@@ -1764,7 +1711,6 @@ void uwsgi_python_hijack(void) {
 		if (ret == 0) {
 			exit(UWSGI_QUIET_CODE);
 		}
-#endif
 		exit(0);
 	}
 }
@@ -1817,7 +1763,7 @@ void uwsgi_python_harakiri(int wid) {
 		char *address = uwsgi_concat2(up.tracebacker, uwsgi_num2str(wid));
 
         	int fd = uwsgi_connect(address, -1, 0);
-        	for (;;) {
+        	while (fd >= 0) {
                 	int ret = uwsgi_waitfd(fd, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
                 	if (ret <= 0) {
 				break;
@@ -1927,6 +1873,12 @@ struct uwsgi_plugin pypy_plugin = {
 	.atexit = uwsgi_python_atexit,
 
 	.code_string = uwsgi_python_code_string,
+
+	.exception_class = uwsgi_python_exception_class,
+	.exception_msg = uwsgi_python_exception_msg,
+	.exception_repr = uwsgi_python_exception_repr,
+	.exception_log = uwsgi_python_exception_log,
+	.backtrace = uwsgi_python_backtrace,
 
 
 };

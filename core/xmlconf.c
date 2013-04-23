@@ -20,7 +20,7 @@ void uwsgi_xml_config(char *filename, struct wsgi_request *wsgi_req, char *magic
 
 	char *xml_id;
 	char *xml_content;
-	int xml_size = 0;
+	size_t xml_size = 0;
 
 	if (uwsgi_check_scheme(filename)) {
 		colon = uwsgi_get_last_char(filename, '/');
@@ -47,7 +47,7 @@ void uwsgi_xml_config(char *filename, struct wsgi_request *wsgi_req, char *magic
 		exit(1);
 	}
 
-	uwsgi_log("[uWSGI] parsing config file %s\n", filename);
+	uwsgi_log_initial("[uWSGI] parsing config file %s\n", filename);
 
 	element = xmlDocGetRootElement(doc);
 	if (element == NULL) {
@@ -221,7 +221,7 @@ void uwsgi_xml_config(char *filename, struct wsgi_request *wsgi_req, char *magic
 	char *colon;
 
 	char *xml_content;
-	int xml_size = 0;
+	size_t xml_size = 0;
 	int done = 0;
 
 	if (uwsgi_check_scheme(filename)) {

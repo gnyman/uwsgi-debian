@@ -56,6 +56,7 @@ void uwsgi_mule(int id) {
 		// avoid race conditions
 		uwsgi.mules[id - 1].id = id;
 		uwsgi.mules[id - 1].pid = getpid();
+		uwsgi.mypid = uwsgi.mules[id - 1].pid;
 
 		uwsgi_fixup_fds(0, id, NULL);
 
@@ -81,7 +82,7 @@ void uwsgi_mule(int id) {
 			for (i = 0; i < 256; i++) {
 				if (uwsgi.p[i]->mule) {
 					if (uwsgi.p[i]->mule(uwsgi.mules[id - 1].patch) == 1) {
-						// never here
+						// never here ?
 						end_me(1);
 					}
 				}
@@ -183,6 +184,7 @@ void uwsgi_mule_handler() {
 		if (interesting_fd == uwsgi.signal_socket || interesting_fd == uwsgi.my_signal_socket || farm_has_signaled(interesting_fd)) {
 			len = read(interesting_fd, &uwsgi_signal, 1);
 			if (len <= 0) {
+				if (len < 0 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)) continue;
 				uwsgi_log_verbose("uWSGI mule %d braying: my master died, i will follow him...\n", uwsgi.muleid);
 				end_me(0);
 			}
@@ -196,7 +198,9 @@ void uwsgi_mule_handler() {
 		else if (interesting_fd == uwsgi.mules[uwsgi.muleid - 1].queue_pipe[1] || interesting_fd == uwsgi.shared->mule_queue_pipe[1] || farm_has_msg(interesting_fd)) {
 			len = read(interesting_fd, message, 65536);
 			if (len < 0) {
-				uwsgi_error("read()");
+				if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
+					uwsgi_error("uwsgi_mule_handler/read()");
+				}
 			}
 			else {
 				int i, found = 0;
@@ -209,7 +213,7 @@ void uwsgi_mule_handler() {
 					}
 				}
 				if (!found)
-					uwsgi_log("*** mule %d received a %d bytes message ***\n", uwsgi.muleid, len);
+					uwsgi_log("*** mule %d received a %ld bytes message ***\n", uwsgi.muleid, (long) len);
 			}
 		}
 	}
@@ -342,6 +346,7 @@ next:
 				if (interesting_fd > -1) {
 					len = read(interesting_fd, &uwsgi_signal, 1);
 					if (len <= 0) {
+						if (len < 0 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)) goto clear;
 						uwsgi_log_verbose("uWSGI mule %d braying: my master died, i will follow him...\n", uwsgi.muleid);
 						end_me(0);
 					}
@@ -349,7 +354,7 @@ next:
 					uwsgi_log_verbose("master sent signal %d to mule %d\n", uwsgi_signal, uwsgi.muleid);
 #endif
 					if (uwsgi_signal_handler(uwsgi_signal)) {
-						uwsgi_log_verbose("error managing signal %d on mule %d\n", uwsgi_signal, uwsgi.mywid);
+						uwsgi_log_verbose("error managing signal %d on mule %d\n", uwsgi_signal, uwsgi.muleid);
 					}
 					// set the error condition
 					len = -1;
@@ -436,6 +441,7 @@ void uwsgi_setup_mules_and_farms() {
 			mules_list++;
 
 			strncpy(uwsgi.farms[i].name, farm_value, 0xff);
+			free(farm_value);
 
 			// create the socket pipe
 			create_signal_pipe(uwsgi.farms[i].signal_pipe);

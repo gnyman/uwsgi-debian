@@ -6,7 +6,9 @@ int uwsgi_signal_handler(uint8_t sig) {
 
 	struct uwsgi_signal_entry *use = NULL;
 
-	use = &uwsgi.shared->signal_table[sig];
+	int pos = (uwsgi.mywid * 256) + sig;
+
+	use = &uwsgi.shared->signal_table[pos];
 
 	if (!use->handler)
 		return -1;
@@ -55,13 +57,11 @@ int uwsgi_signal_handler(uint8_t sig) {
 			set_mule_harakiri(uwsgi.shared->options[UWSGI_OPTION_MULE_HARAKIRI]);
 		}
 	}
-#ifdef UWSGI_SPOOLER
 	else if (uwsgi.i_am_a_spooler && (getpid() == uwsgi.i_am_a_spooler->pid)) {
 		if (uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI] > 0) {
 			set_spooler_harakiri(uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI]);
 		}
 	}
-#endif
 
 	int ret = uwsgi.p[use->modifier1]->signal_handler(sig, use->handler);
 
@@ -77,20 +77,19 @@ int uwsgi_signal_handler(uint8_t sig) {
 			set_mule_harakiri(0);
 		}
 	}
-#ifdef UWSGI_SPOOLER
 	else if (uwsgi.i_am_a_spooler && (getpid() == uwsgi.i_am_a_spooler->pid)) {
 		if (uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI] > 0) {
 			set_spooler_harakiri(0);
 		}
 	}
-#endif
 
 	return ret;
 }
 
 int uwsgi_signal_registered(uint8_t sig) {
 
-	if (uwsgi.shared->signal_table[sig].handler != NULL)
+	int pos = (uwsgi.mywid * 256) + sig;
+	if (uwsgi.shared->signal_table[pos].handler != NULL)
 		return 1;
 
 	return 0;
@@ -100,15 +99,23 @@ int uwsgi_register_signal(uint8_t sig, char *receiver, void *handler, uint8_t mo
 
 	struct uwsgi_signal_entry *use = NULL;
 
+	if (!uwsgi.master_process) return -1;
+
+	if (uwsgi.mywid == 0 && uwsgi.workers[0].pid != uwsgi.mypid) {
+                uwsgi_log("only the master and the workers can register signal handlers\n");
+                return -1;
+        }
+
 	if (strlen(receiver) > 63)
 		return -1;
 
 	uwsgi_lock(uwsgi.signal_table_lock);
 
-	use = &uwsgi.shared->signal_table[sig];
+	int pos = (uwsgi.mywid * 256) + sig;
+	use = &uwsgi.shared->signal_table[pos];
 
-	if (use->handler) {
-		uwsgi_log("[uwsgi-signal] you cannot re-register a signal !!!\n");
+	if (use->handler && uwsgi.mywid == 0) {
+		uwsgi_log("[uwsgi-signal] you cannot re-register a signal as the master !!!\n");
 		uwsgi_unlock(uwsgi.signal_table_lock);
 		return -1;
 	}
@@ -123,6 +130,15 @@ int uwsgi_register_signal(uint8_t sig, char *receiver, void *handler, uint8_t mo
 	}
 	else {
 		uwsgi_log("[uwsgi-signal] signum %d registered (wid: %d modifier1: %d target: %s)\n", sig, uwsgi.mywid, modifier1, receiver);
+	}
+
+	// check for cow
+	if (uwsgi.mywid == 0) {
+		int i;
+                for(i=1;i<=uwsgi.numproc;i++) {
+                        int pos = (i * 256);
+                        memcpy(&uwsgi.shared->signal_table[pos], &uwsgi.shared->signal_table[0], sizeof(struct uwsgi_signal_entry) * 256);
+                }
 	}
 
 	uwsgi_unlock(uwsgi.signal_table_lock);
@@ -161,88 +177,9 @@ int uwsgi_add_file_monitor(uint8_t sig, char *filename) {
 
 }
 
-struct uwsgi_probe *uwsgi_probe_register(struct uwsgi_probe **up, char *name, int (*func) (int, struct uwsgi_signal_probe *)) {
-
-	struct uwsgi_probe *uwsgi_up = *up, *old_up;
-
-	if (!uwsgi_up) {
-		*up = uwsgi_malloc(sizeof(struct uwsgi_probe));
-		uwsgi_up = *up;
-	}
-	else {
-		while (uwsgi_up) {
-			old_up = uwsgi_up;
-			uwsgi_up = uwsgi_up->next;
-		}
-
-		uwsgi_up = uwsgi_malloc(sizeof(struct uwsgi_probe));
-		old_up->next = uwsgi_up;
-	}
-
-	uwsgi_up->name = name;
-	uwsgi_up->func = func;
-	uwsgi_up->next = NULL;
-
-	uwsgi_log("registered new probe \"%s\" at %p\n", name, uwsgi_up);
-
-	return uwsgi_up;
-}
-
-
-int uwsgi_add_probe(uint8_t sig, char *kind, char *args, int timeout, int freq) {
-
-	uwsgi_lock(uwsgi.probe_table_lock);
-
-	if (ushared->probes_cnt < MAX_PROBES) {
-
-		struct uwsgi_probe *up = uwsgi.probes;
-		while (up) {
-			if (!strcmp(up->name, kind)) {
-				break;
-			}
-			up = up->next;
-		}
-
-		if (!up) {
-			uwsgi_log("unable to find probe \"%s\" !!!\n", kind);
-			uwsgi_unlock(uwsgi.probe_table_lock);
-			return -1;
-		}
-
-		// fill the probe table
-		ushared->probes[ushared->probes_cnt].func = up->func;
-		strncpy(ushared->probes[ushared->probes_cnt].args, args, 1024 - 1);
-		ushared->probes[ushared->probes_cnt].registered = 0;
-		ushared->probes[ushared->probes_cnt].sig = sig;
-		ushared->probes[ushared->probes_cnt].fd = -1;
-		ushared->probes[ushared->probes_cnt].state = 0;
-		ushared->probes[ushared->probes_cnt].last_event = 0;
-		ushared->probes[ushared->probes_cnt].data = NULL;
-		ushared->probes[ushared->probes_cnt].cycles = 0;
-		ushared->probes[ushared->probes_cnt].bad = 0;
-
-		if (!timeout) {
-			timeout = uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT];
-		}
-		ushared->probes[ushared->probes_cnt].timeout = timeout;
-		if (!freq) {
-			freq = 1;
-		}
-		ushared->probes[ushared->probes_cnt].freq = freq;
-		ushared->probes_cnt++;
-	}
-	else {
-		uwsgi_log("you can register max %d probes !!!\n", MAX_PROBES);
-		uwsgi_unlock(uwsgi.probe_table_lock);
-		return -1;
-	}
-
-	uwsgi_unlock(uwsgi.probe_table_lock);
-
-	return 0;
-}
-
 int uwsgi_add_timer(uint8_t sig, int secs) {
+
+	if (!uwsgi.master_process) return -1;
 
 	uwsgi_lock(uwsgi.timer_table_lock);
 
@@ -264,63 +201,6 @@ int uwsgi_add_timer(uint8_t sig, int secs) {
 
 	return 0;
 
-}
-
-void uwsgi_opt_add_cron(char *opt, char *value, void *foobar) {
-
-	int i;
-
-	struct uwsgi_cron *old_uc, *uc = uwsgi.crons;
-	if (!uc) {
-		uc = uwsgi_malloc(sizeof(struct uwsgi_cron));
-		uwsgi.crons = uc;
-	}
-	else {
-		old_uc = uc;
-		while (uc->next) {
-			uc = uc->next;
-			old_uc = uc;
-		}
-
-		old_uc->next = uwsgi_malloc(sizeof(struct uwsgi_cron));
-		uc = old_uc->next;
-	}
-
-	memset(uc, 0, sizeof(struct uwsgi_cron));
-
-	if (sscanf(value, "%d %d %d %d %d %n", &uc->minute, &uc->hour, &uc->day, &uc->month, &uc->week, &i) != 5) {
-		uwsgi_log("invalid cron syntax\n");
-		exit(1);
-	}
-	uc->command = value + i;
-}
-
-int uwsgi_signal_add_cron(uint8_t sig, int minute, int hour, int day, int month, int week) {
-
-	if (!uwsgi.master_process)
-		return -1;
-
-	uwsgi_lock(uwsgi.cron_table_lock);
-
-	if (ushared->cron_cnt < MAX_CRONS) {
-
-		ushared->cron[ushared->cron_cnt].sig = sig;
-		ushared->cron[ushared->cron_cnt].minute = minute;
-		ushared->cron[ushared->cron_cnt].hour = hour;
-		ushared->cron[ushared->cron_cnt].day = day;
-		ushared->cron[ushared->cron_cnt].month = month;
-		ushared->cron[ushared->cron_cnt].week = week;
-		ushared->cron_cnt++;
-	}
-	else {
-		uwsgi_log("you can register max %d cron !!!\n", MAX_CRONS);
-		uwsgi_unlock(uwsgi.cron_table_lock);
-		return -1;
-	}
-
-	uwsgi_unlock(uwsgi.cron_table_lock);
-
-	return 0;
 }
 
 int uwsgi_signal_add_rb_timer(uint8_t sig, int secs, int iterations) {
@@ -426,7 +306,8 @@ int uwsgi_signal_send(int fd, uint8_t sig) {
 
 void uwsgi_route_signal(uint8_t sig) {
 
-	struct uwsgi_signal_entry *use = &ushared->signal_table[sig];
+	int pos = (uwsgi.mywid * 256) + sig;
+	struct uwsgi_signal_entry *use = &ushared->signal_table[pos];
 	int i;
 
 	// send to first available worker
@@ -457,7 +338,6 @@ void uwsgi_route_signal(uint8_t sig) {
 	else if (!strcmp(use->receiver, "subscribed")) {
 	}
 	// route to spooler
-#ifdef UWSGI_SPOOLER
 	else if (!strcmp(use->receiver, "spooler")) {
 		if (ushared->worker_signal_pipe[0] != -1) {
 			if (uwsgi_signal_send(ushared->spooler_signal_pipe[0], sig)) {
@@ -465,7 +345,6 @@ void uwsgi_route_signal(uint8_t sig) {
 			}
 		}
 	}
-#endif
 	else if (!strcmp(use->receiver, "mules")) {
 		for (i = 0; i < uwsgi.mules_cnt; i++) {
 			if (uwsgi_signal_send(uwsgi.mules[i].signal_pipe[0], sig)) {
@@ -580,7 +459,7 @@ void uwsgi_receive_signal(int fd, char *name, int id) {
 	if (ret == 0) {
 		goto destroy;
 	}
-	else if (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+	else if (ret < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
 		uwsgi_error("[uwsgi-signal] read()");
 		goto destroy;
 	}

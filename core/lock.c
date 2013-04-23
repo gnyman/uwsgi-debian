@@ -64,6 +64,12 @@ int uwsgi_pthread_robust_mutexes_enabled = 1;
 #define UWSGI_RWLOCK_SIZE	sizeof(pthread_rwlock_t)
 #endif
 
+#ifndef PTHREAD_PRIO_INHERIT
+int pthread_mutexattr_setprotocol (pthread_mutexattr_t *__attr,
+                                          int __protocol);
+#define PTHREAD_PRIO_INHERIT 1
+#endif
+
 // REMEMBER lock must contains space for both pthread_mutex_t and pthread_mutexattr_t !!! 
 struct uwsgi_lock_item *uwsgi_lock_fast_init(char *id) {
 
@@ -85,8 +91,15 @@ retry:
 	}
 
 #ifdef EOWNERDEAD
+#ifndef PTHREAD_MUTEX_ROBUST
+#define PTHREAD_MUTEX_ROBUST PTHREAD_MUTEX_ROBUST_NP
+#endif
+	if (pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT)) {
+		uwsgi_log("unable to set PTHREAD_PRIO_INHERIT\n");
+		exit(1);
+	}
 	if (uwsgi_pthread_robust_mutexes_enabled) {
-		if (pthread_mutexattr_setrobust_np(&attr, PTHREAD_MUTEX_ROBUST_NP)) {
+		if (pthread_mutexattr_setrobust_np(&attr, PTHREAD_MUTEX_ROBUST)) {
 			uwsgi_log("unable to make the mutex 'robust'\n");
 			exit(1);
 		}
@@ -388,6 +401,60 @@ void uwsgi_rwunlock_fast(struct uwsgi_lock_item *uli) {
 	uwsgi_unlock_fast(uli);
 }
 
+#elif defined(UWSGI_LOCK_USE_WINDOWS_MUTEX)
+
+#define UWSGI_LOCK_ENGINE_NAME "windows mutexes"
+#define UWSGI_LOCK_SIZE         sizeof(HANDLE)
+#define UWSGI_RWLOCK_SIZE       sizeof(HANDLE)
+
+
+struct uwsgi_lock_item *uwsgi_lock_fast_init(char *id) {
+
+        struct uwsgi_lock_item *uli = uwsgi_register_lock(id, 0);
+	struct _SECURITY_ATTRIBUTES sa;
+	memset(&sa, 0, sizeof(struct _SECURITY_ATTRIBUTES));
+	sa.bInheritHandle = 1;
+	uli->lock_ptr = CreateMutex(&sa, FALSE, NULL);
+        return uli;
+}
+
+void uwsgi_lock_fast(struct uwsgi_lock_item *uli) {
+	WaitForSingleObject(uli->lock_ptr, INFINITE);
+        uli->pid = uwsgi.mypid;
+}
+
+void uwsgi_unlock_fast(struct uwsgi_lock_item *uli) {
+	ReleaseMutex(uli->lock_ptr);
+        uli->pid = 0;
+}
+
+pid_t uwsgi_lock_fast_check(struct uwsgi_lock_item *uli) {
+	if (WaitForSingleObject(uli->lock_ptr, 0) == WAIT_TIMEOUT) {
+		return 0;
+	}
+        return uli->pid;
+}
+
+struct uwsgi_lock_item *uwsgi_rwlock_fast_init(char *id) {
+	return uwsgi_lock_fast_init(id);
+}
+
+void uwsgi_rlock_fast(struct uwsgi_lock_item *uli) {
+	uwsgi_lock_fast(uli);
+}
+void uwsgi_wlock_fast(struct uwsgi_lock_item *uli) {
+	uwsgi_lock_fast(uli);
+}
+
+pid_t uwsgi_rwlock_fast_check(struct uwsgi_lock_item *uli) {
+	return uwsgi_lock_fast_check(uli);
+}
+
+void uwsgi_rwunlock_fast(struct uwsgi_lock_item *uli) {
+	uwsgi_unlock_fast(uli);
+}
+
+
 #else
 
 #define uwsgi_lock_fast_init uwsgi_lock_ipcsem_init
@@ -406,8 +473,6 @@ void uwsgi_rwunlock_fast(struct uwsgi_lock_item *uli) {
 #define UWSGI_RWLOCK_SIZE sizeof(int)
 
 #define UWSGI_LOCK_ENGINE_NAME "ipcsem"
-
-#define UWSGI_IPCSEM_ATEXIT	1
 
 #endif
 
@@ -464,7 +529,9 @@ void uwsgi_lock_ipcsem(struct uwsgi_lock_item *uli) {
 
 	memcpy(&semid, uli->lock_ptr, sizeof(int));
 
+retry:
 	if (semop(semid, &sb, 1)) {
+		if (errno == EINTR) goto retry; 
 		uwsgi_error("semop()");
 	}
 }
@@ -479,7 +546,9 @@ void uwsgi_unlock_ipcsem(struct uwsgi_lock_item *uli) {
 
 	memcpy(&semid, uli->lock_ptr, sizeof(int));
 
+retry:
 	if (semop(semid, &sb, 1)) {
+		if (errno == EINTR) goto retry; 
 		uwsgi_error("semop()");
 	}
 
@@ -544,6 +613,10 @@ pid_t uwsgi_rwlock_ipcsem_check(struct uwsgi_lock_item *uli) {
 
 void uwsgi_setup_locking() {
 
+	int i;
+
+	if (uwsgi.locking_setup) return;
+
 	// use the fastest available locking
 	if (uwsgi.lock_engine) {
 		if (!strcmp(uwsgi.lock_engine, "ipcsem")) {
@@ -560,8 +633,10 @@ void uwsgi_setup_locking() {
 			uwsgi.lock_ops.rwunlock = uwsgi_rwunlock_ipcsem;
 			uwsgi.lock_size = 8;
 			uwsgi.rwlock_size = 8;
-			return;
+			goto ready;
 		}
+		uwsgi_log("unable to find lock engine \"%s\"\n", uwsgi.lock_engine);
+		exit(1);
 	}
 
 	uwsgi_log_initial("lock engine: %s\n", UWSGI_LOCK_ENGINE_NAME);
@@ -580,8 +655,8 @@ void uwsgi_setup_locking() {
 	uwsgi.lock_size = UWSGI_LOCK_SIZE;
 	uwsgi.rwlock_size = UWSGI_RWLOCK_SIZE;
 
+ready:
 	// application generic lock
-	int i;
 	uwsgi.user_lock = uwsgi_malloc(sizeof(void *) * (uwsgi.locks + 1));
 	for (i = 0; i < uwsgi.locks + 1; i++) {
 		uwsgi.user_lock[i] = uwsgi_lock_init(uwsgi_concat2("user ", uwsgi_num2str(i)));
@@ -602,9 +677,6 @@ void uwsgi_setup_locking() {
 		// timer table lock
 		uwsgi.timer_table_lock = uwsgi_lock_init("timer");
 
-		// probe table lock
-		uwsgi.probe_table_lock = uwsgi_lock_init("probe");
-
 		// rb_timer table lock
 		uwsgi.rb_timer_table_lock = uwsgi_lock_init("rbtimer");
 
@@ -612,8 +684,22 @@ void uwsgi_setup_locking() {
 		uwsgi.cron_table_lock = uwsgi_lock_init("cron");
 	}
 
+	if (uwsgi.use_thunder_lock) {
+		// process shared thunder lock
+		uwsgi.the_thunder_lock = uwsgi_lock_init("thunder");	
+	}
+
 	uwsgi.rpc_table_lock = uwsgi_lock_init("rpc");
 
+#ifdef UWSGI_SSL
+	// register locking for legions
+	struct uwsgi_legion *ul = uwsgi.legions;
+	while(ul) {
+		ul->lock = uwsgi_lock_init(uwsgi_concat2("legion_", ul->legion));
+		ul = ul->next;
+	}
+#endif
+	uwsgi.locking_setup = 1;
 }
 
 

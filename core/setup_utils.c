@@ -106,12 +106,13 @@ void uwsgi_setup_inherited_sockets() {
 	//now close all the unbound fd
 	for (j = 3; j < (int) uwsgi.max_fd; j++) {
 		int useless = 1;
-#ifdef UWSGI_MULTICAST
-		if (j == uwsgi.cluster_fd)
-			continue;
-#endif
+
+		if (uwsgi_fd_is_safe(j)) continue;
+
 		if (uwsgi.has_emperor) {
 			if (j == uwsgi.emperor_fd)
+				continue;
+			if (j == uwsgi.emperor_fd_config)
 				continue;
 		}
 
@@ -125,13 +126,18 @@ void uwsgi_setup_inherited_sockets() {
 				continue;
 		}
 
-		if (uwsgi.original_log_fd > -1) {
-			if (j == uwsgi.original_log_fd)
+		if (uwsgi.shared->worker_req_log_pipe[0] > -1) {
+			if (j == uwsgi.shared->worker_req_log_pipe[0])
 				continue;
 		}
 
-		if (uwsgi.cache_server && uwsgi.cache_server_fd != -1) {
-			if (j == uwsgi.cache_server_fd)
+		if (uwsgi.shared->worker_req_log_pipe[1] > -1) {
+			if (j == uwsgi.shared->worker_req_log_pipe[1])
+				continue;
+		}
+
+		if (uwsgi.original_log_fd > -1) {
+			if (j == uwsgi.original_log_fd)
 				continue;
 		}
 
