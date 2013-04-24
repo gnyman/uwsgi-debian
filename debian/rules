@@ -247,20 +247,19 @@ install/uwsgi-core::
 		cp $(CURDIR)/examples/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile; \
 	done
 	cp -r $(CURDIR)/vassals $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile
-	for FILE in utest.java; do \
-		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/jwsgi; \
-	done
-	for FILE in config.ru config2.ru fibers.ru examples/fibers.yml; do \
+	for FILE in examples/config.ru examples/config2.ru examples/fibers.ru \
+				examples/fibers.yml; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/rack; \
 	done
-	for FILE in router.lua uwsgirouter.py uwsgirouter2.py uwsgirouter3.py \
-	            uwsgirouter4.py uwsgirouter5.py; do \
+	for FILE in examples/router.lua examples/uwsgirouter.py \
+				examples/uwsgirouter2.py examples/uwsgirouter3.py \
+				examples/uwsgirouter4.py examples/uwsgirouter5.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/router; \
 	done
-	for FILE in mojoapp.pl psgi.py test.psgi; do \
+	for FILE in mojoapp.pl; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/psgi; \
 	done
-	for FILE in sputnik.ws; do \
+	for FILE in examples/sputnik.ws; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsapi; \
 	done
 	for FILE in hello_world.py hello_world_rrdtool.py decoratortest.py \
@@ -628,47 +627,6 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 
 # Some other packages
 # -------------------
-
-binary-install/python-django-uwsgi-admin::
-	dh_install -p $(cdbs_curpkg) \
-		django/uwsgi_admin \
-		$(PYTHON_DIST_PACKAGES_DIR)
-	dh_python2 -p $(cdbs_curpkg)
-
-binary-install/python-uwsgicc::
-	$(eval PYPKG_NAME := $(cdbs_curpkg:python-%=%))
-	$(eval PYPKG_DESTDIR := $(PYTHON_DIST_PACKAGES_DIR))
-
-	# Install:
-	# * Python code of uwsgicc into Python packages directory
-	# * assets of uwsgicc (images, JavaScript files, templates) into subdirectory
-	#   of /usr/share
-	dh_install -p $(cdbs_curpkg) -Xstatic -Xtemplates uwsgicc $(PYPKG_DESTDIR)
-	dh_install -p $(cdbs_curpkg) \
-		uwsgicc/templates uwsgicc/static \
-		usr/share/$(cdbs_curpkg)
-
-	# Replace installed jQuery files with symlinks to Debian packaged jQuery
-	# (embedding of JavaScript library should be avoided; see Debian Policy 4.13
-	# and description of Lintian tag embedded-javascript-library).
-	$(RM) $(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(cdbs_curpkg)/static/js/jquery*.js
-	dh_link -p $(cdbs_curpkg) \
-		usr/share/javascript/jquery/jquery.min.js \
-		usr/share/$(cdbs_curpkg)/static/js/jquery.min.js
-	dh_link -p $(cdbs_curpkg) \
-		usr/share/javascript/jquery-ui/jquery-ui.min.js \
-		usr/share/$(cdbs_curpkg)/static/js/jquery-ui.min.js
-
-	# Provide to uwsgicc Python package access to it's assets by symlinking them
-	# into package directory.
-	dh_link -p $(cdbs_curpkg) \
-		usr/share/$(cdbs_curpkg)/static \
-		$(PYPKG_DESTDIR)/$(PYPKG_NAME)/static
-	dh_link -p $(cdbs_curpkg) \
-		usr/share/$(cdbs_curpkg)/templates \
-		$(PYPKG_DESTDIR)/$(PYPKG_NAME)/templates
-
-	dh_python2 -p $(cdbs_curpkg)
 
 binary-install/python-uwsgidecorators::
 	$(eval PYTHON_KIND = $(firstword $(subst -, ,$(notdir $@))))

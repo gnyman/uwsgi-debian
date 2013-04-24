@@ -30,7 +30,8 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
   * Remove no longer needed patch
     110515_01_add_overriding_of_JVM_PATH_into_buildscript_of_jwsgi_plugin.patch.
   * Remove no longer needed patch
-    110515_01_add_overriding_of_JVM_PATH_into_buildscript_of_jwsgi_plugin.patch.
+    000000_03_strip_versions_from_jQuery_scripts_links_in_uwsgicc_templates.patch.
+  * Remove no longer needed patch remove-pg_config_cflags-in-probepg.patch.
   * New binary package uwsgi-plugin-alarm-curl:
      - New Build-Depends libcurl4-openssl-dev.
      - Add alarm option to buildconf/uwsgi-core.ini.
@@ -63,6 +64,14 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
   * New binary package uwsgi-plugin-router-rewrite.
   * New binary package uwsgi-plugin-router-uwsgi.
   * New binary package uwsgi-emperor. (Closes: #660212)
+  * Remove no longer provided plugins:
+    - uwsgi-plugin-probeconnect
+    - uwsgi-plugin-probepg
+    - python-uwsgicc
+    - python-django-uwsgi-admin
+  * uwsgi-extra:
+    - Remove no longer provided nginx and lighttpd directories.
+    - Update description.
 
  -- Janos Guljas <janos@debian.org>  Wed, 06 Feb 2013 20:10:31 +0100
 
