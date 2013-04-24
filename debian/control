@@ -33,6 +33,9 @@ Build-Depends:
  libboost-thread-dev,
  libboost-filesystem-dev,
  libwrap0-dev,
+ libgnustep-gui-dev,
+ libgnustep-base-dev,
+ libcoro-perl,
  pkg-config,
  python,
  python-all-dev,
@@ -146,7 +149,11 @@ Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
  uwsgi-plugin-carbon (= ${binary:Version}),
+ uwsgi-plugin-clock-monotonic (= ${binary:Version}),
+ uwsgi-plugin-clock-realtime (= ${binary:Version}),
  uwsgi-plugin-cheaper-busyness (= ${binary:Version}),
+ uwsgi-plugin-cheaper-backlog2 (= ${binary:Version}),
+ uwsgi-plugin-coroae (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version})
    [amd64 i386 mips powerpc s390],
@@ -176,12 +183,15 @@ Architecture: any
 Depends: ${misc:Depends},
  uwsgi-plugin-admin (= ${binary:Version}),
  uwsgi-plugin-alarm-curl (= ${binary:Version}),
+ uwsgi-plugin-alarm-speech (= ${binary:Version}),
  uwsgi-plugin-alarm-xmpp (= ${binary:Version}),
  uwsgi-plugin-cache (= ${binary:Version}),
+ uwsgi-plugin-curl-cron (= ${binary:Version}),
  uwsgi-plugin-echo (= ${binary:Version}),
  uwsgi-plugin-emperor-amqp (= ${binary:Version}),
  uwsgi-plugin-emperor-mongodb (= ${binary:Version}),
  uwsgi-plugin-emperor-pg (= ${binary:Version}),
+ uwsgi-plugin-emperor-zeromq (= ${binary:Version}),
  uwsgi-plugin-fastrouter (= ${binary:Version}),
  uwsgi-plugin-graylog2 (= ${binary:Version}),
  uwsgi-plugin-http (= ${binary:Version}),
@@ -215,12 +225,12 @@ Description: infrastructure plugins for uWSGI
  the same core.
  .
  This dependency package provides infrastructure plugins for uWSGI:
-   * admin, alarm curl, alarm XMPP, cache, echo, AMPQ emperor, MongoDB emperor,
-     PostgreSQL emperor, fastrouter, graylog2, HTTP serving, logfile, logsocket,
-     mongodblog, Nagios, pam, ping, rawrouter, redislog, router access,
-     router basicauth, router cache, router http, router redirect,
-     router rewrite, router uwsgi, RPC, RRDTool, rsyslog, spooler,
-     MongoDB stats pusher, syslog, zergpool
+   * admin, alarm curl, alarm speech, alarm XMPP, cache, curl cron echo,
+     AMPQ emperor, MongoDB emperor, PostgreSQL emperor ZeroMQ emperor,
+     fastrouter, graylog2, HTTP serving, logfile, logsocket, mongodblog,
+     Nagios, pam, ping, rawrouter, redislog, router access, router basicauth,
+     router cache, router http, router redirect, router rewrite, router uwsgi,
+     RPC, RRDTool, rsyslog, spooler, MongoDB stats pusher, syslog, zergpool
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -273,6 +283,18 @@ Description: Alarm curl plugin for uWSGI
  .
  This package provides alarm_curl plugin for uWSGI.
 
+Package: uwsgi-plugin-alarm-speech
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Alarm speech plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides alarm_speech plugin for uWSGI.
+
 Package: uwsgi-plugin-alarm-xmpp
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -309,6 +331,30 @@ Description: carbon plugin for uWSGI
  .
  This package provides carbon plugin for uWSGI.
 
+Package: uwsgi-plugin-clock-monotonic
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Monotonic clock plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides clock_monotonic plugin for uWSGI.
+
+Package: uwsgi-plugin-clock-realtime
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Realtime clock plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides clock_realtime plugin for uWSGI.
+
 Package: uwsgi-plugin-cgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -321,6 +367,18 @@ Description: CGI plugin for uWSGI
  .
  This package provides CGI plugin for uWSGI.
 
+Package: uwsgi-plugin-cheaper-backlog2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Cheaper backlog2 algorithm plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides cheaper_backlog2 plugin for uWSGI.
+
 Package: uwsgi-plugin-cheaper-busyness
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -332,6 +390,30 @@ Description: Cheaper busyness algorithm plugin for uWSGI
  the same core.
  .
  This package provides cheaper_busyness plugin for uWSGI.
+
+Package: uwsgi-plugin-coroae
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Coro::AnyEvent async Perl plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides coroae plugin for uWSGI.
+
+Package: uwsgi-plugin-curl-cron
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: curl cron plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides curl_cron plugin for uWSGI.
 
 Package: uwsgi-plugin-echo
 Architecture: any
@@ -380,6 +462,18 @@ Description: Emperor PostgreSQL plugin for uWSGI
  the same core.
  .
  This package provides emperor_pg plugin for uWSGI.
+
+Package: uwsgi-plugin-emperor-zeromq
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Emperor ZeroMQ plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides emperor_zeromq plugin for uWSGI.
 
 Package: uwsgi-plugin-erlang
 Architecture: any

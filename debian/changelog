@@ -65,6 +65,15 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
   * New binary package uwsgi-plugin-router-rewrite.
   * New binary package uwsgi-plugin-router-uwsgi.
   * New binary package uwsgi-emperor. (Closes: #660212)
+  * New binary package uwsgi-plugin-alarm-speech:
+     - New Build-Depends libgnustep-base-dev and libgnustep-gui-dev.
+     - Add debian/patches/alarm_speech-flags.patch
+  * New binary package uwsgi-plugin-cheaper-backlog2.
+  * New binary package uwsgi-plugin-clock-monothonic.
+  * New binary package uwsgi-plugin-clock-realtime.
+  * New binary package uwsgi-plugin-coroae:
+     - New Build-Depends libcoro-perl.
+  * New binary package uwsgi-plugin-curl-cron.
   * Remove no longer provided plugins:
     - uwsgi-plugin-probeconnect
     - uwsgi-plugin-probepg
