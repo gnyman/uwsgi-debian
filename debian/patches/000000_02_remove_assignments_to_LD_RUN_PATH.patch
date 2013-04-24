@@ -5,16 +5,15 @@ Description: Remove value assignments to environment variable LD_RUN_PATH
  And then Lintian reports about error (E: binary-or-shlib-defines-rpath).
 Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: not-needed
-Last-Update: 2012-12-30
+Last-Update: 2013-04-24
 
-Index: uwsgi/plugins/rack/uwsgiplugin.py
-===================================================================
---- uwsgi.orig/plugins/rack/uwsgiplugin.py	2011-06-08 20:36:05.000000000 +0300
-+++ uwsgi/plugins/rack/uwsgiplugin.py	2011-06-08 21:52:29.000000000 +0300
-@@ -38,6 +38,5 @@ LDFLAGS = os.popen(RUBYPATH + " -e \"req
+--- a/plugins/rack/uwsgiplugin.py
++++ b/plugins/rack/uwsgiplugin.py
+@@ -44,7 +44,6 @@ LIBS = os.popen(RUBYPATH + " -e \"requir
  
- libpath = os.popen(RUBYPATH + " -e \"require 'rbconfig';print %s::CONFIG['libdir']\"" % rbconfig).read().rstrip()
- LDFLAGS.append('-L' + libpath )
--os.environ['LD_RUN_PATH'] = libpath
- LIBS = os.popen(RUBYPATH + " -e \"require 'rbconfig';print '-l' + %s::CONFIG['RUBY_SO_NAME']\"" % rbconfig).read().rstrip().split()
- 
+ if has_shared == 'yes':
+     LDFLAGS.append('-L' + libpath )
+-    os.environ['LD_RUN_PATH'] = libpath
+     LIBS.append(os.popen(RUBYPATH + " -e \"require 'rbconfig';print '-l' + %s::CONFIG['RUBY_SO_NAME']\"" % rbconfig).read().rstrip())
+ else:
+     GCC_LIST.append("%s/%s" % (libpath, os.popen(RUBYPATH + " -e \"require 'rbconfig';print %s::CONFIG['LIBRUBY_A']\"" % rbconfig).read().rstrip()))

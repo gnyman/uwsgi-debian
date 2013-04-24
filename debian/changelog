@@ -10,6 +10,8 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
     - New binary package uwsgi-plugin-corerouter.
     - uwsgi-plugin-fastrouter and uwsgi-plugin-http depend on
       uwsgi-plugin-corerouter.
+  * debian/rules:
+    - Change UWSGICONFIG_JVM_INCPATH to fix jvm plugin build.
   * Patch Python plugin to remove assignments to environment variable
     LD_RUN_PATH which leads to setting RPATH in compiled binary/shared library.
   * New binary package uwsgi-plugin-php. (Closes: #699174)
@@ -23,6 +25,12 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
   * Update debian/patches/python-plugin_remove_assignments_to_LD_RUN_PATH.patch
     to apply cleanly.
   * Update debian/patches/fix-php-ldflags.patch to apply cleanly.
+  * Update debian/patches/000000_02_remove_assignments_to_LD_RUN_PATH.patch to
+    apply cleanly.
+  * Remove no longer needed patch
+    110515_01_add_overriding_of_JVM_PATH_into_buildscript_of_jwsgi_plugin.patch.
+  * Remove no longer needed patch
+    110515_01_add_overriding_of_JVM_PATH_into_buildscript_of_jwsgi_plugin.patch.
   * New binary package uwsgi-plugin-alarm-curl:
      - New Build-Depends libcurl4-openssl-dev.
      - Add alarm option to buildconf/uwsgi-core.ini.
