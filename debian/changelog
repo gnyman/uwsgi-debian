@@ -207,6 +207,34 @@ uwsgi (1.2.3+dfsg-2) unstable; urgency=low
 
  -- Janos Guljas <janos@resenje.org>  Mon, 09 Jul 2012 03:32:09 +0200
 
+uwsgi (1.2.3+dfsg-2~experimental2) UNRELEASED; urgency=low
+
+  * debian/rules:
+     - Cleanup uwsgibuild log files after the build.
+
+ -- Janos Guljas <janos@resenje.org>  Wed, 20 Jun 2012 15:39:14 +0200
+
+uwsgi (1.2.3+dfsg-2~experimental1) experimental; urgency=low
+
+  * Add support for OpenJDK 7 (Closes: #678120):
+     - Build depend on openjdk-7-jdk.
+     - Add dependencies uwsgi-plugin-jvm-openjdk-7 and
+       uwsgi-plugin-jwsgi-openjdk-7 for uwsgi-app-integration-plugins. 
+     - New binary packages uwsgi-plugin-jvm-openjdk-7 and
+       uwsgi-plugin-jwsgi-openjdk-7.
+     - Update debian/rules for new packages.
+     - Add debian/uwsgi-plugin-jvm-openjdk-7.postinst
+       debian/uwsgi-plugin-jvm-openjdk-7.prerm
+       debian/uwsgi-plugin-jwsgi-openjdk-7.install
+       debian/uwsgi-plugin-jwsgi-openjdk-7.postinst
+       debian/uwsgi-plugin-jwsgi-openjdk-7.prerm
+     - Override binary-or-shlib-defines-rpath lintian warnings for
+       uwsgi-plugin-jvm-openjdk-7 and uwsgi-plugin-jwsgi-openjdk-7.
+   * Change alternatives priprity to 35 for uwsgi-plugin-jvm-openjdk-
+     and uwsgi-plugin-jwsgi-openjdk-6.
+
+ -- Janos Guljas <janos@resenje.org>  Tue, 19 Jun 2012 16:23:06 +0200
+
 uwsgi (1.2.3+dfsg-1) unstable; urgency=low
 
   * New upstream release.

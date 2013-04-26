@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for uwsgi-plugin-jvm-openjdk-6
+# postinst script for uwsgi-plugin-jvm-openjdk-7
 #
 # see: dh_installdeb(1)
 
@@ -23,8 +23,8 @@ case "$1" in
         --install \
           /usr/lib/uwsgi/plugins/jvm_plugin.so \
           uwsgi-plugin-jvm \
-          /usr/lib/uwsgi/plugins/jvm_openjdk6_plugin.so \
-          35 \
+          /usr/lib/uwsgi/plugins/jvm_openjdk7_plugin.so \
+          75 \
         --slave \
           /usr/bin/uwsgi_jvm \
           uwsgi_jvm \
@@ -32,18 +32,18 @@ case "$1" in
         --slave \
           /usr/share/man/man1/uwsgi_jvm.1.gz \
           uwsgi_jvm.1.gz \
-          /usr/share/man/man1/uwsgi_jvm_openjdk6.1.gz
+          /usr/share/man/man1/uwsgi_jvm_openjdk7.1.gz
 
       update-alternatives --quiet \
         --install \
           /usr/bin/uwsgi \
           uwsgi \
-          /usr/bin/uwsgi_jvm_openjdk6 \
+          /usr/bin/uwsgi_jvm_openjdk7 \
           35 \
         --slave \
           /usr/share/man/man1/uwsgi.1.gz \
           uwsgi.1.gz \
-          /usr/share/man/man1/uwsgi_jvm_openjdk6.1.gz
+          /usr/share/man/man1/uwsgi_jvm_openjdk7.1.gz
 
       UWSGI_JVM_BINARY_IS_UWSGI_ALTERNATIVE="$(\
         update-alternatives --list uwsgi 2>/dev/null \
