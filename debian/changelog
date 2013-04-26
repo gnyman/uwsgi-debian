@@ -51,6 +51,7 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
   * New binary package uwsgi-plugin-stats-pusher-mongodb:
      - New Build-Depends mongodb-dev, libboost-thread-dev and
        libboost-filesystem-dev.
+  * New binary package uwsgi-plugin-stats-pusher-statsd.
   * New binary package uwsgi-plugin-emperor-amqp.
   * New binary package uwsgi-plugin-emperor-mongodb.
   * New binary package uwsgi-plugin-emperor-pg.
@@ -61,6 +62,7 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
   * New binary package uwsgi-plugin-router-basicauth.
   * New binary package uwsgi-plugin-router-cache.
   * New binary package uwsgi-plugin-router-http.
+  * New binary package uwsgi-plugin-router-memcached.
   * New binary package uwsgi-plugin-router-redirect.
   * New binary package uwsgi-plugin-router-rewrite.
   * New binary package uwsgi-plugin-router-uwsgi.
@@ -74,6 +76,21 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
   * New binary package uwsgi-plugin-coroae:
      - New Build-Depends libcoro-perl.
   * New binary package uwsgi-plugin-curl-cron.
+  * New binary package uwsgi-plugin-geoip:
+     - New Build-Depends libgeoip-dev.
+  * New binary package uwsgi-plugin-gridfs.
+  * New binary package uwsgi-plugin-ldap.
+  * New binary package uwsgi-plugin-sqlite3.
+  * New binary package uwsgi-plugin-ssi.
+  * New binary package uwsgi-plugin-sslrouter.
+  * New binary package uwsgi-plugin-systemd-logger.
+  * New binary package uwsgi-plugin-transformation-gzip.
+  * New binary package uwsgi-plugin-transformation-tofile.
+  * New binary package uwsgi-plugin-transformation-toupper.
+  * New binary package uwsgi-plugin-v8:
+     - New Build-Depends libv8-dev.
+  * New binary package uwsgi-plugin-xslt:
+     - New Build-Depends libxslt1-dev.
   * Remove no longer provided plugins:
     - uwsgi-plugin-probeconnect
     - uwsgi-plugin-probepg
