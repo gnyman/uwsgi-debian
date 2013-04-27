@@ -91,6 +91,8 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
      - New Build-Depends libv8-dev.
   * New binary package uwsgi-plugin-xslt:
      - New Build-Depends libxslt1-dev.
+  * New binary packages libapache2-mod-proxy-uwsgi and
+    libapache2-mod-proxy-uwsgi-dbg.
   * Remove no longer provided plugins:
     - uwsgi-plugin-probeconnect
     - uwsgi-plugin-probepg

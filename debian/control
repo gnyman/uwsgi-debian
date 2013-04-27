@@ -1249,6 +1249,33 @@ Description: zergpool plugin for uWSGI
  .
  This package provides zergpool plugin for uWSGI.
 
+Package: libapache2-mod-proxy-uwsgi
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, apache2
+Description: uwsgi module for Apache2 (mod_uwsgi)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It uses the uwsgi protocol for all the networking/interprocess communications.
+ .
+ This package provides Apache2 module for communicating with uWSGI.
+ .
+ It is a proxy module, so it provides all of the futures exported by mod_proxy.
+ .
+ It is fully Apache API compliant and it should be easily integrated with all
+ of the available modules.
+
+Package: libapache2-mod-proxy-uwsgi-dbg
+Architecture: any
+Section: debug
+Depends: ${misc:Depends}, libapache2-mod-proxy-uwsgi (= ${binary:Version})
+Description: debugging symbols for Apache2 mod_uwsgi
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ .
+ This package contains the debug symbols for Apache2 mod_proxy_uwsgi. Install
+ this package if you need to debug module or if you need a useful backtrace of
+ a crash.
+
 Package: libapache2-mod-uwsgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, apache2
@@ -1336,7 +1363,5 @@ Description: fast, self-healing application container server (extra files)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  .
- This package provides extra files from uWSGI distribution:
-   * nginx 0.7.x module source
-   * lighttpd module source
-   * contribs
+ This package provides extra files from uWSGI distribution.
+

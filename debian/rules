@@ -79,9 +79,9 @@ ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
 
 # List of packaged Apache2 modules' names
-LIBAPACHE2_MODS_NAMES = uwsgi ruwsgi
+LIBAPACHE2_MODS_NAMES = uwsgi ruwsgi proxy-uwsgi
 
-ruwsgi_to_orig = $(subst ruwsgi,Ruwsgi,$(1))
+libapache2mod_to_orig = $(subst -,_,$(subst ruwsgi,Ruwsgi,$(1)))
 
 # List of templates to instantiate for each libapache2-mod-X package
 # There is special-case template, not listed here: uwsgi.load
@@ -150,7 +150,7 @@ clean::
 	$(RM) -r $(CURDIR)/apache2/.libs
 	$(RM) -r $(addprefix $(CURDIR)/apache2/mod_, \
 		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
-			$(addprefix $(call ruwsgi_to_orig, $(module_name)), .la .lo .slo) \
+			$(addprefix $(call libapache2mod_to_orig, $(module_name)), .la .lo .slo) \
 	))
 	# instantiated build configurations
 	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
@@ -200,7 +200,7 @@ clean::
 	done
 	$(RM) $(addprefix $(CURDIR)/debian/, \
 		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
-			$(addsuffix .load,  $(call ruwsgi_to_orig, $(module_name))) \
+			$(addsuffix .load,  $(call libapache2mod_to_orig, $(module_name))) \
 	))
 	# generated manpages
 	$(RM) $(CURDIR)/debian/uwsgi-core.1
@@ -625,7 +625,7 @@ $(patsubst %,build/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):: build/% : debian
 
 # Build specific Apache2 module
 $(patsubst %,debian/stamp-libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):
-	$(eval MODULE_NAME = $(call ruwsgi_to_orig, $(call target_name_tail, $@)))
+	$(eval MODULE_NAME = $(call libapache2mod_to_orig, $(subst stamp-libapache2-mod-,,$(notdir $@))))
 	$(APXS2) -c \
 		`$(APR_CONFIG) --link-ld` `$(APU_CONFIG) --link-ld` \
 		$(CURDIR)/apache2/mod_$(MODULE_NAME).c
@@ -633,8 +633,11 @@ $(patsubst %,debian/stamp-libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):
 
 # Install libapache2-mod-% package
 $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
-	$(eval MODULE_NAME = $(call ruwsgi_to_orig, $(call target_name_tail, $@)))
+	$(eval MODULE_NAME = $(call libapache2mod_to_orig, $(subst libapache2-mod-,,$(notdir $@))))
+	# Remove the R from Ruwsgi_module
+	$(eval APACHE_MODULE_NAME = $(subst R,,$(MODULE_NAME)))
 	sed -e 's/@@module_name@@/$(MODULE_NAME)/g' \
+		-e 's/@@apache_module_name@@/$(APACHE_MODULE_NAME)/g' \
 		< $(CURDIR)/debian/uwsgi.load.in \
 		> $(CURDIR)/debian/$(MODULE_NAME).load
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
