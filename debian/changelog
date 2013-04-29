@@ -1,4 +1,4 @@
-uwsgi (1.9.8-1) UNRELEASED; urgency=low
+uwsgi (1.9.8-1) unstable; urgency=low
 
   * New upstream release.
   * Upstream version does not contain minfied JavaScript files:
@@ -104,7 +104,7 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
     - Remove no longer provided nginx and lighttpd directories.
     - Update description.
 
- -- Janos Guljas <janos@debian.org>  Wed, 06 Feb 2013 20:10:31 +0100
+ -- Janos Guljas <janos@debian.org>  Mon, 29 Apr 2013 16:48:56 +0200
 
 uwsgi (1.4.4+dfsg-1) experimental; urgency=low
 
