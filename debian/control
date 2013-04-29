@@ -1252,7 +1252,7 @@ Description: zergpool plugin for uWSGI
 Package: libapache2-mod-proxy-uwsgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, apache2
-Description: uwsgi module for Apache2 (mod_uwsgi)
+Description: uwsgi proxy module for Apache2 (mod_uwsgi)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It uses the uwsgi protocol for all the networking/interprocess communications.
@@ -1268,7 +1268,7 @@ Package: libapache2-mod-proxy-uwsgi-dbg
 Architecture: any
 Section: debug
 Depends: ${misc:Depends}, libapache2-mod-proxy-uwsgi (= ${binary:Version})
-Description: debugging symbols for Apache2 mod_uwsgi
+Description: debugging symbols for Apache2 mod_proxy_uwsgi
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  .
