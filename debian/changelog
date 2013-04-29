@@ -16,92 +16,91 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
   * debian/rules:
     - Change UWSGICONFIG_JVM_INCPATH to fix jvm plugin build.
   * Patch Python plugin to remove assignments to environment variable
-    LD_RUN_PATH which leads to setting RPATH in compiled binary/shared library.
-  * New binary package uwsgi-plugin-php. (Closes: #699174)
-     - New Build-Depends libphp5-embed, php5-dev, libonig-dev, libdb-dev,
-       libqdbm-dev and libbz2-dev. 
+    LD_RUN_PATH which leads to setting RPATH in compiled binary/shared library:
+    python-plugin_remove_assignments_to_LD_RUN_PATH.patch.
   * debian/pathces/fix-php-ldflags.patch
      - Include php5-embed ld library path when building PHP plugin.
   * debian/patches/remove-php-libs.patch
      - Remove PHP libraries when building PHP plugin.
-  * Update debian/patches/fix-reload-process-name.patch to apply cleanly.
-  * Update debian/patches/python-plugin_remove_assignments_to_LD_RUN_PATH.patch
-    to apply cleanly.
-  * Update debian/patches/fix-php-ldflags.patch to apply cleanly.
-  * Update debian/patches/000000_02_remove_assignments_to_LD_RUN_PATH.patch to
-    apply cleanly.
-  * Remove no longer needed patch
-    110515_01_add_overriding_of_JVM_PATH_into_buildscript_of_jwsgi_plugin.patch.
-  * Remove no longer needed patch
-    000000_03_strip_versions_from_jQuery_scripts_links_in_uwsgicc_templates.patch.
-  * Remove no longer needed patch remove-pg_config_cflags-in-probepg.patch.
+  * Update patches to apply cleanly:
+     - fix-reload-process-name.patch
+     - fix-php-ldflags.patch
+     - 000000_02_remove_assignments_to_LD_RUN_PATH.patch
+  * Remove no longer needed patches:
+     - 110515_01_add_overriding_of_JVM_PATH_into_buildscript_of_jwsgi_plugin.patch
+     - 000000_03_strip_versions_from_jQuery_scripts_links_in_uwsgicc_templates.patch
+     - remove-pg_config_cflags-in-probepg.patch
   * Update lintian-overrides for jwsgi and jvm plugins.
+  * New binary package uwsgi-emperor. (Closes: #660212)
+  * New binary package uwsgi-plugin-php. (Closes: #699174)
+     - New Build-Depends libphp5-embed, php5-dev, libonig-dev, libdb-dev,
+       libqdbm-dev and libbz2-dev.
   * New binary package uwsgi-plugin-alarm-curl:
      - New Build-Depends libcurl4-openssl-dev.
      - Add alarm option to buildconf/uwsgi-core.ini.
      - Set pcre option to true in: buildconf/uwsgi-core.ini.
   * New binary package uwsgi-plugin-alarm-xmpp:
      - New Build-Depends libgloox-dev.
-  * New binary package uwsgi-plugin-cheaper-busyness.
-  * New binary package uwsgi-plugin-logfile.
-  * New binary package uwsgi-plugin-notfound.
-  * New binary package uwsgi-plugin-spooler.
-  * New binary package uwsgi-plugin-mongodblog.
   * New binary package uwsgi-plugin-pam:
      - New Build-Depends libpam0g-dev.
-  * New binary package uwsgi-plugin-redislog.
-  * New binary package uwsgi-plugin-zergpool.
   * New binary package uwsgi-plugin-stats-pusher-mongodb:
      - New Build-Depends mongodb-dev, libboost-thread-dev and
        libboost-filesystem-dev.
-  * New binary package uwsgi-plugin-stats-pusher-statsd.
-  * New binary package uwsgi-plugin-emperor-amqp.
-  * New binary package uwsgi-plugin-emperor-mongodb.
-  * New binary package uwsgi-plugin-emperor-pg.
-  * New binary package uwsgi-plugin-rawrouter.
   * New binary package uwsgi-plugin-router-access:
      - New Build-Depends libwrap0-dev.
      - Add routing option to buildconf/uwsgi-core.ini.
-  * New binary package uwsgi-plugin-router-basicauth.
-  * New binary package uwsgi-plugin-router-cache.
-  * New binary package uwsgi-plugin-router-http.
-  * New binary package uwsgi-plugin-router-memcached.
-  * New binary package uwsgi-plugin-router-redirect.
-  * New binary package uwsgi-plugin-router-rewrite.
-  * New binary package uwsgi-plugin-router-uwsgi.
-  * New binary package uwsgi-emperor. (Closes: #660212)
   * New binary package uwsgi-plugin-alarm-speech:
      - New Build-Depends libgnustep-base-dev and libgnustep-gui-dev.
      - Add debian/patches/alarm_speech-flags.patch
-  * New binary package uwsgi-plugin-cheaper-backlog2.
-  * New binary package uwsgi-plugin-clock-monothonic.
-  * New binary package uwsgi-plugin-clock-realtime.
   * New binary package uwsgi-plugin-coroae:
      - New Build-Depends libcoro-perl.
-  * New binary package uwsgi-plugin-curl-cron.
   * New binary package uwsgi-plugin-geoip:
      - New Build-Depends libgeoip-dev.
-  * New binary package uwsgi-plugin-gridfs.
-  * New binary package uwsgi-plugin-ldap.
-  * New binary package uwsgi-plugin-sqlite3.
-  * New binary package uwsgi-plugin-ssi.
-  * New binary package uwsgi-plugin-sslrouter.
-  * New binary package uwsgi-plugin-systemd-logger.
-  * New binary package uwsgi-plugin-transformation-gzip.
-  * New binary package uwsgi-plugin-transformation-tofile.
-  * New binary package uwsgi-plugin-transformation-toupper.
   * New binary package uwsgi-plugin-v8:
      - New Build-Depends libv8-dev.
   * New binary package uwsgi-plugin-xslt:
      - New Build-Depends libxslt1-dev.
   * New binary packages libapache2-mod-proxy-uwsgi and
     libapache2-mod-proxy-uwsgi-dbg.
+  * New plugins:
+    - uwsgi-plugin-cheaper-backlog2
+    - uwsgi-plugin-cheaper-busyness
+    - uwsgi-plugin-clock-monothonic
+    - uwsgi-plugin-clock-realtime
+    - uwsgi-plugin-curl-cron
+    - uwsgi-plugin-emperor-amqp
+    - uwsgi-plugin-emperor-mongodb
+    - uwsgi-plugin-emperor-pg
+    - uwsgi-plugin-gridfs
+    - uwsgi-plugin-ldap
+    - uwsgi-plugin-logfile
+    - uwsgi-plugin-mongodblog
+    - uwsgi-plugin-notfound
+    - uwsgi-plugin-rawrouter
+    - uwsgi-plugin-redislog
+    - uwsgi-plugin-router-basicauth
+    - uwsgi-plugin-router-cache
+    - uwsgi-plugin-router-http
+    - uwsgi-plugin-router-memcached
+    - uwsgi-plugin-router-redirect
+    - uwsgi-plugin-router-rewrite
+    - uwsgi-plugin-router-uwsgi
+    - uwsgi-plugin-spooler
+    - uwsgi-plugin-sqlite3
+    - uwsgi-plugin-ssi
+    - uwsgi-plugin-sslrouter
+    - uwsgi-plugin-stats-pusher-statsd
+    - uwsgi-plugin-systemd-logger
+    - uwsgi-plugin-transformation-gzip
+    - uwsgi-plugin-transformation-tofile
+    - uwsgi-plugin-transformation-toupper
+    - uwsgi-plugin-zergpool
   * Remove no longer provided plugins:
     - uwsgi-plugin-probeconnect
     - uwsgi-plugin-probepg
     - python-uwsgicc
     - python-django-uwsgi-admin
-  * uwsgi-extra:
+  * Changes in uwsgi-extra package:
     - Remove no longer provided nginx and lighttpd directories.
     - Update description.
 
