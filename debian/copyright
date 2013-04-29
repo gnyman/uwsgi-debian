@@ -5,7 +5,7 @@ Upstream-Contact: uWSGI developers and users list <uwsgi@lists.unbit.it>
 Source: http://projects.unbit.it/uwsgi/
 
 Files: *
-Copyright: 2009-2011, Unbit S.a.s <info@unbit.it>
+Copyright: 2009-2013, Unbit S.a.s <info@unbit.it>
 License: GPL-2+
 
 Files: apache2/mod_Ruwsgi.c
@@ -13,33 +13,16 @@ Copyright: 2009-2010, Roger Florkowski <rflorkowski@mypublisher.com>
            2009-2010, Unbit S.a.s <info@unbit.it>
 License: GPL-2+
 
-Files: apache2/mod_uwsgi.c
-Copyright: 2009-2012 Unbit S.a.s. <info@unbit.it>
+Files: core/rb_timers.c
+Copyright: Igor Sysoev
+ Nginx, Inc.
+ Unbit S.a.s.
 License: GPL-2+
 
-Files: nginx/ngx_http_uwsgi_module.c
-Copyright: 2009-2010, Unbit S.a.s <info@unbit.it>
-License: BSD
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
- 1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
- 2. Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in the
-    documentation and/or other materials provided with the distribution.
- .
- THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- SUCH DAMAGE.
+Files: core/hash.c
+Copyright: Austin Appleby
+License: GPL-2+
+ Applies only to murmur2_hash function adapted from nginx.
 
 Files: debian/*
 Copyright: 2012-2013, Janos Guljas <janos@debian.org>

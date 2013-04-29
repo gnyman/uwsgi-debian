@@ -5,7 +5,10 @@ uwsgi (1.9.8-1) UNRELEASED; urgency=low
     - Drop dfsg sufix from version.
     - Remove get-orig-source target from debian/rules.
   * Update debian/copyright:
-    - Remove references to removed files lib/rbtree.c and lib/rbtree.h.
+    - Remove references to removed files lib/rbtree.c, lib/rbtree.h and
+      nginx/ngx_http_uwsgi_module.c.
+    - Added copyrights for core/rb_timers.c and core/hash.c.
+    - Updated copyright years.
   * debian/control:
     - New binary package uwsgi-plugin-corerouter.
     - uwsgi-plugin-fastrouter and uwsgi-plugin-http depend on
