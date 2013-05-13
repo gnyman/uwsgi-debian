@@ -21,47 +21,35 @@ struct uwsgi_ugreen {
 
 extern struct uwsgi_server uwsgi;
 
-struct uwsgi_option ugreen_options[] = {
-	{"ugreen", no_argument, 0, "enable ugreen coroutine subsystem", uwsgi_opt_true, &ug.ugreen, 1},
+static struct uwsgi_option ugreen_options[] = {
+	{"ugreen", no_argument, 0, "enable ugreen coroutine subsystem", uwsgi_opt_true, &ug.ugreen, 0},
 	{"ugreen-stacksize", required_argument, 0, "set ugreen stack size in pages", uwsgi_opt_set_int, &ug.stackpages, 0},
 	{ 0, 0, 0, 0, 0, 0, 0 }
 };
 
-void u_green_request() {
-#ifdef UWSGI_ROUTING
-        if (uwsgi_apply_routes(uwsgi.wsgi_req) == UWSGI_ROUTE_BREAK) {
-		// end of the request
-		uwsgi.wsgi_req->async_status = UWSGI_OK;
-		uwsgi.wsgi_req->suspended = 0;
-		return;
-	}
-#endif
-	uwsgi.wsgi_req->async_status = uwsgi.p[uwsgi.wsgi_req->uh->modifier1]->request(uwsgi.wsgi_req);
-	uwsgi.wsgi_req->suspended = 0;
-}
-
 static void u_green_schedule_to_req() {
 
 	int id = uwsgi.wsgi_req->async_id;
+	uint8_t modifier1 = uwsgi.wsgi_req->uh->modifier1;
 
+	// first round ?
 	if (!uwsgi.wsgi_req->suspended) {
 		ug.contexts[id].uc_link = &ug.main;
-        	makecontext(&ug.contexts[id], u_green_request, 0);
+        	makecontext(&ug.contexts[id], async_schedule_to_req_green, 0);
 		uwsgi.wsgi_req->suspended = 1;
 	}
 
-	if (uwsgi.p[uwsgi.wsgi_req->uh->modifier1]->suspend) {
-		uwsgi.p[uwsgi.wsgi_req->uh->modifier1]->suspend(NULL);
+	// call it in the main core
+	if (uwsgi.p[modifier1]->suspend) {
+		uwsgi.p[modifier1]->suspend(NULL);
 	}
 
+	// save the main stack and switch to the core
 	swapcontext(&ug.main, &ug.contexts[id] );		
 
-	if (uwsgi.p[uwsgi.wsgi_req->uh->modifier1]->resume) {
-		uwsgi.p[uwsgi.wsgi_req->uh->modifier1]->resume(NULL);
-	}
-
-	if (uwsgi.wsgi_req->suspended) {
-		uwsgi.wsgi_req->async_status = UWSGI_AGAIN;
+	// call it in the main core
+	if (uwsgi.p[modifier1]->resume) {
+		uwsgi.p[modifier1]->resume(NULL);
 	}
 
 }
@@ -72,7 +60,9 @@ static void u_green_schedule_to_main(struct wsgi_request *wsgi_req) {
 		uwsgi.p[wsgi_req->uh->modifier1]->suspend(wsgi_req);
 	}
 
+	// back to main
 	swapcontext(&ug.contexts[wsgi_req->async_id], &ug.main);
+	// back to core
 
 	if (uwsgi.p[wsgi_req->uh->modifier1]->resume) {
 		uwsgi.p[wsgi_req->uh->modifier1]->resume(wsgi_req);
@@ -82,7 +72,7 @@ static void u_green_schedule_to_main(struct wsgi_request *wsgi_req) {
 }
 
 
-int u_green_init() {
+static int u_green_init() {
 
 	static int i;
 

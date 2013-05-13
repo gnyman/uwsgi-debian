@@ -293,8 +293,9 @@ int uwsgi_request_wsgi(struct wsgi_request *wsgi_req) {
 
 	struct uwsgi_app *wi;
 
-	if (wsgi_req->async_status == UWSGI_AGAIN) {
+	if (wsgi_req->async_force_again) {
 		wi = &uwsgi_apps[wsgi_req->app_id];
+		wsgi_req->async_force_again = 0;
 		UWSGI_GET_GIL
 		// get rid of timeout
 		if (wsgi_req->async_timed_out) {
@@ -315,6 +316,9 @@ int uwsgi_request_wsgi(struct wsgi_request *wsgi_req) {
 		int ret = manage_python_response(wsgi_req);
 		if (ret == UWSGI_OK) goto end;
 		UWSGI_RELEASE_GIL
+		if (ret == UWSGI_AGAIN) {
+			wsgi_req->async_force_again = 1;
+		}
 		return ret;
 	}
 
@@ -328,13 +332,15 @@ int uwsgi_request_wsgi(struct wsgi_request *wsgi_req) {
 		return -1;
 	}
 
+	if (wsgi_req->dynamic) {
+        	// this part must be heavy locked in threaded modes
+                if (uwsgi.threads > 1) {
+                	pthread_mutex_lock(&up.lock_pyloaders);
+                }
+	}
+
 	if ( (wsgi_req->app_id = uwsgi_get_app_id(wsgi_req, wsgi_req->appid, wsgi_req->appid_len, 0))  == -1) {
 		if (wsgi_req->dynamic) {
-			// this part must be heavy locked in threaded modes
-			if (uwsgi.threads > 1) {
-				pthread_mutex_lock(&up.lock_pyloaders);
-			}
-
 			UWSGI_GET_GIL
 			if (uwsgi.single_interpreter) {
 				wsgi_req->app_id = init_uwsgi_app(LOADER_DYN, (void *) wsgi_req, wsgi_req, up.main_thread, PYTHON_APP_TYPE_WSGI);
@@ -343,9 +349,12 @@ int uwsgi_request_wsgi(struct wsgi_request *wsgi_req) {
 				wsgi_req->app_id = init_uwsgi_app(LOADER_DYN, (void *) wsgi_req, wsgi_req, NULL, PYTHON_APP_TYPE_WSGI);
 			}
 			UWSGI_RELEASE_GIL
-			if (uwsgi.threads > 1) {
-				pthread_mutex_unlock(&up.lock_pyloaders);
-			}
+		}
+	}
+
+	if (wsgi_req->dynamic) {
+		if (uwsgi.threads > 1) {
+			pthread_mutex_unlock(&up.lock_pyloaders);
 		}
 	}
 
@@ -388,6 +397,7 @@ int uwsgi_request_wsgi(struct wsgi_request *wsgi_req) {
 		while (wi->response_subhandler(wsgi_req) != UWSGI_OK) {
 			if (uwsgi.async > 1) {
 				UWSGI_RELEASE_GIL
+				wsgi_req->async_force_again = 1;
 				return UWSGI_AGAIN;
 			}
 			else {

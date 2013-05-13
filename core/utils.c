@@ -574,23 +574,14 @@ void uwsgi_close_request(struct wsgi_request *wsgi_req) {
 	int tmp_id;
 	uint64_t tmp_rt, rss = 0, vsz = 0;
 
-	// flush the response buf (if any)
-	if (wsgi_req->response_buffer) {
-		// send the body only if transformations are successfull
-		struct uwsgi_buffer *ub = wsgi_req->response_buffer;
-		if (uwsgi_apply_transformations(wsgi_req) == 0) {
-			// the response_buffer could be changed by translations
-			ub = wsgi_req->response_buffer;
-			// force true write (take flushing into account)
-			wsgi_req->response_buffer = NULL;
-			if (wsgi_req->response_size == 0) {
-				uwsgi_response_write_body_do(wsgi_req, ub->buf, ub->pos);
+	// apply transformations
+	if (wsgi_req->transformations) {
+		if (uwsgi_apply_final_transformations(wsgi_req) == 0) {
+			if (wsgi_req->transformed_chunk && wsgi_req->transformed_chunk_len > 0) {
+				uwsgi_response_write_body_do(wsgi_req, wsgi_req->transformed_chunk, wsgi_req->transformed_chunk_len);
 			}
 		}
-		else {
-			wsgi_req->write_errors++;
-		}
-		uwsgi_buffer_destroy(ub);
+		uwsgi_free_transformations(wsgi_req);
 	}
 
 	// check if headers should be sent
@@ -616,6 +607,20 @@ void uwsgi_close_request(struct wsgi_request *wsgi_req) {
 		uwsgi.workers[uwsgi.mywid].rss_size = rss;
 	}
 
+	if (!wsgi_req->do_not_account) {
+		uwsgi.workers[0].requests++;
+		uwsgi.workers[uwsgi.mywid].requests++;
+		uwsgi.workers[uwsgi.mywid].cores[wsgi_req->async_id].requests++;
+		uwsgi.workers[uwsgi.mywid].cores[wsgi_req->async_id].write_errors += wsgi_req->write_errors;
+		// this is used for MAX_REQUESTS
+		uwsgi.workers[uwsgi.mywid].delta_requests++;
+	}
+
+#ifdef UWSGI_ROUTING
+	// apply final routes after accounting
+	uwsgi_apply_final_routes(wsgi_req);
+#endif
+
 	// close the connection with the client
 	if (!wsgi_req->fd_closed) {
 		// NOTE, if we close the socket before receiving eventually sent data, socket layer will send a RST
@@ -638,15 +643,6 @@ void uwsgi_close_request(struct wsgi_request *wsgi_req) {
 		free(wsgi_req->proto_parser_buf);
 	}
 
-	if (!wsgi_req->do_not_account) {
-		uwsgi.workers[0].requests++;
-		uwsgi.workers[uwsgi.mywid].requests++;
-		uwsgi.workers[uwsgi.mywid].cores[wsgi_req->async_id].requests++;
-		uwsgi.workers[uwsgi.mywid].cores[wsgi_req->async_id].write_errors += wsgi_req->write_errors;
-		// this is used for MAX_REQUESTS
-		uwsgi.workers[uwsgi.mywid].delta_requests++;
-	}
-
 	// after_request hook
 	if (uwsgi.p[wsgi_req->uh->modifier1]->after_request)
 		uwsgi.p[wsgi_req->uh->modifier1]->after_request(wsgi_req);
@@ -666,12 +662,14 @@ void uwsgi_close_request(struct wsgi_request *wsgi_req) {
 		set_user_harakiri(0);
 	}
 
-	// this is racy in multithread mode
-	if (wsgi_req->response_size > 0) {
-		uwsgi.workers[uwsgi.mywid].tx += wsgi_req->response_size;
-	}
-	if (wsgi_req->headers_size > 0) {
-		uwsgi.workers[uwsgi.mywid].tx += wsgi_req->headers_size;
+	if (!wsgi_req->do_not_account) {
+		// this is racy in multithread mode
+		if (wsgi_req->response_size > 0) {
+			uwsgi.workers[uwsgi.mywid].tx += wsgi_req->response_size;
+		}
+		if (wsgi_req->headers_size > 0) {
+			uwsgi.workers[uwsgi.mywid].tx += wsgi_req->headers_size;
+		}
 	}
 
 	// defunct process reaper
@@ -1810,23 +1808,32 @@ void init_magic_table(char *magic_table[]) {
 }
 
 char *uwsgi_get_last_char(char *what, char c) {
-	int i;
-	char *ptr = NULL;
-
-	for (i = 0; i < (int) strlen(what); i++) {
-		if (what[i] == c) {
-			ptr = what + i;
-		}
+	size_t len = strlen(what);
+	while(len--) {
+		if (what[len] == c) return what + len;
 	}
-
-	return ptr;
+	return NULL;
 }
+
+char *uwsgi_get_last_charn(char *what, size_t len, char c) {
+        while(len--) {
+                if (what[len] == c) return what + len;
+        }
+        return NULL;
+}
+
 
 char *uwsgi_num2str(int num) {
 
 	char *str = uwsgi_malloc(11);
 
 	snprintf(str, 11, "%d", num);
+	return str;
+}
+
+char *uwsgi_64bit2str(int64_t num) {
+	char *str = uwsgi_malloc(sizeof(MAX64_STR)+1);
+	snprintf(str, sizeof(MAX64_STR)+1, "%lld", (long long) num);
 	return str;
 }
 
@@ -2223,6 +2230,7 @@ struct uwsgi_string_list *uwsgi_string_new_list(struct uwsgi_string_list **list,
 	uwsgi_string->next = NULL;
 	uwsgi_string->custom = 0;
 	uwsgi_string->custom2 = 0;
+	uwsgi_string->custom_ptr = NULL;
 
 	return uwsgi_string;
 }
@@ -3100,6 +3108,7 @@ void http_url_decode(char *buf, uint16_t * len, char *dst) {
 
 }
 
+
 /*
 	we scan the table in reverse, as updated values are at the end
 */
@@ -3143,6 +3152,10 @@ struct uwsgi_app *uwsgi_add_app(int id, uint8_t modifier1, char *mountpoint, int
 		}
 	}
 
+	if ((mountpoint_len == 0 || (mountpoint_len =- 1 && mountpoint[0] == '/')) && uwsgi.default_app == -1) {
+                uwsgi.default_app = id;
+        }
+
 	return wi;
 }
 
@@ -3162,7 +3175,7 @@ char *uwsgi_check_touches(struct uwsgi_string_list *touch_list) {
 				uwsgi_log("[uwsgi-check-touches] File %s was removed\n", touch->value);
 #endif
 				touch->custom2 = 1;
-				return touch->value;
+				return touch->custom_ptr ? touch->custom_ptr : touch->value;
 			}
 			else if (!touch->custom && !touch->custom2) {
 				uwsgi_log("unable to stat() %s, events will be triggered as soon as the file is created\n", touch->value);
@@ -3177,14 +3190,14 @@ char *uwsgi_check_touches(struct uwsgi_string_list *touch_list) {
 #endif
 				touch->custom = (uint64_t) tr_st.st_mtime;
 				touch->custom2 = 0;
-				return touch->value;
+				return touch->custom_ptr ? touch->custom_ptr : touch->value;
 			}
 			else if (touch->custom && (uint64_t) tr_st.st_mtime > touch->custom) {
 #ifdef UWSGI_DEBUG
 				uwsgi_log("[uwsgi-check-touches] modification detected on %s: %llu -> %llu\n", touch->value, (unsigned long long) touch->custom, (unsigned long long) tr_st.st_mtime);
 #endif
 				touch->custom = (uint64_t) tr_st.st_mtime;
-				return touch->value;
+				return touch->custom_ptr ? touch->custom_ptr : touch->value;
 			}
 			touch->custom = (uint64_t) tr_st.st_mtime;
 		}
@@ -3906,4 +3919,40 @@ char *uwsgi_str_to_hex(char *src, size_t slen) {
 		ptr+=2;
 	}
 	return dst;
+}
+
+// dst has to be 3 times buf size (USE IT ONLY FOR PATH_INFO !!!)
+void http_url_encode(char *buf, uint16_t *len, char *dst) {
+
+        uint16_t i;
+        char *ptr = dst;
+        for(i=0;i<*len;i++) {
+                if ((buf[i] >= 'A' && buf[i] <= 'Z') ||
+                        (buf[i] >= 'a' && buf[i] <= 'z') ||
+                        (buf[i] >= '0' && buf[i] <= '9') ||
+                        buf[i] == '-' || buf[i] == '_' || buf[i] == '.' || buf[i] == '~' || buf[i] == '/' ) {
+                        *ptr++= buf[i];
+                }
+                else {
+                        char *h = uwsgi_hex_table[(int) buf[i]];
+                        *ptr++= '%';
+                        *ptr++= h[0];
+                        *ptr++= h[1];
+                }
+        }
+
+        *len = ptr-dst;
+
+}
+
+void uwsgi_takeover() {
+	if (uwsgi.i_am_a_spooler) {
+		uwsgi_spooler_run();
+	}
+	else if (uwsgi.muleid) {
+		uwsgi_mule_run();
+	}
+	else {
+		uwsgi_worker_run();
+	}
 }

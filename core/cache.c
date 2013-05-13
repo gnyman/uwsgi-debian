@@ -416,6 +416,24 @@ char *uwsgi_cache_get2(struct uwsgi_cache *uc, char *key, uint16_t keylen, uint6
 	return NULL;
 }
 
+int64_t uwsgi_cache_num2(struct uwsgi_cache *uc, char *key, uint16_t keylen) {
+
+        uint64_t index = uwsgi_cache_get_index(uc, key, keylen);
+
+        if (index) {
+                struct uwsgi_cache_item *uci = cache_item(index);
+		if (uci->flags & UWSGI_CACHE_FLAG_UNGETTABLE)
+                        return 0;
+                uci->hits++;
+                uc->hits++;
+		int64_t *num = (int64_t *) (uc->data + (uci->first_block * uc->blocksize));
+		return *num;
+        }
+
+        uc->miss++;
+	return 0;
+}
+
 char *uwsgi_cache_get3(struct uwsgi_cache *uc, char *key, uint16_t keylen, uint64_t * valsize, uint64_t *expires) {
 
         uint64_t index = uwsgi_cache_get_index(uc, key, keylen);
@@ -543,6 +561,8 @@ int uwsgi_cache_set2(struct uwsgi_cache *uc, char *key, uint16_t keylen, char *v
 
 	if (vallen > uc->max_item_size) return -1;
 
+	if ((flags & UWSGI_CACHE_FLAG_MATH) && vallen != 8) return -1;
+
 	//uwsgi_log("putting cache data in key %.*s %d\n", keylen, key, vallen);
 	index = uwsgi_cache_get_index(uc, key, keylen);
 	if (!index) {
@@ -602,7 +622,33 @@ int uwsgi_cache_set2(struct uwsgi_cache *uc, char *key, uint16_t keylen, char *v
 		uci->hits = 0;
 		uci->flags = flags;
 		memcpy(uci->key, key, keylen);
-		memcpy(((char *) uc->data) + (uci->first_block * uc->blocksize), val, vallen);
+
+		if ( !(flags & UWSGI_CACHE_FLAG_MATH)) {
+			memcpy(((char *) uc->data) + (uci->first_block * uc->blocksize), val, vallen);
+		}		
+		// ok math operations here
+		else {
+			int64_t *num = (int64_t *)(((char *) uc->data) + (uci->first_block * uc->blocksize));
+			*num = uc->math_initial;
+			int64_t *delta = (int64_t *) val;
+			if (flags & UWSGI_CACHE_FLAG_INC) {
+				*num += *delta;
+			}
+			else if (flags & UWSGI_CACHE_FLAG_DEC) {
+				*num -= *delta;
+			}
+			else if (flags & UWSGI_CACHE_FLAG_MUL) {
+				*num *= *delta;
+			}
+			else if (flags & UWSGI_CACHE_FLAG_DIV) {
+				if (*delta == 0) {
+					*num = 0;
+				}
+				else {
+					*num /= *delta;
+				}
+			}
+		}
 
 		// set this as late as possibile (to reduce races risk)
 
@@ -634,7 +680,7 @@ int uwsgi_cache_set2(struct uwsgi_cache *uc, char *key, uint16_t keylen, char *v
 	}
 	else if (flags & UWSGI_CACHE_FLAG_UPDATE) {
 		uci = cache_item(index);
-		if (expires && !(flags & UWSGI_CACHE_FLAG_ABSEXPIRE)) {
+		if (expires && !(flags & UWSGI_CACHE_FLAG_ABSEXPIRE) && !(flags & UWSGI_CACHE_FLAG_FIXEXPIRE)) {
 			now = uwsgi_now();
 			expires += now;
 			uci->expires = expires;
@@ -661,7 +707,30 @@ int uwsgi_cache_set2(struct uwsgi_cache *uc, char *key, uint16_t keylen, char *v
 			// unmark the old blocks
 			cache_unmark_blocks(uc, uci->first_block, uci->valsize);
 		}
-		memcpy(uc->data + (uci->first_block * uc->blocksize), val, vallen);
+		if ( !(flags & UWSGI_CACHE_FLAG_MATH)) {
+			memcpy(uc->data + (uci->first_block * uc->blocksize), val, vallen);
+		}
+		else {
+			int64_t *num = (int64_t *)(((char *) uc->data) + (uci->first_block * uc->blocksize));
+                        int64_t *delta = (int64_t *) val;
+                        if (flags & UWSGI_CACHE_FLAG_INC) {
+                                *num += *delta;
+                        }
+                        else if (flags & UWSGI_CACHE_FLAG_DEC) {
+                                *num -= *delta;
+                        }
+                        else if (flags & UWSGI_CACHE_FLAG_MUL) {
+                                *num *= *delta;
+                        }
+                        else if (flags & UWSGI_CACHE_FLAG_DIV) {
+                                if (*delta == 0) {
+                                        *num = 0;
+                                }
+                                else {
+                                        *num /= *delta;
+                                }
+                        }
+		}
 		uci->valsize = vallen;
 		ret = 0;
 	}
@@ -968,6 +1037,7 @@ struct uwsgi_cache *uwsgi_cache_create(char *arg) {
 		char *c_udp_servers = NULL;
 		char *c_bitmap = NULL;
 		char *c_use_last_modified = NULL;
+		char *c_math_initial = NULL;
 
 		if (uwsgi_kvlist_parse(arg, strlen(arg), ',', '=',
                         "name", &c_name,
@@ -994,6 +1064,7 @@ struct uwsgi_cache *uwsgi_cache_create(char *arg) {
                         "udpserver", &c_udp_servers,
                         "bitmap", &c_bitmap,
                         "lastmod", &c_use_last_modified,
+                        "math_initial", &c_math_initial,
                 	NULL)) {
 			uwsgi_log("unable to parse cache definition\n");
 			exit(1);
@@ -1039,6 +1110,8 @@ struct uwsgi_cache *uwsgi_cache_create(char *arg) {
 			uc->max_item_size = uc->blocksize * uc->blocks;
 		}
 		if (c_use_last_modified) uc->use_last_modified = 1;
+
+		if (c_math_initial) uc->math_initial = strtol(c_math_initial, NULL, 10);
 
 		uc->store_sync = uwsgi.cache_store_sync;
 		if (c_store_sync) { uc->store_sync = uwsgi_n64(c_store_sync); }
@@ -1737,7 +1810,7 @@ void uwsgi_cache_sync_from_nodes(struct uwsgi_cache *uc) {
 			goto next;
 		}
 
-		uwsgi_hooked_parse(ub->buf, ub->pos, cache_sync_hook, uc);
+		uwsgi_hooked_parse(ub->buf, rlen, cache_sync_hook, uc);
 
 		if (uwsgi_read_nb(fd, (char *) uc->items, uc->filesize, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT])) {
 			uwsgi_buffer_destroy(ub);
