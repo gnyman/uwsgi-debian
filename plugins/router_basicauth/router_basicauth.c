@@ -1,4 +1,4 @@
-#include "../../uwsgi.h"
+#include <uwsgi.h>
 
 #ifdef UWSGI_ROUTING
 
@@ -60,7 +60,13 @@ static uint16_t htpasswd_check(char *filename, char *auth) {
 	return 0;
 }
 
-int uwsgi_routing_func_basicauth(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
+static int uwsgi_routing_func_basicauth(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
+
+	// skip if already authenticated
+	if (wsgi_req->remote_user_len > 0) {
+		return UWSGI_ROUTE_NEXT;
+	}
+
 
 	if (wsgi_req->authorization_len > 7 && ur->data2_len > 0) {
 		if (strncmp(wsgi_req->authorization, "Basic ", 6))
@@ -74,28 +80,32 @@ int uwsgi_routing_func_basicauth(struct wsgi_request *wsgi_req, struct uwsgi_rou
 				uint16_t ulen = htpasswd_check(ur->data2, auth);
 				if (ulen > 0) {
 					wsgi_req->remote_user = uwsgi_req_append(wsgi_req, "REMOTE_USER", 11, auth, ulen); 
-					if (wsgi_req->remote_user)
-						wsgi_req->remote_user_len = ulen;
+					if (!wsgi_req->remote_user) {
+						free(auth);
+						goto forbidden;
+					}
+					wsgi_req->remote_user_len = ulen;
+				}
+				else if (ur->data3_len == 0) {
 					free(auth);
-					if (ur->data3_len > 0)
-						return UWSGI_ROUTE_CONTINUE;
-					return UWSGI_ROUTE_GOON;
+					goto forbidden;
 				}
 			}
 			else {
 				if (!uwsgi_strncmp(auth, auth_len, ur->data2, ur->data2_len)) {
 					wsgi_req->remote_user = uwsgi_req_append(wsgi_req, "REMOTE_USER", 11, auth, ur->custom); 
-					if (wsgi_req->remote_user)
-						wsgi_req->remote_user_len = ur->custom;
+					if (!wsgi_req->remote_user) {
+						free(auth);
+						goto forbidden;
+					}
+					wsgi_req->remote_user_len = ur->custom;
+				}
+				else if (ur->data3_len == 0) {
 					free(auth);
-					if (ur->data3_len > 0)
-						return UWSGI_ROUTE_CONTINUE;
-					return UWSGI_ROUTE_GOON;
+					goto forbidden;
 				}
 			}
 			free(auth);
-			if (ur->is_last)
-				goto forbidden;
 			return UWSGI_ROUTE_NEXT;
 		}
 	}
@@ -103,16 +113,16 @@ int uwsgi_routing_func_basicauth(struct wsgi_request *wsgi_req, struct uwsgi_rou
 forbidden:
 	if (uwsgi_response_prepare_headers(wsgi_req, "401 Authorization Required", 26)) goto end;
 	char *realm = uwsgi_concat3n("Basic realm=\"", 13, ur->data, ur->data_len, "\"", 1);
-	int ret = uwsgi_response_add_header(wsgi_req, "WWW-Authenticate", 16, realm, 13 + ur->data_len + 1);
+	// no need to check for errors
+	uwsgi_response_add_header(wsgi_req, "WWW-Authenticate", 16, realm, 13 + ur->data_len + 1);
 	free(realm);
-	if (ret) goto end;
 	uwsgi_response_write_body_do(wsgi_req, "Unauthorized", 12);
 end:
 	return UWSGI_ROUTE_BREAK;
 }
 
 #ifndef __linux__
-void router_basicauth_init_lock() {
+static void router_basicauth_init_lock() {
 	pthread_mutex_init(&ur_basicauth_crypt_mutex, NULL);
 }
 #endif
@@ -147,17 +157,14 @@ static int uwsgi_router_basicauth(struct uwsgi_route *ur, char *args) {
 	return 0;
 }
 
-static int uwsgi_router_basicauth_last(struct uwsgi_route *ur, char *args) {
-	uwsgi_router_basicauth(ur, args);
+static int uwsgi_router_basicauth_next(struct uwsgi_route *ur, char *args) {
 	ur->data3_len = 1;
-	return 0;
+	return uwsgi_router_basicauth(ur, args);
 }
 
-
-void router_basicauth_register(void) {
-
+static void router_basicauth_register(void) {
 	uwsgi_register_router("basicauth", uwsgi_router_basicauth);
-	uwsgi_register_router("basicauth-last", uwsgi_router_basicauth_last);
+	uwsgi_register_router("basicauth-next", uwsgi_router_basicauth_next);
 }
 
 struct uwsgi_plugin router_basicauth_plugin = {

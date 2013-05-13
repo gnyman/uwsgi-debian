@@ -65,7 +65,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"harakiri-no-arh", no_argument, 0, "do not enable harakiri during after-request-hook", uwsgi_opt_true, &uwsgi.harakiri_no_arh, 0},
 	{"no-harakiri-arh", no_argument, 0, "do not enable harakiri during after-request-hook", uwsgi_opt_true, &uwsgi.harakiri_no_arh, 0},
 	{"no-harakiri-after-req-hook", no_argument, 0, "do not enable harakiri during after-request-hook", uwsgi_opt_true, &uwsgi.harakiri_no_arh, 0},
-	{"backtrace-depth", no_argument, 0, "set backtrace depth", uwsgi_opt_set_int, &uwsgi.backtrace_depth, 0},
+	{"backtrace-depth", required_argument, 0, "set backtrace depth", uwsgi_opt_set_int, &uwsgi.backtrace_depth, 0},
 	{"mule-harakiri", required_argument, 0, "set harakiri timeout for mule tasks", uwsgi_opt_set_dyn, (void *) UWSGI_OPTION_MULE_HARAKIRI, 0},
 #ifdef UWSGI_XML
 	{"xmlconfig", required_argument, 'x', "load config from xml file", uwsgi_opt_load_xml, NULL, UWSGI_OPT_IMMEDIATE},
@@ -344,6 +344,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"touch-chain-reload", required_argument, 0, "trigger chain reload if the specified file is modified/touched", uwsgi_opt_add_string_list, &uwsgi.touch_chain_reload, UWSGI_OPT_MASTER},
 	{"touch-logrotate", required_argument, 0, "trigger logrotation if the specified file is modified/touched", uwsgi_opt_add_string_list, &uwsgi.touch_logrotate, UWSGI_OPT_MASTER | UWSGI_OPT_LOG_MASTER},
 	{"touch-logreopen", required_argument, 0, "trigger log reopen if the specified file is modified/touched", uwsgi_opt_add_string_list, &uwsgi.touch_logreopen, UWSGI_OPT_MASTER | UWSGI_OPT_LOG_MASTER},
+	{"touch-exec", required_argument, 0, "run command when the specified file is modified/touched (syntax: file command)", uwsgi_opt_add_string_list, &uwsgi.touch_exec, UWSGI_OPT_MASTER},
 	{"propagate-touch", no_argument, 0, "over-engineering option for system with flaky signal mamagement", uwsgi_opt_true, &uwsgi.propagate_touch, 0},
 	{"limit-post", required_argument, 0, "limit request body", uwsgi_opt_set_64bit, &uwsgi.limit_post, 0},
 	{"no-orphans", no_argument, 0, "automatically kill workers if master dies (can be dangerous for availability)", uwsgi_opt_true, &uwsgi.no_orphans, 0},
@@ -457,6 +458,8 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"alarm", required_argument, 0, "create a new alarm, syntax: <alarm> <plugin:args>", uwsgi_opt_add_string_list, &uwsgi.alarm_list, UWSGI_OPT_MASTER},
 	{"alarm-freq", required_argument, 0, "tune the anti-loop alam system (default 3 seconds)", uwsgi_opt_set_int, &uwsgi.alarm_freq, 0},
 	{"alarm-fd", required_argument, 0, "raise the specified alarm when an fd is read for read (by default it reads 1 byte, set 8 for eventfd)", uwsgi_opt_add_string_list, &uwsgi.alarm_fd_list, UWSGI_OPT_MASTER},
+	{"alarm-segfault", required_argument, 0, "raise the specified alarm when the segmentation fault handler is executed", uwsgi_opt_add_string_list, &uwsgi.alarm_segfault, UWSGI_OPT_MASTER},
+	{"segfault-alarm", required_argument, 0, "raise the specified alarm when the segmentation fault handler is executed", uwsgi_opt_add_string_list, &uwsgi.alarm_segfault, UWSGI_OPT_MASTER},
 #ifdef UWSGI_PCRE
 	{"log-alarm", required_argument, 0, "raise the specified alarm when a log line matches the specified regexp, syntax: <alarm>[,alarm...] <regexp>", uwsgi_opt_add_string_list, &uwsgi.alarm_logs_list, UWSGI_OPT_MASTER | UWSGI_OPT_LOG_MASTER},
 	{"alarm-log", required_argument, 0, "raise the specified alarm when a log line matches the specified regexp, syntax: <alarm>[,alarm...] <regexp>", uwsgi_opt_add_string_list, &uwsgi.alarm_logs_list, UWSGI_OPT_MASTER | UWSGI_OPT_LOG_MASTER},
@@ -528,6 +531,22 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"route-if", required_argument, 0, "add a route based on condition", uwsgi_opt_add_route, "if", 0},
 	{"route-if-not", required_argument, 0, "add a route based on condition (negate version)", uwsgi_opt_add_route, "if-not", 0},
 	{"route-run", required_argument, 0, "always run the specified route action", uwsgi_opt_add_route, "run", 0},
+
+
+
+	{"final-route", required_argument, 0, "add a final route", uwsgi_opt_add_route, "path_info", 0},
+        {"final-route-host", required_argument, 0, "add a final route based on Host header", uwsgi_opt_add_route, "http_host", 0},
+        {"final-route-uri", required_argument, 0, "add a final route based on REQUEST_URI", uwsgi_opt_add_route, "request_uri", 0},
+        {"final-route-qs", required_argument, 0, "add a final route based on QUERY_STRING", uwsgi_opt_add_route, "query_string", 0},
+        {"final-route-remote-addr", required_argument, 0, "add a final route based on REMOTE_ADDR", uwsgi_opt_add_route, "remote_addr", 0},
+        {"final-route-user-agent", required_argument, 0, "add a final route based on HTTP_USER_AGENT", uwsgi_opt_add_route, "user_agent", 0},
+        {"final-route-remote-user", required_argument, 0, "add a final route based on REMOTE_USER", uwsgi_opt_add_route, "remote_user", 0},
+        {"final-route-referer", required_argument, 0, "add a final route based on HTTP_REFERER", uwsgi_opt_add_route, "referer", 0},
+        {"final-route-label", required_argument, 0, "add a final routing label (for use with goto)", uwsgi_opt_add_route, NULL, 0},
+        {"final-route-if", required_argument, 0, "add a final route based on condition", uwsgi_opt_add_route, "if", 0},
+        {"final-route-if-not", required_argument, 0, "add a final route based on condition (negate version)", uwsgi_opt_add_route, "if-not", 0},
+        {"final-route-run", required_argument, 0, "always run the specified final route action", uwsgi_opt_add_route, "run", 0},
+
 	{"router-list", no_argument, 0, "list enabled routers", uwsgi_opt_true, &uwsgi.router_list, 0},
 	{"routers-list", no_argument, 0, "list enabled routers", uwsgi_opt_true, &uwsgi.router_list, 0},
 #endif
@@ -628,6 +647,11 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"attach-daemon", required_argument, 0, "attach a command/daemon to the master process (the command has to not go in background)", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
 	{"smart-attach-daemon", required_argument, 0, "attach a command/daemon to the master process managed by a pidfile (the command has to daemonize)", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
 	{"smart-attach-daemon2", required_argument, 0, "attach a command/daemon to the master process managed by a pidfile (the command has to NOT daemonize)", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
+#ifdef UWSGI_SSL
+	{"legion-attach-daemon", required_argument, 0, "same as --attach-daemon but daemon runs only on legion lord node", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
+	{"legion-smart-attach-daemon", required_argument, 0, "same as --smart-attach-daemon but daemon runs only on legion lord node", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
+	{"legion-smart-attach-daemon2", required_argument, 0, "same as --smart-attach-daemon2 but daemon runs only on legion lord node", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
+#endif
 	{"daemons-honour-stdin", no_argument, 0, "do not change the stdin of external daemons to /dev/null", uwsgi_opt_true, &uwsgi.daemons_honour_stdin, UWSGI_OPT_MASTER},
 	{"plugins", required_argument, 0, "load uWSGI plugins", uwsgi_opt_load_plugin, NULL, UWSGI_OPT_IMMEDIATE},
 	{"plugin", required_argument, 0, "load uWSGI plugins", uwsgi_opt_load_plugin, NULL, UWSGI_OPT_IMMEDIATE},
@@ -1447,15 +1471,28 @@ void uwsgi_backtrace(int depth) {
 
 	bt_strings = backtrace_symbols(btrace, bt_size);
 
-	uwsgi_log("*** backtrace of %d ***\n", (int) getpid());
+	struct uwsgi_buffer *ub = uwsgi_buffer_new(uwsgi.page_size);
+	uwsgi_buffer_append(ub, "*** backtrace of ",17);
+	uwsgi_buffer_num64(ub, (int64_t) getpid());
+	uwsgi_buffer_append(ub, " ***\n", 5);
 	for (i = 0; i < bt_size; i++) {
-		uwsgi_log("%s\n", bt_strings[i]);
+		uwsgi_buffer_append(ub, bt_strings[i], strlen(bt_strings[i]));
+		uwsgi_buffer_append(ub, "\n", 1);
 	}
 
 	free(btrace);
-	uwsgi_log("*** end of backtrace ***\n");
 
+	uwsgi_buffer_append(ub, "*** end of backtrace ***\n", 25);
 
+	uwsgi_log("%.*s", ub->pos, ub->buf);
+
+	struct uwsgi_string_list *usl = uwsgi.alarm_segfault;
+	while(usl) {
+		uwsgi_alarm_trigger(usl->value, ub->buf, ub->pos);	
+		usl = usl->next;
+	}	
+
+	uwsgi_buffer_destroy(ub);
 #endif
 
 }
@@ -2202,18 +2239,9 @@ int uwsgi_start(void *v_argv) {
 			}
 		}
 		uwsgi_log("- async cores set to %d - fd table size: %d\n", uwsgi.async, (int) uwsgi.max_fd);
-		uwsgi.async_waiting_fd_table = malloc(sizeof(struct wsgi_request *) * uwsgi.max_fd);
-		if (!uwsgi.async_waiting_fd_table) {
-			uwsgi_error("malloc()");
-			exit(1);
-		}
-		memset(uwsgi.async_waiting_fd_table, 0, sizeof(struct wsgi_request *) * uwsgi.max_fd);
-		uwsgi.async_proto_fd_table = malloc(sizeof(struct wsgi_request *) * uwsgi.max_fd);
-		if (!uwsgi.async_proto_fd_table) {
-			uwsgi_error("malloc()");
-			exit(1);
-		}
-		memset(uwsgi.async_proto_fd_table, 0, sizeof(struct wsgi_request *) * uwsgi.max_fd);
+		// optimization, this array maps file descriptor to requests
+		uwsgi.async_waiting_fd_table = uwsgi_calloc(sizeof(struct wsgi_request *) * uwsgi.max_fd);
+		uwsgi.async_proto_fd_table = uwsgi_calloc(sizeof(struct wsgi_request *) * uwsgi.max_fd);
 	}
 
 #ifdef UWSGI_DEBUG
@@ -2777,6 +2805,16 @@ next2:
 			uwsgi.p[i]->post_fork();
 		}
 	}
+
+	uwsgi_worker_run();
+	// never here
+	_exit(0);
+
+}
+
+void uwsgi_worker_run() {
+
+	int i;
 
 	if (uwsgi.lazy || uwsgi.lazy_apps) {
 		uwsgi_init_all_apps();

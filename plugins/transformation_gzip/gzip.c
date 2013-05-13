@@ -4,27 +4,62 @@
 
 /*
 
-	gzip transformations reset your headers !!!
+	gzip transformations add content-encoding to your headers and changes the final size !!!
 
-	remember to re-add the content type via routing rules
+	remember to fix the content_length (or use chunked encoding) !!!
 
 */
 
-static int transform_gzip(struct wsgi_request *wsgi_req, struct uwsgi_buffer *ub, struct uwsgi_buffer **new, void *data) {
-	struct uwsgi_buffer *gzipped = uwsgi_gzip(ub->buf, ub->pos);
-	if (!gzipped) {
-		return -1;
+struct uwsgi_transformation_gzip {
+	z_stream z;
+	uint32_t crc32;
+	size_t len;
+	uint8_t header;
+};
+
+extern char gzheader[];
+
+static int transform_gzip(struct wsgi_request *wsgi_req, struct uwsgi_transformation *ut) {
+	struct uwsgi_transformation_gzip *utgz = (struct uwsgi_transformation_gzip *) ut->data;
+	struct uwsgi_buffer *ub = ut->chunk;
+
+	if (ut->is_final) {
+		if (uwsgi_gzip_fix(&utgz->z, utgz->crc32, ub, utgz->len)) {
+			free(utgz);
+			return -1;
+		}
+		free(utgz);
+		return 0;
 	}
-	// use this new buffer
-	*new = gzipped;	
-	if (uwsgi_response_prepare_headers_int(wsgi_req, wsgi_req->status)) return -1;
-        if (uwsgi_response_add_header(wsgi_req, "Content-Encoding", 16, "gzip", 4)) return -1;
-        if (uwsgi_response_add_content_length(wsgi_req, gzipped->pos)) return -1;
+
+	size_t dlen = 0;
+	char *gzipped = uwsgi_gzip_chunk(&utgz->z, &utgz->crc32, ub->buf, ub->pos, &dlen);
+	if (!gzipped) return -1;
+	utgz->len += ub->pos;
+	uwsgi_buffer_map(ub, gzipped, dlen);
+	if (!utgz->header) {
+		// do not check for errors !!!
+        	uwsgi_response_add_header(wsgi_req, "Content-Encoding", 16, "gzip", 4);
+		utgz->header = 1;
+		if (uwsgi_buffer_insert(ub, 0, gzheader, 10)) {
+			return -1;
+		}
+	}
+
 	return 0;
 }
 
 static int uwsgi_routing_func_gzip(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
-	uwsgi_add_transformation(wsgi_req, transform_gzip, NULL);
+	struct uwsgi_transformation_gzip *utgz = uwsgi_calloc(sizeof(struct uwsgi_transformation_gzip));
+	if (uwsgi_gzip_prepare(&utgz->z, NULL, 0, &utgz->crc32)) {
+		free(utgz);
+		return UWSGI_ROUTE_BREAK;
+	}
+	struct uwsgi_transformation *ut = uwsgi_add_transformation(wsgi_req, transform_gzip, utgz);
+	ut->can_stream = 1;
+	// this is the trasformation clearing the memory
+	ut = uwsgi_add_transformation(wsgi_req, transform_gzip, utgz);
+        ut->is_final = 1;
 	return UWSGI_ROUTE_NEXT;
 }
 
