@@ -29,9 +29,6 @@ Build-Depends:
  libdb-dev,
  libqdbm-dev,
  libbz2-dev,
- mongodb-dev,
- libboost-thread-dev,
- libboost-filesystem-dev,
  libwrap0-dev,
  libgnustep-gui-dev,
  libgnustep-base-dev,
@@ -193,18 +190,15 @@ Depends: ${misc:Depends},
  uwsgi-plugin-curl-cron (= ${binary:Version}),
  uwsgi-plugin-echo (= ${binary:Version}),
  uwsgi-plugin-emperor-amqp (= ${binary:Version}),
- uwsgi-plugin-emperor-mongodb (= ${binary:Version}),
  uwsgi-plugin-emperor-pg (= ${binary:Version}),
  uwsgi-plugin-emperor-zeromq (= ${binary:Version}),
  uwsgi-plugin-fastrouter (= ${binary:Version}),
  uwsgi-plugin-graylog2 (= ${binary:Version}),
  uwsgi-plugin-geoip (= ${binary:Version}),
- uwsgi-plugin-gridfs (= ${binary:Version}),
  uwsgi-plugin-http (= ${binary:Version}),
  uwsgi-plugin-ldap (= ${binary:Version}),
  uwsgi-plugin-logfile (= ${binary:Version}),
  uwsgi-plugin-logsocket (= ${binary:Version}),
- uwsgi-plugin-mongodblog (= ${binary:Version}),
  uwsgi-plugin-nagios (= ${binary:Version}),
  uwsgi-plugin-pam (= ${binary:Version}),
  uwsgi-plugin-ping (= ${binary:Version}),
@@ -226,7 +220,6 @@ Depends: ${misc:Depends},
  uwsgi-plugin-sqlite3 (= ${binary:Version}),
  uwsgi-plugin-ssi (= ${binary:Version}),
  uwsgi-plugin-sslrouter (= ${binary:Version}),
- uwsgi-plugin-stats-pusher-mongodb (= ${binary:Version}),
  uwsgi-plugin-stats-pusher-statsd (= ${binary:Version}),
  uwsgi-plugin-syslog (= ${binary:Version}),
  uwsgi-plugin-transformation-gzip (= ${binary:Version}),
@@ -243,13 +236,13 @@ Description: infrastructure plugins for uWSGI
  .
  This dependency package provides infrastructure plugins for uWSGI:
    * admin, alarm curl, alarm speech, alarm XMPP, cache, curl cron echo,
-     AMPQ emperor, MongoDB emperor, PostgreSQL emperor ZeroMQ emperor,
-     fastrouter, graylog2, GeoIP, MongoDB GridFS, HTTP serving, LDAP, logfile,
-     logsocket, mongodblog, Nagios, pam, ping, rawrouter, redislog,
+     AMPQ emperor, PostgreSQL emperor ZeroMQ emperor,
+     fastrouter, graylog2, GeoIP, HTTP serving, LDAP, logfile,
+     logsocket, Nagios, pam, ping, rawrouter, redislog,
      router access, router basicauth, router cache, router http,
      router memcached, router redirect, router rewrite, router static,
      router uwsgi, RPC, RRDTool, rsyslog, spooler, sqlite3, ssi, SSL router,
-     MongoDB stats pusher, statsd stats pusher, syslog, gzip transformation,
+     statsd stats pusher, syslog, gzip transformation,
      transformation tofile transformation toupper, XSLT request, zergpool
 
 Package: uwsgi-app-integration-plugins
@@ -462,18 +455,6 @@ Description: Emperor AMPQ plugin for uWSGI
  .
  This package provides emperor_amqp plugin for uWSGI.
 
-Package: uwsgi-plugin-emperor-mongodb
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Emperor MongoDB plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides emperor_mongodb plugin for uWSGI.
-
 Package: uwsgi-plugin-emperor-pg
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -586,18 +567,6 @@ Description: greenlet plugin for uWSGI (Python)
  the same core.
  .
  This package provides greenlet plugin for uWSGI with Python WSGI plugin.
-
-Package: uwsgi-plugin-gridfs
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: MongoDB GridFS plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides gridfs plugin for uWSGI.
 
 Package: uwsgi-plugin-http
 Architecture: any
@@ -716,18 +685,6 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.1)
  .
  This package provides Lua WSAPI plugin for uWSGI (linked with Lua 5.1
  runtime).
-
-Package: uwsgi-plugin-mongodblog
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: MongoDBlog plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides mongodblog plugin for uWSGI.
 
 Package: uwsgi-plugin-nagios
 Architecture: any
@@ -1103,18 +1060,6 @@ Description: SSL router plugin for uWSGI
  the same core.
  .
  This package provides sslrouter plugin for uWSGI.
-
-Package: uwsgi-plugin-stats-pusher-mongodb
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: MongoDB stats pusher plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides stats_pusher_mongodb plugin for uWSGI.
 
 Package: uwsgi-plugin-stats-pusher-statsd
 Architecture: any
