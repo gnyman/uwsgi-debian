@@ -1,4 +1,4 @@
-uwsgi (1.9.8-1) unstable; urgency=low
+uwsgi (1.9.10-1) UNRELEASED; urgency=low
 
   * New upstream release.
   * Upstream version does not contain minfied JavaScript files:
@@ -43,9 +43,6 @@ uwsgi (1.9.8-1) unstable; urgency=low
      - New Build-Depends libgloox-dev.
   * New binary package uwsgi-plugin-pam:
      - New Build-Depends libpam0g-dev.
-  * New binary package uwsgi-plugin-stats-pusher-mongodb:
-     - New Build-Depends mongodb-dev, libboost-thread-dev and
-       libboost-filesystem-dev.
   * New binary package uwsgi-plugin-router-access:
      - New Build-Depends libwrap0-dev.
      - Add routing option to buildconf/uwsgi-core.ini.
@@ -69,12 +66,9 @@ uwsgi (1.9.8-1) unstable; urgency=low
     - uwsgi-plugin-clock-realtime
     - uwsgi-plugin-curl-cron
     - uwsgi-plugin-emperor-amqp
-    - uwsgi-plugin-emperor-mongodb
     - uwsgi-plugin-emperor-pg
-    - uwsgi-plugin-gridfs
     - uwsgi-plugin-ldap
     - uwsgi-plugin-logfile
-    - uwsgi-plugin-mongodblog
     - uwsgi-plugin-notfound
     - uwsgi-plugin-rawrouter
     - uwsgi-plugin-redislog
@@ -104,7 +98,7 @@ uwsgi (1.9.8-1) unstable; urgency=low
     - Remove no longer provided nginx and lighttpd directories.
     - Update description.
 
- -- Janos Guljas <janos@debian.org>  Mon, 29 Apr 2013 16:48:56 +0200
+ -- Janos Guljas <janos@debian.org>  Mon, 13 May 2013 15:38:44 +0200
 
 uwsgi (1.4.4+dfsg-1) experimental; urgency=low
 
