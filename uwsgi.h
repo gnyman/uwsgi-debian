@@ -292,6 +292,7 @@ extern int pivot_root(const char *new_root, const char *put_old);
 #include <sys/devpoll.h>
 #elif defined(__HAIKU__)
 #elif defined(__CYGWIN__)
+#elif defined(__HURD__)
 #else
 #include <sys/event.h>
 #endif
@@ -783,6 +784,9 @@ struct uwsgi_opt {
 #elif defined(__APPLE__)
 #include <libkern/OSByteOrder.h>
 #elif defined(__HAIKU__)
+#elif defined(__HURD__)
+#define PATH_MAX 8192
+#define RTLD_DEFAULT   ((void *) 0)
 #else
 #include <machine/endian.h>
 #endif
@@ -1082,6 +1086,7 @@ struct uwsgi_route {
 
 	int (*if_func)(struct wsgi_request *, struct uwsgi_route *);
 	int if_negate;
+	int if_status;
 
 	int (*func) (struct wsgi_request *, struct uwsgi_route *);
 
@@ -1426,11 +1431,18 @@ struct wsgi_request {
 	// avoid routing loops
 	int is_routing;
 	int is_final_routing;
+	int is_error_routing;
 	int routes_applied;
 	// internal routing vm program counter
 	uint32_t route_pc;
+	uint32_t error_route_pc;
+	uint32_t final_route_pc;
 	// internal routing goto instruction
 	uint32_t route_goto;
+	uint32_t error_route_goto;
+	uint32_t final_route_goto;
+
+	int ignore_body;
 
 	struct uwsgi_transformation *transformations;
 	char *transformed_chunk;
@@ -1932,6 +1944,7 @@ struct uwsgi_server {
 	struct uwsgi_offload_engine *offload_engines;
 	struct uwsgi_offload_engine *offload_engine_sendfile;
 	struct uwsgi_offload_engine *offload_engine_transfer;
+	struct uwsgi_offload_engine *offload_engine_memory;
 	int offload_threads;
 	int offload_threads_events;
 	struct uwsgi_thread **offload_thread;
@@ -2085,6 +2098,7 @@ struct uwsgi_server {
 	struct uwsgi_mule *mules;
 	struct uwsgi_string_list *farms_list;
 	struct uwsgi_farm *farms;
+	int mule_msg_size;
 
 	pid_t mypid;
 	int mywid;
@@ -2115,6 +2129,7 @@ struct uwsgi_server {
 	struct uwsgi_router *routers;
 	struct uwsgi_route *routes;
 	struct uwsgi_route *final_routes;
+	struct uwsgi_route *error_routes;
 	struct uwsgi_route_condition *route_conditions;
 	struct uwsgi_route_var *route_vars;
 #endif
@@ -2148,6 +2163,7 @@ struct uwsgi_server {
 #ifdef __linux__
 	struct uwsgi_string_list *cgroup;
 	struct uwsgi_string_list *cgroup_opt;
+	char *cgroup_dir_mode;
 	char *ns;
 	char *ns_net;
 	struct uwsgi_string_list *ns_keep_mount;
@@ -2170,6 +2186,7 @@ struct uwsgi_server {
 	struct uwsgi_string_list *map_socket;
 
 	struct uwsgi_cron *crons;
+	time_t cron_harakiri;
 
 	time_t respawn_delta;
 
@@ -2370,6 +2387,16 @@ struct uwsgi_cron {
 	char *legion;
 #endif
 	void (*func)(struct uwsgi_cron *, time_t);
+
+	time_t started_at;
+
+	// next harakiri timestamp
+	time_t harakiri;
+	// number of seconds to wait before calling harakiri on cron
+	int mercy;
+
+	uint8_t unique;
+	pid_t pid;
 
 	struct uwsgi_cron *next;
 };
@@ -2905,7 +2932,8 @@ struct uwsgi_async_request {
 int event_queue_read(void);
 int event_queue_write(void);
 
-void uwsgi_help(char *opt, char *val, void *);
+void uwsgi_help(char *, char *, void *);
+void uwsgi_print_sym(char *, char *, void *);
 
 int uwsgi_str2_num(char *);
 int uwsgi_str3_num(char *);
@@ -2929,7 +2957,7 @@ char *uwsgi_amqp_consume(int, uint64_t *, char **);
 
 int uwsgi_file_serve(struct wsgi_request *, char *, uint16_t, char *, uint16_t, int);
 int uwsgi_starts_with(char *, int, char *, int);
-int uwsgi_static_want_gzip(struct wsgi_request *, char *, size_t, struct stat *);
+int uwsgi_static_want_gzip(struct wsgi_request *, char *, size_t *, struct stat *);
 
 #ifdef __sun__
 time_t timegm(struct tm *);
@@ -3148,6 +3176,7 @@ void mule_send_msg(int, char *, size_t);
 
 uint32_t djb33x_hash(char *, uint64_t);
 void create_signal_pipe(int *);
+void create_msg_pipe(int *, int);
 struct uwsgi_subscribe_slot *uwsgi_get_subscribe_slot(struct uwsgi_subscribe_slot **, char *, uint16_t);
 struct uwsgi_subscribe_node *uwsgi_get_subscribe_node_by_name(struct uwsgi_subscribe_slot **, char *, uint16_t, char *, uint16_t);
 struct uwsgi_subscribe_node *uwsgi_get_subscribe_node(struct uwsgi_subscribe_slot **, char *, uint16_t);
@@ -3240,12 +3269,15 @@ void uwsgi_opt_add_shared_socket(char *, char *, void *);
 void uwsgi_opt_add_socket(char *, char *, void *);
 void uwsgi_opt_add_lazy_socket(char *, char *, void *);
 void uwsgi_opt_add_cron(char *, char *, void *);
+void uwsgi_opt_add_cron2(char *, char *, void *);
+void uwsgi_opt_add_unique_cron(char *, char *, void *);
 void uwsgi_opt_load_plugin(char *, char *, void *);
 void uwsgi_opt_load_dl(char *, char *, void *);
 void uwsgi_opt_load(char *, char *, void *);
 void uwsgi_opt_safe_fd(char *, char *, void *);
 #ifdef UWSGI_SSL
 void uwsgi_opt_add_legion_cron(char *, char *, void *);
+void uwsgi_opt_add_unique_legion_cron(char *, char *, void *);
 void uwsgi_opt_sni(char *, char *, void *);
 struct uwsgi_string_list *uwsgi_ssl_add_sni_item(char *, char *, char *, char *, char *);
 #endif
@@ -3330,6 +3362,7 @@ struct uwsgi_router *uwsgi_register_router(char *, int (*)(struct uwsgi_route *,
 void uwsgi_opt_add_route(char *, char *, void *);
 int uwsgi_apply_routes(struct wsgi_request *);
 void uwsgi_apply_final_routes(struct wsgi_request *);
+int uwsgi_apply_error_routes(struct wsgi_request *);
 int uwsgi_apply_routes_do(struct uwsgi_route *, struct wsgi_request *, char *, uint16_t);
 void uwsgi_register_embedded_routers(void);
 void uwsgi_routing_dump();
@@ -3736,6 +3769,7 @@ void uwsgi_offload_engines_register_all(void);
 struct uwsgi_thread *uwsgi_offload_thread_start(void);
 int uwsgi_offload_request_sendfile_do(struct wsgi_request *, int, size_t);
 int uwsgi_offload_request_net_do(struct wsgi_request *, char *, struct uwsgi_buffer *);
+int uwsgi_offload_request_memory_do(struct wsgi_request *, char *, size_t);
 
 
 void uwsgi_subscription_set_algo(char *);
@@ -3764,8 +3798,8 @@ int uwsgi_plugin_modifier1(char *);
 
 void *cache_udp_server_loop(void *);
 
-void uwsgi_user_lock(int);
-void uwsgi_user_unlock(int);
+int uwsgi_user_lock(int);
+int uwsgi_user_unlock(int);
 
 void simple_loop_run_int(int);
 
@@ -3830,6 +3864,7 @@ int uwsgi_response_add_header(struct wsgi_request *, char *, uint16_t, char *, u
 int uwsgi_response_add_header_force(struct wsgi_request *, char *, uint16_t, char *, uint16_t);
 int uwsgi_response_commit_headers(struct wsgi_request *);
 int uwsgi_response_sendfile_do(struct wsgi_request *, int, size_t, size_t);
+int uwsgi_response_sendfile_do_can_close(struct wsgi_request *, int, size_t, size_t, int);
 
 struct uwsgi_buffer *uwsgi_proto_base_add_header(struct wsgi_request *, char *, uint16_t, char *, uint16_t);
 
@@ -3874,6 +3909,7 @@ void uwsgi_master_check_workers_deadline(void);
 void uwsgi_master_check_gateways_deadline(void);
 void uwsgi_master_check_mules_deadline(void);
 void uwsgi_master_check_spoolers_deadline(void);
+void uwsgi_master_check_crons_deadline(void);
 int uwsgi_master_check_spoolers_death(int);
 int uwsgi_master_check_emperor_death(int);
 int uwsgi_master_check_mules_death(int);
@@ -4002,10 +4038,14 @@ void uwsgi_mule_run(void);
 void uwsgi_spooler_run(void);
 void uwsgi_takeover(void);
 
+char *uwsgi_binary_path(void);
+
 void uwsgi_check_emperor(void);
 #ifdef UWSGI_AS_SHARED_LIBRARY
 int uwsgi_init(int, char **, char **);
 #endif
+
+int uwsgi_master_check_cron_death(int);
 
 #ifdef __cplusplus
 }

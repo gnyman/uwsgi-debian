@@ -1,6 +1,6 @@
 # uWSGI build system
 
-uwsgi_version = '1.9.10'
+uwsgi_version = '1.9.11'
 
 import os
 import re
@@ -356,6 +356,20 @@ def build_uwsgi(uc, print_only=False):
                         compile(' '.join(uniq_warnings(p_cflags)), last_cflags_ts,
                             path + '/' + cfile + '.o', path + '/' + cfile)
                         gcc_list.append('%s/%s' % (path, cfile))
+                for bfile in up.get('BINARY_LIST', []):
+                    try:
+                        binary_link_cmd = "ld -r -b binary -o %s/%s.o %s/%s" % (path, bfile[1], path, bfile[1])
+                        print(binary_link_cmd)
+                        if os.system(binary_link_cmd) != 0:
+                            raise Exception('unable to link binary file')
+                        for kind in ('start','end'):
+                            objcopy_cmd = "objcopy --redefine-sym _binary_%s_%s=%s_%s %s/%s.o" % (binarize('%s/%s' % (path, bfile[1])), kind, bfile[0], kind, path, bfile[1])
+                            print(objcopy_cmd)
+                            if os.system(objcopy_cmd) != 0:
+                                raise Exception('unable to link binary file')
+                        gcc_list.append('%s/%s.o' % (path, bfile[1]))
+                    except:
+                        pass
 
                 libs += up['LIBS']
 
@@ -486,6 +500,9 @@ class uConf(object):
                     report['kernel'] = 'Old Linux'
             except:
                 pass
+
+        if uwsgi_os == 'GNU':
+            self.cflags.append('-D__HURD__')
 
         try:
             gcc_version = str(spcall("%s -dumpversion" % GCC))
@@ -660,6 +677,8 @@ class uConf(object):
                          locking_mode = 'posix_sem'
                  except:
                      pass
+            elif uwsgi_os == 'GNU':
+                locking_mode = 'posix_sem'
             elif uwsgi_os == 'Darwin':
                 locking_mode = 'osx_spinlock'
             elif uwsgi_os.startswith('CYGWIN'):
@@ -696,7 +715,7 @@ class uConf(object):
                         event_mode = 'port'
             elif uwsgi_os in ('Darwin', 'FreeBSD', 'OpenBSD', 'NetBSD', 'DragonFly'):
                 event_mode = 'kqueue'
-            elif uwsgi_os.startswith('CYGWIN'):
+            elif uwsgi_os.startswith('CYGWIN') or uwsgi_os == 'GNU':
                 event_mode = 'poll'
 
         if event_mode == 'epoll':
@@ -1128,6 +1147,20 @@ def build_plugin(path, uc, cflags, ldflags, libs, name = None):
             gcc_list.append(path + '/' + cfile + '.c')
         else:
             gcc_list.append(path + '/' + cfile)
+    for bfile in up.get('BINARY_LIST', []):
+        try:
+            binary_link_cmd = "ld -r -b binary -o %s/%s.o %s/%s" % (path, bfile[1], path, bfile[1])
+            print(binary_link_cmd)
+            if os.system(binary_link_cmd) != 0:
+                raise Exception('unable to link binary file')
+            for kind in ('start','end'):
+                objcopy_cmd = "objcopy --redefine-sym _binary_%s_%s=%s_%s %s/%s.o" % (binarize('%s/%s' % (path, bfile[1])), kind, bfile[0], kind, path, bfile[1])
+                print(objcopy_cmd)
+                if os.system(objcopy_cmd) != 0:
+                    raise Exception('unable to link binary file')
+            gcc_list.append('%s/%s.o' % (path, bfile[1]))
+        except:
+            pass
 
     try:
         p_ldflags.remove('-Wl,--no-undefined')
