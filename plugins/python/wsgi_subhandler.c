@@ -4,6 +4,44 @@ extern struct uwsgi_server uwsgi;
 extern struct uwsgi_python up;
 extern PyTypeObject uwsgi_InputType;
 
+/*
+this is a hack for supporting non-file object passed to wsgi.file_wrapper
+*/
+static void uwsgi_python_consume_file_wrapper_read(struct wsgi_request *wsgi_req, PyObject *pychunk) {
+	PyObject *read_method_args = NULL;
+	PyObject *read_method = PyObject_GetAttrString(pychunk, "read");
+	if (wsgi_req->sendfile_fd_chunk > 0) {
+        	read_method_args = PyTuple_New(1);
+		PyTuple_SetItem(read_method_args, 0, PyInt_FromLong(wsgi_req->sendfile_fd_chunk));
+	}
+	else {
+        	read_method_args = PyTuple_New(0);
+	}
+	for(;;) {
+        	PyObject *read_method_output = PyEval_CallObject(read_method, read_method_args);
+                if (PyErr_Occurred()) {
+                	uwsgi_manage_exception(wsgi_req, 0);
+			break;
+                }
+		if (!read_method_output) break;
+               	if (PyString_Check(read_method_output)) {
+                     	char *content = PyString_AsString(read_method_output);
+                        size_t content_len = PyString_Size(read_method_output);
+			if (content_len == 0) {
+                        	Py_DECREF(read_method_output);
+				break;
+			}
+                        UWSGI_RELEASE_GIL
+                        uwsgi_response_write_body_do(wsgi_req, content, content_len);
+                        UWSGI_GET_GIL
+                }
+		Py_DECREF(read_method_output);
+		if (wsgi_req->sendfile_fd_chunk == 0) break;
+	}
+        Py_DECREF(read_method_args);
+        Py_DECREF(read_method);
+}
+
 void *uwsgi_request_subhandler_wsgi(struct wsgi_request *wsgi_req, struct uwsgi_app *wi) {
 
 
@@ -143,10 +181,16 @@ int uwsgi_response_subhandler_wsgi(struct wsgi_request *wsgi_req) {
 	}
 
 
-	if (wsgi_req->sendfile_obj == wsgi_req->async_result && wsgi_req->sendfile_fd != -1) {
-		UWSGI_RELEASE_GIL
-		uwsgi_response_sendfile_do(wsgi_req, wsgi_req->sendfile_fd, 0, 0);
-		UWSGI_GET_GIL
+	if (wsgi_req->sendfile_obj == wsgi_req->async_result) {
+		if (wsgi_req->sendfile_fd >= 0) {
+			UWSGI_RELEASE_GIL
+			uwsgi_response_sendfile_do(wsgi_req, wsgi_req->sendfile_fd, 0, 0);
+			UWSGI_GET_GIL
+		}
+                // we do not have an iterable, check for read() method
+		else if (PyObject_HasAttrString((PyObject *)wsgi_req->async_result, "read")) {
+			uwsgi_python_consume_file_wrapper_read(wsgi_req, (PyObject *)wsgi_req->async_result);
+		}
 		uwsgi_py_check_write_errors {
 			uwsgi_py_write_exception(wsgi_req);
 		}
@@ -190,10 +234,17 @@ exception:
 		}
 	}
 
-	else if (wsgi_req->sendfile_obj == pychunk && wsgi_req->sendfile_fd != -1) {
-		UWSGI_RELEASE_GIL
-		uwsgi_response_sendfile_do(wsgi_req, wsgi_req->sendfile_fd, 0, 0);
-		UWSGI_GET_GIL
+	else if (wsgi_req->sendfile_obj == pychunk) {
+		if (wsgi_req->sendfile_fd >= 0) {
+			UWSGI_RELEASE_GIL
+			uwsgi_response_sendfile_do(wsgi_req, wsgi_req->sendfile_fd, 0, 0);
+			UWSGI_GET_GIL
+		}
+		// we do not have an iterable, check for read() method
+		else if (PyObject_HasAttrString(pychunk, "read")) {
+			uwsgi_python_consume_file_wrapper_read(wsgi_req, pychunk);
+		}
+
 		uwsgi_py_check_write_errors {
 			uwsgi_py_write_exception(wsgi_req);
 			Py_DECREF(pychunk);

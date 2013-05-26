@@ -173,15 +173,27 @@ int uwsgi_apply_routes_do(struct uwsgi_route *routes, struct wsgi_request *wsgi_
 	char *orig_subject = subject;
 	uint16_t orig_subject_len = subject_len;
 
+	uint32_t *r_goto = &wsgi_req->route_goto;
+	uint32_t *r_pc = &wsgi_req->route_pc;
+
+	if (routes == uwsgi.error_routes) {
+		r_goto = &wsgi_req->error_route_goto;
+		r_pc = &wsgi_req->error_route_pc;
+	}
+	else if (routes == uwsgi.final_routes) {
+		r_goto = &wsgi_req->final_route_goto;
+		r_pc = &wsgi_req->final_route_pc;
+	}
+
 	while (routes) {
 
 		if (routes->label) goto next;
 
-		if (wsgi_req->route_goto > 0 && wsgi_req->route_pc < wsgi_req->route_goto) {
+		if (*r_goto > 0 && *r_pc < *r_goto) {
 			goto next;
 		}
 
-		wsgi_req->route_goto = 0;
+		*r_goto = 0;
 
 		if (!routes->if_func) {
 			// could be a "run"
@@ -243,7 +255,7 @@ next:
 		subject = orig_subject;
 		subject_len = orig_subject_len;
 		routes = routes->next;
-		if (routes) wsgi_req->route_pc++;
+		if (routes) *r_pc = *r_pc+1;
 	}
 
 	return UWSGI_ROUTE_CONTINUE;
@@ -282,6 +294,18 @@ void uwsgi_apply_final_routes(struct wsgi_request *wsgi_req) {
         uwsgi_apply_routes_do(uwsgi.final_routes, wsgi_req, NULL, 0);
 }
 
+int uwsgi_apply_error_routes(struct wsgi_request *wsgi_req) {
+
+        if (!uwsgi.error_routes) return 0;
+
+	// do not forget to check it !!!
+        if (wsgi_req->is_error_routing) return 0;
+
+        wsgi_req->is_error_routing = 1;
+
+	return uwsgi_apply_routes_do(uwsgi.error_routes, wsgi_req, NULL, 0);
+}
+
 
 static void *uwsgi_route_get_condition_func(char *name) {
 	struct uwsgi_route_condition *urc = uwsgi.route_conditions;
@@ -294,6 +318,14 @@ static void *uwsgi_route_get_condition_func(char *name) {
 	return NULL;
 }
 
+static int uwsgi_route_condition_status(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
+	if (wsgi_req->status == ur->if_status) {
+		return 1;
+	}
+        return 0;
+}
+
+
 void uwsgi_opt_add_route(char *opt, char *value, void *foobar) {
 
 	char *space = NULL;
@@ -302,6 +334,9 @@ void uwsgi_opt_add_route(char *opt, char *value, void *foobar) {
 	if (!uwsgi_starts_with(opt, strlen(opt), "final", 5)) {
 		ur = uwsgi.final_routes;
 	} 
+	else if (!uwsgi_starts_with(opt, strlen(opt), "error", 5)) {
+                ur = uwsgi.error_routes;
+        }
 	uint64_t pos = 0;
 	while(ur) {
 		old_ur = ur;
@@ -316,6 +351,9 @@ void uwsgi_opt_add_route(char *opt, char *value, void *foobar) {
 		if (!uwsgi_starts_with(opt, strlen(opt), "final", 5)) {
 			uwsgi.final_routes = ur;
 		}
+		else if (!uwsgi_starts_with(opt, strlen(opt), "error", 5)) {
+                        uwsgi.error_routes = ur;
+                }
 		else {
 			uwsgi.routes = ur;
 		}
@@ -364,6 +402,11 @@ void uwsgi_opt_add_route(char *opt, char *value, void *foobar) {
 			exit(1);
 		}
 	}
+	else if (!strcmp(foobar, "status")) {
+		ur->if_status = atoi(ur->orig_route);
+		foobar = ur->orig_route;
+                ur->if_func = uwsgi_route_condition_status;
+        }
 
 	else if (!strcmp(foobar, "http_host")) {
 		ur->subject = offsetof(struct wsgi_request, host);
@@ -515,6 +558,21 @@ static int uwsgi_router_break(struct uwsgi_route *ur, char *arg) {
 	return 0;
 }
 
+
+// harakiri router
+static int uwsgi_router_harakiri_func(struct wsgi_request *wsgi_req, struct uwsgi_route *route) {
+	if (route->custom > 0) {	
+		set_user_harakiri(route->custom);
+	}
+	return UWSGI_ROUTE_CONTINUE;
+}
+
+static int uwsgi_router_harakiri(struct uwsgi_route *ur, char *arg) {
+	ur->func = uwsgi_router_harakiri_func;
+	ur->custom = atoi(arg);
+	return 0;
+}
+
 // flush response
 static int transform_flush(struct wsgi_request *wsgi_req, struct uwsgi_transformation *ut) {
 	// avoid loops !!!
@@ -628,28 +686,37 @@ static int uwsgi_router_goto_func(struct wsgi_request *wsgi_req, struct uwsgi_ro
 
 	struct uwsgi_buffer *ub = uwsgi_routing_translate(wsgi_req, ur, *subject, *subject_len, ur->data, ur->data_len);
         if (!ub) return UWSGI_ROUTE_BREAK;
+	uint32_t *r_goto = &wsgi_req->route_goto;
+	uint32_t *r_pc = &wsgi_req->route_pc;
 
 	// find the label
 	struct uwsgi_route *routes = uwsgi.routes;
-	if (wsgi_req->is_final_routing) {
+	if (wsgi_req->is_error_routing) {
+		routes = uwsgi.error_routes;
+		r_goto = &wsgi_req->error_route_goto;
+		r_pc = &wsgi_req->error_route_pc;
+	}
+	else if (wsgi_req->is_final_routing) {
 		routes = uwsgi.final_routes;
+		r_goto = &wsgi_req->final_route_goto;
+		r_pc = &wsgi_req->final_route_pc;
 	}
 	while(routes) {
 		if (!routes->label) goto next;
 		if (!uwsgi_strncmp(routes->label, routes->label_len, ub->buf, ub->pos)) {
-			wsgi_req->route_goto = routes->pos;
+			*r_goto = routes->pos;
 			goto found;
 		}
 next:
 		routes = routes->next;
 	}
 
-	wsgi_req->route_goto = ur->custom;
+	*r_goto = ur->custom;
 	
 found:
 	uwsgi_buffer_destroy(ub);
-	if (wsgi_req->route_goto <= wsgi_req->route_pc) {
-		wsgi_req->route_goto = 0;
+	if (*r_goto <= *r_pc) {
+		*r_goto = 0;
 		uwsgi_log("[uwsgi-route] ERROR \"goto\" instruction can only jump forward (check your label !!!)\n");
 		return UWSGI_ROUTE_BREAK;
 	}
@@ -1453,6 +1520,8 @@ void uwsgi_register_embedded_routers() {
         uwsgi_register_router("flush", uwsgi_router_flush);
         uwsgi_register_router("fixcl", uwsgi_router_fixcl);
 
+        uwsgi_register_router("harakiri", uwsgi_router_harakiri);
+
         uwsgi_register_route_condition("exists", uwsgi_route_condition_exists);
         uwsgi_register_route_condition("isfile", uwsgi_route_condition_isfile);
         uwsgi_register_route_condition("isdir", uwsgi_route_condition_isdir);
@@ -1552,7 +1621,7 @@ struct uwsgi_route_condition *uwsgi_register_route_condition(char *name, int (*f
 
 void uwsgi_routing_dump() {
 	struct uwsgi_route *routes = uwsgi.routes;
-	if (!routes) return;
+	if (!routes) goto next;
 	uwsgi_log("*** dumping internal routing table ***\n");
 	while(routes) {
 		if (routes->label) {
@@ -1567,6 +1636,24 @@ void uwsgi_routing_dump() {
 		routes = routes->next;
 	}
 	uwsgi_log("*** end of the internal routing table ***\n");
+next:
+	routes = uwsgi.error_routes;
+        if (!routes) goto next2;
+        uwsgi_log("*** dumping internal error routing table ***\n");
+        while(routes) {
+                if (routes->label) {
+                        uwsgi_log("[rule: %llu] label: %s\n", (unsigned long long ) routes->pos, routes->label);
+                }
+                else if (!routes->subject_str && !routes->if_func) {
+                        uwsgi_log("[rule: %llu] action: %s\n", (unsigned long long ) routes->pos, routes->action);
+                }
+                else {
+                        uwsgi_log("[rule: %llu] subject: %s %s: %s%s action: %s\n", (unsigned long long ) routes->pos, routes->subject_str, routes->if_func ? "func" : "regexp", routes->if_negate ? "!" : "", routes->regexp, routes->action);
+                }
+                routes = routes->next;
+        }
+        uwsgi_log("*** end of the internal error routing table ***\n");
+next2:
 	routes = uwsgi.final_routes;
 	if (!routes) return;
         uwsgi_log("*** dumping internal final routing table ***\n");

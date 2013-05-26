@@ -206,14 +206,20 @@ void uwsgi_set_cgroup() {
 	usl = uwsgi.cgroup;
 
 	while (usl) {
-		if (mkdir(usl->value, 0700)) {
-			uwsgi_log("using Linux cgroup %s\n", usl->value);
+		int mode = strtol(uwsgi.cgroup_dir_mode, 0, 8);
+		if (mkdir(usl->value, mode)) {
 			if (errno != EEXIST) {
 				uwsgi_error("mkdir()");
+				exit(1);
 			}
+			if (chmod(usl->value, mode)) {
+				uwsgi_error("chmod()");
+				exit(1);
+			}
+			uwsgi_log("using Linux cgroup %s with mode %o\n", usl->value, mode);
 		}
 		else {
-			uwsgi_log("created Linux cgroup %s\n", usl->value);
+			uwsgi_log("created Linux cgroup %s with mode %o\n", usl->value, mode);
 		}
 
 		cgroup_taskfile = uwsgi_concat2(usl->value, "/tasks");
@@ -1146,7 +1152,7 @@ int uwsgi_get_app_id(struct wsgi_request *wsgi_req, char *key, uint16_t key_len,
 	char *app_name = key;
 	uint16_t app_name_len = key_len;
 
-	if (!app_name && wsgi_req) {
+	if (app_name_len == 0 && wsgi_req) {
 		app_name = wsgi_req->appid;
 		app_name_len = wsgi_req->appid_len;
 		if (app_name_len == 0) {
@@ -1208,11 +1214,7 @@ int uwsgi_get_app_id(struct wsgi_request *wsgi_req, char *key, uint16_t key_len,
 		}
 	}
 
-	if (!uwsgi.no_default_app) {
-		if (free_appname) free(app_name);
-		return uwsgi.default_app;
-	}
-
+	if (free_appname) free(app_name);
 	return -1;
 }
 
@@ -3955,4 +3957,40 @@ void uwsgi_takeover() {
 	else {
 		uwsgi_worker_run();
 	}
+}
+
+// create a message pipe
+void create_msg_pipe(int *fd, int bufsize) {
+
+#if defined(SOCK_SEQPACKET) && defined(__linux__)
+        if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, fd)) {
+#else
+        if (socketpair(AF_UNIX, SOCK_DGRAM, 0, fd)) {
+#endif
+		uwsgi_error("create_msg_pipe()/socketpair()");
+		exit(1);
+	}
+
+	uwsgi_socket_nb(fd[0]);
+        uwsgi_socket_nb(fd[1]);
+
+        if (bufsize) {
+                if (setsockopt(fd[0], SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(int))) {
+                        uwsgi_error("create_msg_pipe()/setsockopt()");
+                }
+                if (setsockopt(fd[0], SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(int))) {
+                        uwsgi_error("create_msg_pipe()/setsockopt()");
+                }
+
+                if (setsockopt(fd[1], SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(int))) {
+                        uwsgi_error("create_msg_pipe()/setsockopt()");
+                }
+                if (setsockopt(fd[1], SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(int))) {
+                        uwsgi_error("create_msg_pipe()/setsockopt()");
+                }
+        }
+}
+
+char *uwsgi_binary_path() {
+	return uwsgi.binary_path ? uwsgi.binary_path : "uwsgi";
 }

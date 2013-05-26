@@ -76,7 +76,19 @@ int uwsgi_response_prepare_headers(struct wsgi_request *wsgi_req, char *status, 
 
 	// reset the buffer (could be useful for rollbacks...)
 	wsgi_req->headers->pos = 0;
+	// reset headers count
+	wsgi_req->header_cnt = 0;
 	struct uwsgi_buffer *hh = NULL;
+	wsgi_req->status = uwsgi_str3_num(status);
+#ifdef UWSGI_ROUTING
+	// apply error routes
+	if (uwsgi_apply_error_routes(wsgi_req) == UWSGI_ROUTE_BREAK) {
+		// from now on ignore write body requests...
+		wsgi_req->ignore_body = 1;
+		return -1;
+	}
+	wsgi_req->is_error_routing = 0;
+#endif
 	if (status_len <= 4) {
 		char *new_sc = NULL;
 		size_t new_sc_len = 0;
@@ -99,7 +111,6 @@ int uwsgi_response_prepare_headers(struct wsgi_request *wsgi_req, char *status, 
 	if (!hh) {wsgi_req->write_errors++; return -1;}
         if (uwsgi_buffer_append(wsgi_req->headers, hh->buf, hh->pos)) goto error;
         uwsgi_buffer_destroy(hh);
-	wsgi_req->status = uwsgi_str3_num(status);
         return 0;
 error:
         uwsgi_buffer_destroy(hh);
@@ -208,6 +219,7 @@ int uwsgi_response_write_headers_do(struct wsgi_request *wsgi_req) {
 int uwsgi_response_write_body_do(struct wsgi_request *wsgi_req, char *buf, size_t len) {
 
 	if (wsgi_req->write_errors) return -1;
+	if (wsgi_req->ignore_body) return UWSGI_OK;
 
 	// if the transformation chain returns 1, we are in buffering mode
 	if (wsgi_req->transformed_chunk_len == 0 && wsgi_req->transformations) {
@@ -270,14 +282,21 @@ sendbody:
 }
 
 int uwsgi_response_sendfile_do(struct wsgi_request *wsgi_req, int fd, size_t pos, size_t len) {
+	return uwsgi_response_sendfile_do_can_close(wsgi_req, fd, pos, len, 1);	
+}
 
-	int can_close = 1;
+int uwsgi_response_sendfile_do_can_close(struct wsgi_request *wsgi_req, int fd, size_t pos, size_t len, int can_close) {
 
 	if (fd == wsgi_req->sendfile_fd) can_close = 0;
 
 	if (wsgi_req->write_errors) {
 		if (can_close) close(fd);
 		return -1;
+	}
+
+	if (wsgi_req->ignore_body) {
+		if (can_close) close(fd);
+		return UWSGI_OK;
 	}
 
 	if (!wsgi_req->headers_sent) {
@@ -294,7 +313,7 @@ sendfile:
 	if (len == 0) {
 		struct stat st;
 		if (fstat(fd, &st)) {
-			uwsgi_error("fstat()");
+			uwsgi_error("uwsgi_response_sendfile_do()/fstat()");
 			wsgi_req->write_errors++;
 			if (can_close) close(fd);
 			return -1;

@@ -206,6 +206,9 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"help", no_argument, 'h', "show this help", uwsgi_help, NULL, UWSGI_OPT_IMMEDIATE},
 	{"usage", no_argument, 'h', "show this help", uwsgi_help, NULL, UWSGI_OPT_IMMEDIATE},
 
+	{"print-sym", required_argument, 0, "print content of the specified binary symbol", uwsgi_print_sym, NULL, UWSGI_OPT_IMMEDIATE},
+	{"print-symbol", required_argument, 0, "print content of the specified binary symbol", uwsgi_print_sym, NULL, UWSGI_OPT_IMMEDIATE},
+
 	{"reaper", no_argument, 'r', "call waitpid(-1,...) after each request to get rid of zombies", uwsgi_opt_dyn_true, (void *) UWSGI_OPTION_REAPER, 0},
 	{"max-requests", required_argument, 'R', "reload workers after the specified amount of managed requests", uwsgi_opt_set_dyn, (void *) UWSGI_OPTION_MAX_REQUESTS, 0},
 	{"min-worker-lifetime", required_argument, 0, "number of seconds worker must run before being reloaded (default is 60)", uwsgi_opt_set_dyn, (void *) UWSGI_OPTION_MIN_WORKER_LIFETIME, 0},
@@ -258,6 +261,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"mule", optional_argument, 0, "add a mule", uwsgi_opt_add_mule, NULL, UWSGI_OPT_MASTER},
 	{"mules", required_argument, 0, "add the specified number of mules", uwsgi_opt_add_mules, NULL, UWSGI_OPT_MASTER},
 	{"farm", required_argument, 0, "add a mule farm", uwsgi_opt_add_farm, NULL, UWSGI_OPT_MASTER},
+	{"mule-msg-size", optional_argument, 0, "set mule message buffer size", uwsgi_opt_set_int, &uwsgi.mule_msg_size, UWSGI_OPT_MASTER},
 
 	{"signal", required_argument, 0, "send a uwsgi signal to a server", uwsgi_opt_signal, NULL, UWSGI_OPT_IMMEDIATE},
 	{"signal-bufsize", required_argument, 0, "set buffer size for signal queue", uwsgi_opt_set_int, &uwsgi.signal_bufsize, 0},
@@ -414,7 +418,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"ssl-verbose", no_argument, 0, "be verbose about SSL errors", uwsgi_opt_true, &uwsgi.ssl_verbose, 0},
 	// force master, as ssl sessions caching initialize locking early
 	{"ssl-sessions-use-cache", optional_argument, 0, "use uWSGI cache for ssl sessions storage", uwsgi_opt_set_str, &uwsgi.ssl_sessions_use_cache, UWSGI_OPT_MASTER},
-	{"ssl-session-use-cache", no_argument, 0, "use uWSGI cache for ssl sessions storage", uwsgi_opt_true, &uwsgi.ssl_sessions_use_cache, UWSGI_OPT_MASTER},
+	{"ssl-session-use-cache", optional_argument, 0, "use uWSGI cache for ssl sessions storage", uwsgi_opt_set_str, &uwsgi.ssl_sessions_use_cache, UWSGI_OPT_MASTER},
 	{"ssl-sessions-timeout", required_argument, 0, "set SSL sessions timeout (default: 300 seconds)", uwsgi_opt_set_int, &uwsgi.ssl_sessions_timeout, 0},
 	{"ssl-session-timeout", required_argument, 0, "set SSL sessions timeout (default: 300 seconds)", uwsgi_opt_set_int, &uwsgi.ssl_sessions_timeout, 0},
 	{"sni", required_argument, 0, "add an SNI-governed SSL context", uwsgi_opt_sni, NULL, 0},
@@ -535,6 +539,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 
 
 	{"final-route", required_argument, 0, "add a final route", uwsgi_opt_add_route, "path_info", 0},
+	{"final-route-status", required_argument, 0, "add a final route for the specified status", uwsgi_opt_add_route, "status", 0},
         {"final-route-host", required_argument, 0, "add a final route based on Host header", uwsgi_opt_add_route, "http_host", 0},
         {"final-route-uri", required_argument, 0, "add a final route based on REQUEST_URI", uwsgi_opt_add_route, "request_uri", 0},
         {"final-route-qs", required_argument, 0, "add a final route based on QUERY_STRING", uwsgi_opt_add_route, "query_string", 0},
@@ -546,6 +551,20 @@ static struct uwsgi_option uwsgi_base_options[] = {
         {"final-route-if", required_argument, 0, "add a final route based on condition", uwsgi_opt_add_route, "if", 0},
         {"final-route-if-not", required_argument, 0, "add a final route based on condition (negate version)", uwsgi_opt_add_route, "if-not", 0},
         {"final-route-run", required_argument, 0, "always run the specified final route action", uwsgi_opt_add_route, "run", 0},
+
+	{"error-route", required_argument, 0, "add an error route", uwsgi_opt_add_route, "path_info", 0},
+	{"error-route-status", required_argument, 0, "add an error route for the specified status", uwsgi_opt_add_route, "status", 0},
+        {"error-route-host", required_argument, 0, "add an error route based on Host header", uwsgi_opt_add_route, "http_host", 0},
+        {"error-route-uri", required_argument, 0, "add an error route based on REQUEST_URI", uwsgi_opt_add_route, "request_uri", 0},
+        {"error-route-qs", required_argument, 0, "add an error route based on QUERY_STRING", uwsgi_opt_add_route, "query_string", 0},
+        {"error-route-remote-addr", required_argument, 0, "add an error route based on REMOTE_ADDR", uwsgi_opt_add_route, "remote_addr", 0},
+        {"error-route-user-agent", required_argument, 0, "add an error route based on HTTP_USER_AGENT", uwsgi_opt_add_route, "user_agent", 0},
+        {"error-route-remote-user", required_argument, 0, "add an error route based on REMOTE_USER", uwsgi_opt_add_route, "remote_user", 0},
+        {"error-route-referer", required_argument, 0, "add an error route based on HTTP_REFERER", uwsgi_opt_add_route, "referer", 0},
+        {"error-route-label", required_argument, 0, "add an error routing label (for use with goto)", uwsgi_opt_add_route, NULL, 0},
+        {"error-route-if", required_argument, 0, "add an error route based on condition", uwsgi_opt_add_route, "if", 0},
+        {"error-route-if-not", required_argument, 0, "add an error route based on condition (negate version)", uwsgi_opt_add_route, "if-not", 0},
+        {"error-route-run", required_argument, 0, "always run the specified error route action", uwsgi_opt_add_route, "run", 0},
 
 	{"router-list", no_argument, 0, "list enabled routers", uwsgi_opt_true, &uwsgi.router_list, 0},
 	{"routers-list", no_argument, 0, "list enabled routers", uwsgi_opt_true, &uwsgi.router_list, 0},
@@ -620,6 +639,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 #ifdef __linux__
 	{"cgroup", required_argument, 0, "put the processes in the specified cgroup", uwsgi_opt_add_string_list, &uwsgi.cgroup, 0},
 	{"cgroup-opt", required_argument, 0, "set value in specified cgroup option", uwsgi_opt_add_string_list, &uwsgi.cgroup_opt, 0},
+	{"cgroup-dir-mode", required_argument, 0, "set permission for cgroup directory (default is 700)", uwsgi_opt_set_str, &uwsgi.cgroup_dir_mode, 0},
 	{"namespace", required_argument, 0, "run in a new namespace under the specified rootfs", uwsgi_opt_set_str, &uwsgi.ns, 0},
 	{"namespace-keep-mount", required_argument, 0, "keep the specified mountpoint in your namespace", uwsgi_opt_add_string_list, &uwsgi.ns_keep_mount, 0},
 	{"ns", required_argument, 0, "run in a new namespace under the specified rootfs", uwsgi_opt_set_str, &uwsgi.ns, 0},
@@ -636,9 +656,14 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"zerg-server", required_argument, 0, "enable the zerg server on the specified UNIX socket", uwsgi_opt_set_str, &uwsgi.zerg_server, UWSGI_OPT_MASTER},
 
 	{"cron", required_argument, 0, "add a cron task", uwsgi_opt_add_cron, NULL, UWSGI_OPT_MASTER},
+	{"cron2", required_argument, 0, "add a cron task (key=val syntax)", uwsgi_opt_add_cron2, NULL, UWSGI_OPT_MASTER},
+	{"unique-cron", required_argument, 0, "add a unique cron task", uwsgi_opt_add_unique_cron, NULL, UWSGI_OPT_MASTER},
+	{"cron-harakiri", required_argument, 0, "set the maximum time (in seconds) we wait for cron command to complete", uwsgi_opt_set_int, &uwsgi.cron_harakiri, 0},
 #ifdef UWSGI_SSL
 	{"legion-cron", required_argument, 0, "add a cron task runnable only when the instance is a lord of the specified legion", uwsgi_opt_add_legion_cron, NULL, UWSGI_OPT_MASTER},
 	{"cron-legion", required_argument, 0, "add a cron task runnable only when the instance is a lord of the specified legion", uwsgi_opt_add_legion_cron, NULL, UWSGI_OPT_MASTER},
+	{"unique-legion-cron", required_argument, 0, "add a unique cron task runnable only when the instance is a lord of the specified legion", uwsgi_opt_add_unique_legion_cron, NULL, UWSGI_OPT_MASTER},
+	{"unique-cron-legion", required_argument, 0, "add a unique cron task runnable only when the instance is a lord of the specified legion", uwsgi_opt_add_unique_legion_cron, NULL, UWSGI_OPT_MASTER},
 #endif
 	{"loop", required_argument, 0, "select the uWSGI loop engine", uwsgi_opt_set_str, &uwsgi.loop, 0},
 	{"loop-list", no_argument, 0, "list enabled loop engines", uwsgi_opt_true, &uwsgi.loop_list, 0},
@@ -4078,5 +4103,25 @@ void uwsgi_opt_extract(char *opt, char *address, void *foobar) {
 			exit(1);
 		};
 	};
+	exit(0);
+}
+
+void uwsgi_print_sym(char *opt, char *symbol, void *foobar) {
+	char *sym = dlsym(RTLD_DEFAULT, symbol);
+	if (sym) {
+		uwsgi_log("%s", sym);
+		exit(0);
+	}
+	
+	char *symbol_start = uwsgi_concat2(symbol, "_start");
+	char *symbol_end = uwsgi_concat2(symbol, "_end");
+
+	char *sym_s = dlsym(RTLD_DEFAULT, symbol_start);
+	char *sym_e = dlsym(RTLD_DEFAULT, symbol_end);
+
+	if (sym_s && sym_e) {
+		uwsgi_log("%.*s", sym_e - sym_s, sym_s);
+	}
+
 	exit(0);
 }
