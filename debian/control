@@ -99,6 +99,44 @@ Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Suggests: nginx-full | cherokee | libapache2-mod-uwsgi | libapache2-mod-ruwsgi,
  uwsgi-plugins-all, uwsgi-extra
+Replaces: wsgi-plugin-admin,
+ uwsgi-plugin-cache,
+ uwsgi-plugin-carbon,
+ uwsgi-plugin-cgi,
+ uwsgi-plugin-echo,
+ uwsgi-plugin-emperor-zeromq,
+ uwsgi-plugin-fastrouter,
+ uwsgi-plugin-http,
+ uwsgi-plugin-logsocket,
+ uwsgi-plugin-nagios,
+ uwsgi-plugin-ping,
+ uwsgi-plugin-router-static,
+ uwsgi-plugin-rpc,
+ uwsgi-plugin-rrdtool,
+ uwsgi-plugin-rsyslog,
+ uwsgi-plugin-signal,
+ uwsgi-plugin-symcall,
+ uwsgi-plugin-syslog,
+ uwsgi-plugin-ugreen
+Conflicts: wsgi-plugin-admin,
+ uwsgi-plugin-cache,
+ uwsgi-plugin-carbon,
+ uwsgi-plugin-cgi,
+ uwsgi-plugin-echo,
+ uwsgi-plugin-emperor-zeromq,
+ uwsgi-plugin-fastrouter,
+ uwsgi-plugin-http,
+ uwsgi-plugin-logsocket,
+ uwsgi-plugin-nagios,
+ uwsgi-plugin-ping,
+ uwsgi-plugin-router-static,
+ uwsgi-plugin-rpc,
+ uwsgi-plugin-rrdtool,
+ uwsgi-plugin-rsyslog,
+ uwsgi-plugin-signal,
+ uwsgi-plugin-symcall,
+ uwsgi-plugin-syslog,
+ uwsgi-plugin-ugreen
 Description: fast, self-healing application container server (core)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -118,6 +156,52 @@ Description: fast, self-healing application container server (core)
    * executable uWSGI core binary (built without any embedded plugins)
    * uWSGI usage examples
    * uWSGI test suite
+   * plugins that do not require additional dependencies:
+    - admin
+    - cache
+    - carbon
+    - cgi
+    - cheaper_backlog2
+    - cheaper_busyness
+    - clock_monothonic
+    - clock_realtime
+    - corerouter
+    - echo
+    - emperor_amqp
+    - emperor_zeromq
+    - fastrouter
+    - http
+    - logfile
+    - logfile
+    - logsocket
+    - nagios
+    - notfound
+    - ping
+    - rawrouter
+    - redislog
+    - router_basicauth
+    - router_cache
+    - router_http
+    - router_memcached
+    - router_redirect
+    - router_rewrite
+    - router_static
+    - router_uwsgi
+    - rpc
+    - rrdtool
+    - rsyslog
+    - signal
+    - spooler
+    - ssi
+    - sslrouter
+    - stats_pusher_statsd
+    - symcall
+    - syslog
+    - transformation_gzip
+    - transformation_tofile
+    - transformation_toupper
+    - ugreen
+    - zergpool
 
 Package: uwsgi-emperor
 Architecture: any
@@ -149,22 +233,13 @@ Architecture: any
 Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
- uwsgi-plugin-carbon (= ${binary:Version}),
- uwsgi-plugin-clock-monotonic (= ${binary:Version}),
- uwsgi-plugin-clock-realtime (= ${binary:Version}),
- uwsgi-plugin-cheaper-busyness (= ${binary:Version}),
- uwsgi-plugin-cheaper-backlog2 (= ${binary:Version}),
  uwsgi-plugin-coroae (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version})
    [amd64 i386 mips powerpc s390],
- uwsgi-plugin-notfound (= ${binary:Version}),
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-pyerl-python (= ${binary:Version}),
- uwsgi-plugin-pyerl-python3 (= ${binary:Version}),
- uwsgi-plugin-signal (= ${binary:Version}),
- uwsgi-plugin-symcall (= ${binary:Version}),
- uwsgi-plugin-ugreen (= ${binary:Version})
+ uwsgi-plugin-pyerl-python3 (= ${binary:Version})
 Description: all available plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -173,60 +248,26 @@ Description: all available plugins for uWSGI
  the same core.
  .
  This dependency package provides all available plugins for uWSGI:
-   * infrastructure plugins (fastrouter, HTTP serving, RPC, etc.)
-   * plugins for integration of uWSGI and application (CGI, PSGI, Rack, WSGI,
+   * infrastructure plugins (HTTP serving, RPC, etc.)
+   * plugins for integration of uWSGI and application (PSGI, Rack, WSGI,
      etc.)
-   * carbon, fiber loop engine, greenlet (Python), pyerl (Python/Python 3),
-     uGreen
+   * fiber loop engine, greenlet (Python), pyerl (Python/Python 3)
 
 Package: uwsgi-infrastructure-plugins
 Architecture: any
 Depends: ${misc:Depends},
- uwsgi-plugin-admin (= ${binary:Version}),
  uwsgi-plugin-alarm-curl (= ${binary:Version}),
  uwsgi-plugin-alarm-speech (= ${binary:Version}),
  uwsgi-plugin-alarm-xmpp (= ${binary:Version}),
- uwsgi-plugin-cache (= ${binary:Version}),
  uwsgi-plugin-curl-cron (= ${binary:Version}),
- uwsgi-plugin-echo (= ${binary:Version}),
- uwsgi-plugin-emperor-amqp (= ${binary:Version}),
  uwsgi-plugin-emperor-pg (= ${binary:Version}),
- uwsgi-plugin-emperor-zeromq (= ${binary:Version}),
- uwsgi-plugin-fastrouter (= ${binary:Version}),
  uwsgi-plugin-graylog2 (= ${binary:Version}),
  uwsgi-plugin-geoip (= ${binary:Version}),
- uwsgi-plugin-http (= ${binary:Version}),
  uwsgi-plugin-ldap (= ${binary:Version}),
- uwsgi-plugin-logfile (= ${binary:Version}),
- uwsgi-plugin-logsocket (= ${binary:Version}),
- uwsgi-plugin-nagios (= ${binary:Version}),
  uwsgi-plugin-pam (= ${binary:Version}),
- uwsgi-plugin-ping (= ${binary:Version}),
- uwsgi-plugin-rawrouter (= ${binary:Version}),
- uwsgi-plugin-redislog (= ${binary:Version}),
  uwsgi-plugin-router-access (= ${binary:Version}),
- uwsgi-plugin-router-basicauth (= ${binary:Version}),
- uwsgi-plugin-router-cache (= ${binary:Version}),
- uwsgi-plugin-router-http (= ${binary:Version}),
- uwsgi-plugin-router-memcached (= ${binary:Version}),
- uwsgi-plugin-router-redirect (= ${binary:Version}),
- uwsgi-plugin-router-rewrite (= ${binary:Version}),
- uwsgi-plugin-router-static (= ${binary:Version}),
- uwsgi-plugin-router-uwsgi (= ${binary:Version}),
- uwsgi-plugin-rpc (= ${binary:Version}),
- uwsgi-plugin-rrdtool (= ${binary:Version}),
- uwsgi-plugin-rsyslog (= ${binary:Version}),
- uwsgi-plugin-spooler (= ${binary:Version}),
  uwsgi-plugin-sqlite3 (= ${binary:Version}),
- uwsgi-plugin-ssi (= ${binary:Version}),
- uwsgi-plugin-sslrouter (= ${binary:Version}),
- uwsgi-plugin-stats-pusher-statsd (= ${binary:Version}),
- uwsgi-plugin-syslog (= ${binary:Version}),
- uwsgi-plugin-transformation-gzip (= ${binary:Version}),
- uwsgi-plugin-transformation-tofile (= ${binary:Version}),
- uwsgi-plugin-transformation-toupper (= ${binary:Version}),
- uwsgi-plugin-xslt (= ${binary:Version}),
- uwsgi-plugin-zergpool (= ${binary:Version})
+ uwsgi-plugin-xslt (= ${binary:Version})
 Description: infrastructure plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -235,20 +276,22 @@ Description: infrastructure plugins for uWSGI
  the same core.
  .
  This dependency package provides infrastructure plugins for uWSGI:
-   * admin, alarm curl, alarm speech, alarm XMPP, cache, curl cron echo,
-     AMPQ emperor, PostgreSQL emperor ZeroMQ emperor,
-     fastrouter, graylog2, GeoIP, HTTP serving, LDAP, logfile,
-     logsocket, Nagios, pam, ping, rawrouter, redislog,
-     router access, router basicauth, router cache, router http,
-     router memcached, router redirect, router rewrite, router static,
-     router uwsgi, RPC, RRDTool, rsyslog, spooler, sqlite3, ssi, SSL router,
-     statsd stats pusher, syslog, gzip transformation,
-     transformation tofile transformation toupper, XSLT request, zergpool
+   * alarm curl
+   * alarm speech
+   * alarm XMPP
+   * curl cron
+   * PostgreSQL emperor
+   * graylog2
+   * GeoIP
+   * LDAP
+   * PAM
+   * router access
+   * sqlite3
+   * XSLT request
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
 Depends: ${misc:Depends},
- uwsgi-plugin-cgi (= ${binary:Version}),
  uwsgi-plugin-erlang (= ${binary:Version}),
  uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
  uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}),
@@ -271,21 +314,15 @@ Description: plugins for integration of uWSGI and application
  .
  This dependency package provides plugins for integration of uWSGI and
  application:
-   * CGI, Erlang, Java (OpenJDK 6 and 7), JWSGI (OpenJDK 6 and 7),
-     Lua WSAPI (Lua 5.1), Perl PSGI, Python WSGI (Python/Python 3),
-     Rack (Ruby 1.8/Ruby 1.9.1), V8
-
-Package: uwsgi-plugin-admin
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: admin plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides admin plugin for uWSGI.
+   * Erlang
+   * Java (OpenJDK 6 and 7)
+   * JWSGI (OpenJDK 6 and 7)
+   * Lua WSAPI (Lua 5.1)
+   * PHP
+   * Perl PSGI
+   * Python WSGI (Python/Python 3)
+   * Rack (Ruby 1.8/Ruby 1.9.1)
+   * V8
 
 Package: uwsgi-plugin-alarm-curl
 Architecture: any
@@ -323,90 +360,6 @@ Description: Alarm XMPP plugin for uWSGI
  .
  This package provides alarm_xmpp plugin for uWSGI.
 
-Package: uwsgi-plugin-cache
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: cache plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides cache plugin for uWSGI.
-
-Package: uwsgi-plugin-carbon
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: carbon plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides carbon plugin for uWSGI.
-
-Package: uwsgi-plugin-clock-monotonic
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Monotonic clock plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides clock_monotonic plugin for uWSGI.
-
-Package: uwsgi-plugin-clock-realtime
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Realtime clock plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides clock_realtime plugin for uWSGI.
-
-Package: uwsgi-plugin-cgi
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: CGI plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides CGI plugin for uWSGI.
-
-Package: uwsgi-plugin-cheaper-backlog2
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Cheaper backlog2 algorithm plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides cheaper_backlog2 plugin for uWSGI.
-
-Package: uwsgi-plugin-cheaper-busyness
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Cheaper busyness algorithm plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides cheaper_busyness plugin for uWSGI.
-
 Package: uwsgi-plugin-coroae
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -431,30 +384,6 @@ Description: curl cron plugin for uWSGI
  .
  This package provides curl_cron plugin for uWSGI.
 
-Package: uwsgi-plugin-echo
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: echo plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides echo plugin for uWSGI.
-
-Package: uwsgi-plugin-emperor-amqp
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Emperor AMPQ plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides emperor_amqp plugin for uWSGI.
-
 Package: uwsgi-plugin-emperor-pg
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -467,18 +396,6 @@ Description: Emperor PostgreSQL plugin for uWSGI
  .
  This package provides emperor_pg plugin for uWSGI.
 
-Package: uwsgi-plugin-emperor-zeromq
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Emperor ZeroMQ plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides emperor_zeromq plugin for uWSGI.
-
 Package: uwsgi-plugin-erlang
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -490,31 +407,6 @@ Description: Erlang plugin for uWSGI
  the same core.
  .
  This package provides Erlang plugin for uWSGI.
-
-Package: uwsgi-plugin-corerouter
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: corerouter plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides corerouter plugin for uWSGI.
-
-Package: uwsgi-plugin-fastrouter
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- uwsgi-plugin-corerouter (= ${binary:Version})
-Description: fastrouter plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides fastrouter plugin for uWSGI.
 
 Package: uwsgi-plugin-fiber
 Architecture: any
@@ -567,19 +459,6 @@ Description: greenlet plugin for uWSGI (Python)
  the same core.
  .
  This package provides greenlet plugin for uWSGI with Python WSGI plugin.
-
-Package: uwsgi-plugin-http
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- uwsgi-plugin-corerouter (= ${binary:Version})
-Description: HTTP server plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides HTTP server plugin for uWSGI.
 
 Package: uwsgi-plugin-jvm-openjdk-6
 Architecture: any
@@ -649,30 +528,6 @@ Description: LDAP plugin for uWSGI
  .
  This package provides ldap plugin for uWSGI.
 
-Package: uwsgi-plugin-logfile
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: logfile plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides logfile plugin for uWSGI.
-
-Package: uwsgi-plugin-logsocket
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: logsocket plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides logsocket plugin for uWSGI.
-
 Package: uwsgi-plugin-lua5.1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -686,31 +541,6 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.1)
  This package provides Lua WSAPI plugin for uWSGI (linked with Lua 5.1
  runtime).
 
-Package: uwsgi-plugin-nagios
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Nagios plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides Nagios plugin for uWSGI.
-
-Package: uwsgi-plugin-notfound
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: notfound plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides notfound plugin for uWSGI which always returns HTTP
- response with Not Found 404 Code.
-
 Package: uwsgi-plugin-pam
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -722,18 +552,6 @@ Description: PAM plugin for uWSGI
  the same core.
  .
  This package provides pam plugin for uWSGI.
-
-Package: uwsgi-plugin-ping
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: ping plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides ping plugin for uWSGI.
 
 Package: uwsgi-plugin-psgi
 Architecture: any
@@ -829,31 +647,6 @@ Description: Rack plugin for uWSGI (Ruby 1.9.1)
  .
  This package provides Rack plugin for uWSGI (linked with Ruby 1.9.1 runtime).
 
-Package: uwsgi-plugin-rawrouter
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- uwsgi-plugin-corerouter (= ${binary:Version})
-Description: rawrouter plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides rawrouter plugin for uWSGI.
-
-Package: uwsgi-plugin-redislog
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: redislog plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides redislog plugin for uWSGI.
-
 Package: uwsgi-plugin-router-access
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -865,163 +658,6 @@ Description: Access router plugin for uWSGI
  the same core.
  .
  This package provides router_access plugin for uWSGI.
-
-Package: uwsgi-plugin-router-basicauth
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Basic auth router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides router_basicauth plugin for uWSGI.
-
-Package: uwsgi-plugin-router-cache
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Cache router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides router_cache plugin for uWSGI.
-
-Package: uwsgi-plugin-router-http
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: HTTP router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides router_http plugin for uWSGI.
-
-Package: uwsgi-plugin-router-memcached
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: memcached router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides router_memcached plugin for uWSGI.
-
-Package: uwsgi-plugin-router-redirect
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Redirect router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides router_redirect plugin for uWSGI.
-
-Package: uwsgi-plugin-router-rewrite
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Rewrite router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides router_rewrite plugin for uWSGI.
-
-Package: uwsgi-plugin-router-static
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Static router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides router_static plugin for uWSGI.
-
-Package: uwsgi-plugin-router-uwsgi
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: uwsgi router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides router_uwsgi plugin for uWSGI.
-
-Package: uwsgi-plugin-rpc
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: RPC plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides RPC plugin for uWSGI.
-
-Package: uwsgi-plugin-rrdtool
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: rrdtool plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides rrdtool plugin for uWSGI.
-
-Package: uwsgi-plugin-rsyslog
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: rsyslog plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides rsyslog plugin for uWSGI.
-
-Package: uwsgi-plugin-signal
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: signal plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides signal plugin for uWSGI.
-
-Package: uwsgi-plugin-spooler
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: spooler plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides spooler plugin for uWSGI, which allows remote spooling
- of jobs.
 
 Package: uwsgi-plugin-sqlite3
 Architecture: any
@@ -1035,115 +671,6 @@ Description: sqlite3 configurations plugin for uWSGI
  .
  This package provides sqlite plugin for uWSGI, which allows loading
  configurations from sqlite3 db.
-
-Package: uwsgi-plugin-ssi
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: uWSGI server side includes plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides ssi plugin for uWSGI.
-
-Package: uwsgi-plugin-sslrouter
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- uwsgi-plugin-corerouter (= ${binary:Version})
-Description: SSL router plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides sslrouter plugin for uWSGI.
-
-Package: uwsgi-plugin-stats-pusher-statsd
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: statsd stats pusher plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides stats_pusher_statsd plugin for uWSGI.
-
-Package: uwsgi-plugin-symcall
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: symcall plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides symcall plugin for uWSGI.
-
-Package: uwsgi-plugin-syslog
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: syslog plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides syslog plugin for uWSGI.
-
-Package: uwsgi-plugin-transformation-gzip
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Transformation gzip plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides transformation_gzip plugin for uWSGI.
-
-Package: uwsgi-plugin-transformation-tofile
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Transformation tofile plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides transformation_tofile plugin for uWSGI.
-
-Package: uwsgi-plugin-transformation-toupper
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Transformation toupper plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides transformation_toupper plugin for uWSGI.
-
-Package: uwsgi-plugin-ugreen
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: uGreen plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides uGreen plugin for uWSGI.
 
 Package: uwsgi-plugin-v8
 Architecture: any
@@ -1181,18 +708,6 @@ Description: XSLT request plugin for uWSGI
  the same core.
  .
  This package provides xslt plugin for uWSGI.
-
-Package: uwsgi-plugin-zergpool
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: zergpool plugin for uWSGI
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides zergpool plugin for uWSGI.
 
 Package: libapache2-mod-proxy-uwsgi
 Architecture: any

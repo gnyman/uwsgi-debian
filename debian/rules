@@ -229,9 +229,62 @@ binary-post-install/uwsgi::
 
 build/uwsgi-core:: uwsgi-core
 
-uwsgi-core:
+uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 	$(PYTHON) $(UWSGI_BUILDER) \
 		--build $(CURDIR)/debian/buildconf/uwsgi-core.ini
+	
+	set -e; for PLUGIN_NAME in \
+			admin \
+			cache \
+			carbon \
+			cgi \
+			cheaper_backlog2 \
+			cheaper_busyness \
+			clock_monotonic \
+			clock_realtime \
+			corerouter \
+			echo \
+			emperor_amqp \
+			emperor_zeromq \
+			fastrouter \
+			http \
+			logfile \
+			logfile \
+			logsocket \
+			nagios \
+			notfound \
+			ping \
+			rawrouter \
+			redislog \
+			router_basicauth \
+			router_cache \
+			router_http \
+			router_memcached \
+			router_redirect \
+			router_rewrite \
+			router_static \
+			router_uwsgi \
+			rpc \
+			rrdtool \
+			rsyslog \
+			signal \
+			spooler \
+			ssi \
+			sslrouter \
+			stats_pusher_statsd \
+			symcall \
+			syslog \
+			transformation_gzip \
+			transformation_tofile \
+			transformation_toupper \
+			ugreen \
+			zergpool \
+			; do \
+		$(PYTHON) $(UWSGI_BUILDER) \
+			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$${PLUGIN_NAME} \
+				     $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+				     $${PLUGIN_NAME}; \
+	done
 
 install/uwsgi-core::
 	test -e $(UWSGI_CORE_DOCS_STAGING_DIR) \
