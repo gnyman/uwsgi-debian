@@ -23,3 +23,4 @@ fix-mod_uwsgi-authenticated-but-authentication-typeless-requests.patch
 fixed-fastcgi-support-for-response-bigger-than-64k.patch
 disable-SIGSTOP-SIGTSTP-in-gateways.patch
 fixed-idle-mode.patch
+nagios-plugin-fix.patch

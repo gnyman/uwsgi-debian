@@ -1,3 +1,11 @@
+uwsgi (1.2.3+dfsg-5+deb7u1) stable; urgency=low
+
+  * Add debian/patches/nagios-plugin-fix.patch
+    - Fix the bug with nagios plugin failing to load due to missing
+      struct object. (Closes: #715155)
+
+ -- Janos Guljas <janos@resenje.org>  Sat, 06 Jul 2013 14:17:48 +0200
+
 uwsgi (1.2.3+dfsg-5) unstable; urgency=low
 
   * debian/patches/remove-pg_config_cflags-in-probepg.patch

@@ -1,0 +1,17 @@
+Description: Fix nagios plugin 
+ This patch fixes the bug with nagios plugin failing to load due to missing
+ struct object.
+Author: Janos Guljas <janos@resenje.org>
+Bug-Debian: http://bugs.debian.org/715155
+Last-Update: 2013-07-06
+
+--- a/plugins/nagios/nagios.c
++++ b/plugins/nagios/nagios.c
+@@ -73,6 +73,7 @@ int nagios() {
+ 
+ struct uwsgi_plugin nagios_plugin = {
+ 	
++	.name = "nagios",
+ 	.options = nagios_options,
+ 	.init = nagios,
+ };
