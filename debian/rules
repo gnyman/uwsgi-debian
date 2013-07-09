@@ -235,6 +235,7 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 	
 	set -e; for PLUGIN_NAME in \
 			admin \
+			alarm_speech \
 			cache \
 			carbon \
 			cgi \
@@ -243,6 +244,7 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 			clock_monotonic \
 			clock_realtime \
 			corerouter \
+			coroae \
 			echo \
 			emperor_amqp \
 			emperor_zeromq \
@@ -253,6 +255,7 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 			logsocket \
 			nagios \
 			notfound \
+			pam \
 			ping \
 			rawrouter \
 			redislog \
