@@ -1,3 +1,17 @@
+uwsgi (1.9.13-4) unstable; urgency=low
+
+  * Remove hardcoded phpapi-20100525 dependency. (Closes: #715472)
+  * Build uwsgi-plugin-v8 and build depend on libv8-dev only on
+    amd64 armel armhf i386 architectures. (Closes: #715473)
+  * Remove apache2 and apache2-api-20120211 dependencies for
+    libapache2-mod-proxy-uwsgi, libapache2-mod-uwsgi and
+    libapache2-mod-ruwsgi. (Closes: #715485)
+  * Add ${uwsgi:apache2:Depends} substvar to reference Apache2 API version.
+  * Add ${uwsgi:php:Depends} substvar to reference PHP API version.
+  * Add libphp5-embed as a dependency for uwsgi-plugin-php.
+
+ -- Janos Guljas <janos@debian.org>  Wed, 10 Jul 2013 22:23:20 +0200
+
 uwsgi (1.9.13-3) unstable; urgency=low
 
   * debian/uwsgi-core.install.

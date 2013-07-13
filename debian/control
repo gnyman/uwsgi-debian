@@ -34,7 +34,7 @@ Build-Depends:
  libgnustep-base-dev,
  libcoro-perl,
  libgeoip-dev,
- libv8-dev,
+ libv8-dev [amd64 armel armhf i386],
  libxslt1-dev,
  pkg-config,
  python,
@@ -302,7 +302,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-python3 (= ${binary:Version}),
  uwsgi-plugin-rack-ruby1.8 (= ${binary:Version}),
  uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version}),
- uwsgi-plugin-v8 (= ${binary:Version})
+ uwsgi-plugin-v8 (= ${binary:Version}) [amd64 armel armhf i386]
 Description: plugins for integration of uWSGI and application
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -635,7 +635,7 @@ Description: sqlite3 configurations plugin for uWSGI
  configurations from sqlite3 db.
 
 Package: uwsgi-plugin-v8
-Architecture: any
+Architecture: amd64 armel armhf i386
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: V8 JavaScript plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
@@ -649,7 +649,7 @@ Description: V8 JavaScript plugin for uWSGI
 Package: uwsgi-plugin-php
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- phpapi-20100525
+ ${uwsgi:php:Depends}, libphp5-embed
 Description: PHP plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -673,7 +673,7 @@ Description: XSLT request plugin for uWSGI
 
 Package: libapache2-mod-proxy-uwsgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, apache2-api-20120211
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
 Description: uwsgi proxy module for Apache2 (mod_uwsgi)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -700,7 +700,7 @@ Description: debugging symbols for Apache2 mod_proxy_uwsgi
 
 Package: libapache2-mod-uwsgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, apache2-api-20120211
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
 Conflicts: libapache2-mod-ruwsgi
 Replaces: libapache2-mod-ruwsgi
 Description: uwsgi module for Apache2 (mod_uwsgi)
@@ -727,7 +727,7 @@ Description: debugging symbols for Apache2 mod_uwsgi
 
 Package: libapache2-mod-ruwsgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, apache2-api-20120211
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
 Conflicts: libapache2-mod-uwsgi
 Replaces: libapache2-mod-uwsgi
 Description: uwsgi module for Apache2 (mod_Ruwsgi)
