@@ -35,12 +35,12 @@ Build-Depends:
  libgnustep-base-dev,
  libcoro-perl,
  libgeoip-dev,
- libv8-dev [amd64 armel armhf i386],
+ libv8-dev [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel],
  libxslt1-dev,
  pkg-config,
  python,
  python-all-dev,
- python-greenlet-dev [amd64 i386 mips powerpc s390],
+ python-greenlet-dev [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390 s390x sparc],
  python3-all-dev,
  openjdk-6-jdk,
  openjdk-7-jdk [amd64 armel armhf i386 ia64 kfreebsd-amd64 kfreebsd-i386 powerpc s390 s390x sparc],
@@ -238,8 +238,7 @@ Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
- uwsgi-plugin-greenlet-python (= ${binary:Version})
-   [amd64 i386 mips powerpc s390],
+ uwsgi-plugin-greenlet-python (= ${binary:Version}) [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390 s390x sparc],
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-pyerl-python (= ${binary:Version}),
  uwsgi-plugin-pyerl-python3 (= ${binary:Version})
@@ -303,7 +302,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-python3 (= ${binary:Version}),
  uwsgi-plugin-rack-ruby1.8 (= ${binary:Version}),
  uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version}),
- uwsgi-plugin-v8 (= ${binary:Version}) [amd64 armel armhf i386]
+ uwsgi-plugin-v8 (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel]
 Description: plugins for integration of uWSGI and application
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -423,7 +422,7 @@ Description: graylog2 plugin for uWSGI
  This package provides graylog2 plugin for uWSGI.
 
 Package: uwsgi-plugin-greenlet-python
-Architecture: amd64 i386 mips powerpc s390
+Architecture: amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390 s390x sparc
 Depends: ${shlibs:Depends}, ${misc:Depends}, python-greenlet,
  uwsgi-plugin-python (= ${binary:Version})
 Description: greenlet plugin for uWSGI (Python)
@@ -636,7 +635,7 @@ Description: sqlite3 configurations plugin for uWSGI
  configurations from sqlite3 db.
 
 Package: uwsgi-plugin-v8
-Architecture: amd64 armel armhf i386
+Architecture: amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: V8 JavaScript plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
