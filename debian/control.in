@@ -43,7 +43,7 @@ Build-Depends:
  python-greenlet-dev [amd64 i386 mips powerpc s390],
  python3-all-dev,
  openjdk-6-jdk,
- openjdk-7-jdk,
+ openjdk-7-jdk [@openjdk7_archs@],
  ruby1.8,
  ruby1.8-dev,
  ruby1.9.1,
@@ -293,9 +293,9 @@ Architecture: any
 Depends: ${misc:Depends},
  uwsgi-plugin-erlang (= ${binary:Version}),
  uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
- uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}),
+ uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}) [@openjdk7_archs@],
  uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
- uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}),
+ uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}) [@openjdk7_archs@],
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
@@ -450,7 +450,7 @@ Description: Java plugin for uWSGI (OpenJDK 6)
  runtime).
 
 Package: uwsgi-plugin-jvm-openjdk-7
-Architecture: any
+Architecture: @openjdk7_archs@
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
   openjdk-7-jre-headless
 Description: Java plugin for uWSGI (OpenJDK 7)
@@ -478,7 +478,7 @@ Description: JWSGI plugin for uWSGI (OpenJDK 6)
  runtime).
 
 Package: uwsgi-plugin-jwsgi-openjdk-7
-Architecture: any
+Architecture: @openjdk7_archs@
 Depends: ${shlibs:Depends}, ${misc:Depends},
  uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}), openjdk-7-jre-headless
 Description: JWSGI plugin for uWSGI (OpenJDK 7)
