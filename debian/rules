@@ -51,12 +51,7 @@ PYTHON_DIST_PACKAGES_DIR = usr/lib/python$(PYTHON_DEFAULT_DOTTED)/dist-packages
 PYTHON3_DIST_PACKAGES_DIR = usr/lib/python3/dist-packages
 
 # Search in debian/control for packages with name $(1)% and extract % in list.
-list_pkgname_suffixes = $(strip \
-	$(shell \
-		grep "^Package: $(1)" $(CURDIR)/debian/control \
-		| sed 's/Package: $(1)//' \
-	) \
-)
+list_pkgname_suffixes = $(patsubst $(1)%,%,$(filter $(1)%,$(DEB_PACKAGES)))
 
 # Transform plugin's package name to plugin's name:
 # * delete dots
