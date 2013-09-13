@@ -1,3 +1,19 @@
+uwsgi (1.9.13-5) unstable; urgency=medium
+
+  * Add myself as uploader.
+  * Limit package relations tied to openjdk-7 to supported
+    architectures: mips/mipsel unsupported since openjdk-7 7u15-2.3.7-1.
+  * Avoid mips and mipsel architectures for jvm-openjdk-7 plugin,
+    unsupported since openjdk-7 7u15-2.3.7-1:
+    + Limit build-dependency and arch hints for binary packages in
+      control file.
+    + Fix resolving what plugins to build to be arch-aware.
+    Closes: bug#720262. Thanks to Adam D. Barratt.
+  * Set urgency=medium, as changes are rather limited and affects recent
+    perl migration for those using uWSGI.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Fri, 13 Sep 2013 20:15:29 +0200
+
 uwsgi (1.9.13-4) unstable; urgency=low
 
   * Remove hardcoded phpapi-20100525 dependency. (Closes: #715472)
