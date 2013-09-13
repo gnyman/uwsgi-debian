@@ -40,7 +40,7 @@ Build-Depends:
  pkg-config,
  python,
  python-all-dev,
- python-greenlet-dev [amd64 i386 mips powerpc s390],
+ python-greenlet-dev [@greenlet_archs@],
  python3-all-dev,
  openjdk-6-jdk,
  openjdk-7-jdk [@openjdk7_archs@],
@@ -238,8 +238,7 @@ Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
- uwsgi-plugin-greenlet-python (= ${binary:Version})
-   [amd64 i386 mips powerpc s390],
+ uwsgi-plugin-greenlet-python (= ${binary:Version}) [@greenlet_archs@],
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-pyerl-python (= ${binary:Version}),
  uwsgi-plugin-pyerl-python3 (= ${binary:Version})
@@ -423,7 +422,7 @@ Description: graylog2 plugin for uWSGI
  This package provides graylog2 plugin for uWSGI.
 
 Package: uwsgi-plugin-greenlet-python
-Architecture: amd64 i386 mips powerpc s390
+Architecture: @greenlet_archs@
 Depends: ${shlibs:Depends}, ${misc:Depends}, python-greenlet,
  uwsgi-plugin-python (= ${binary:Version})
 Description: greenlet plugin for uWSGI (Python)

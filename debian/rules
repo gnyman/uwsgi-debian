@@ -5,10 +5,12 @@ include /usr/share/cdbs/1/rules/debhelper.mk
 # resolve supported architectures for arch-varying build-dependencies
 # (in maintainer mode only: uses network and messes with control file)
 ifneq (,$(DEB_MAINTAINER_MODE))
+GREENLET_ARCHS := $(shell sh debian/pkgarchs.sh python-greenlet-dev)
 OPENJDK7_ARCHS := $(shell sh debian/pkgarchs.sh openjdk-7-jdk)
 V8_ARCHS := $(shell sh debian/pkgarchs.sh libv8-dev)
 debian/control::
 	sed -i \
+		-e 's/@greenlet_archs@/$(GREENLET_ARCHS)/g' \
 		-e 's/@openjdk7_archs@/$(OPENJDK7_ARCHS)/g' \
 		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
 		debian/control
