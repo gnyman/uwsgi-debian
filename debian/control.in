@@ -35,7 +35,7 @@ Build-Depends:
  libgnustep-base-dev,
  libcoro-perl,
  libgeoip-dev,
- libv8-dev [amd64 armel armhf i386],
+ libv8-dev [@v8_archs@],
  libxslt1-dev,
  pkg-config,
  python,
@@ -303,7 +303,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-python3 (= ${binary:Version}),
  uwsgi-plugin-rack-ruby1.8 (= ${binary:Version}),
  uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version}),
- uwsgi-plugin-v8 (= ${binary:Version}) [amd64 armel armhf i386]
+ uwsgi-plugin-v8 (= ${binary:Version}) [@v8_archs@]
 Description: plugins for integration of uWSGI and application
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -636,7 +636,7 @@ Description: sqlite3 configurations plugin for uWSGI
  configurations from sqlite3 db.
 
 Package: uwsgi-plugin-v8
-Architecture: amd64 armel armhf i386
+Architecture: @v8_archs@
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Description: V8 JavaScript plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
