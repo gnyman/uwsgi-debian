@@ -4,7 +4,7 @@ Last-Update: 2012-04-23
 
 --- a/plugins/php/uwsgiplugin.py
 +++ b/plugins/php/uwsgiplugin.py
-@@ -20,6 +20,7 @@ except:
+@@ -20,6 +20,7 @@
  CFLAGS = [os.popen(PHPPATH + ' --includes').read().rstrip(), '-Wno-sign-compare']
  
  LDFLAGS = os.popen(PHPPATH + ' --ldflags').read().rstrip().split()

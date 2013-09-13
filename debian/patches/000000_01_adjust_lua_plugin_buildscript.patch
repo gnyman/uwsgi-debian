@@ -5,10 +5,8 @@ Author: Leonid Borisenko <leo.borisenko@gmail.com>
 Forwarded: not-needed
 Last-Update: 2011-05-17
 
-Index: uwsgi/plugins/lua/uwsgiplugin.py
-===================================================================
---- uwsgi.orig/plugins/lua/uwsgiplugin.py	2011-05-15 22:40:27.000000000 +0300
-+++ uwsgi/plugins/lua/uwsgiplugin.py	2011-05-15 22:41:32.000000000 +0300
+--- a/plugins/lua/uwsgiplugin.py
++++ b/plugins/lua/uwsgiplugin.py
 @@ -1,5 +1,12 @@
  import os,sys
  

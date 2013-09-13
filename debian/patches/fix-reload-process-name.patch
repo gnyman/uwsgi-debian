@@ -9,7 +9,7 @@ Last-Update: 2013-04-23
 
 --- a/core/master_utils.c
 +++ b/core/master_utils.c
-@@ -425,7 +425,7 @@ void uwsgi_reload(char **argv) {
+@@ -431,7 +431,7 @@
  
  	uwsgi_log("running %s\n", uwsgi.binary_path);
  	uwsgi_flush_logs();
@@ -18,7 +18,7 @@ Last-Update: 2013-04-23
  	//strcpy (argv[0], uwsgi.binary_path);
  	if (uwsgi.log_master) {
  		if (uwsgi.original_log_fd > -1) {
-@@ -439,7 +439,7 @@ void uwsgi_reload(char **argv) {
+@@ -445,7 +445,7 @@
  			close(uwsgi.shared->worker_log_pipe[1]);
  		}
  	}

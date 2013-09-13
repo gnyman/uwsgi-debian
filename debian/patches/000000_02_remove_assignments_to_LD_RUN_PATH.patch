@@ -9,7 +9,7 @@ Last-Update: 2013-04-24
 
 --- a/plugins/rack/uwsgiplugin.py
 +++ b/plugins/rack/uwsgiplugin.py
-@@ -44,7 +44,6 @@ LIBS = os.popen(RUBYPATH + " -e \"requir
+@@ -44,7 +44,6 @@
  
  if has_shared == 'yes':
      LDFLAGS.append('-L' + libpath )

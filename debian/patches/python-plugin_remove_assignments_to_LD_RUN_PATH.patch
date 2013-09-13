@@ -8,7 +8,7 @@ Last-Update: 2013-04-23
 
 --- a/plugins/python/uwsgiplugin.py
 +++ b/plugins/python/uwsgiplugin.py
-@@ -48,10 +48,8 @@ if not 'UWSGI_PYTHON_NOLIB' in os.enviro
+@@ -44,10 +44,8 @@
      else:
          try:
              LDFLAGS.append("-L%s" % sysconfig.get_config_var('LIBDIR'))
