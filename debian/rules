@@ -1,5 +1,6 @@
 #!/usr/bin/make -f
 
+include /usr/share/cdbs/1/rules/upstream-tarball.mk
 include /usr/share/cdbs/1/rules/debhelper.mk
 
 # resolve supported architectures for arch-varying build-dependencies
@@ -15,6 +16,8 @@ debian/control::
 		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
 		debian/control
 endif
+
+DEB_UPSTREAM_URL = http://projects.unbit.it/downloads
 
 export LDFLAGS=$(shell dpkg-buildflags --get LDFLAGS)
 export CFLAGS=$(shell dpkg-buildflags --get CFLAGS)
