@@ -39,6 +39,7 @@ Build-Depends:
  libv8-dev [@v8_archs@],
  libxslt1-dev,
  libcap-dev [linux-any],
+ libmatheval-dev,
  pkg-config,
  python,
  python-all-dev,
