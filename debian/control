@@ -15,6 +15,7 @@ Build-Depends:
  libjansson-dev,
  libldap2-dev,
  liblua5.1-0-dev,
+ liblua5.2-dev,
  libperl-dev,
  libpq-dev,
  libcurl4-openssl-dev,
@@ -37,6 +38,8 @@ Build-Depends:
  libgeoip-dev,
  libv8-dev [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel],
  libxslt1-dev,
+ libcap-dev [linux-any],
+ libmatheval-dev,
  pkg-config,
  python,
  python-all-dev,
@@ -44,8 +47,6 @@ Build-Depends:
  python3-all-dev,
  openjdk-6-jdk,
  openjdk-7-jdk [amd64 armel armhf i386 ia64 kfreebsd-amd64 kfreebsd-i386 powerpc s390 s390x sparc],
- ruby1.8,
- ruby1.8-dev,
  ruby1.9.1,
  ruby1.9.1-dev,
  uuid-dev
@@ -237,6 +238,7 @@ Architecture: any
 Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
+ uwsgi-plugin-rbthreads (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version}) [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390 s390x sparc],
  uwsgi-plugin-php (= ${binary:Version}),
@@ -296,11 +298,11 @@ Depends: ${misc:Depends},
  uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
  uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 ia64 kfreebsd-amd64 kfreebsd-i386 powerpc s390 s390x sparc],
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
+ uwsgi-plugin-lua5.2 (= ${binary:Version}),
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
  uwsgi-plugin-python3 (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.8 (= ${binary:Version}),
  uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version}),
  uwsgi-plugin-v8 (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel]
 Description: plugins for integration of uWSGI and application
@@ -315,11 +317,11 @@ Description: plugins for integration of uWSGI and application
    * Erlang
    * Java (OpenJDK 6 and 7)
    * JWSGI (OpenJDK 6 and 7)
-   * Lua WSAPI (Lua 5.1)
+   * Lua WSAPI (Lua 5.1 and 5.2)
    * PHP
    * Perl PSGI
    * Python WSGI (Python/Python 3)
-   * Rack (Ruby 1.8/Ruby 1.9.1)
+   * Rack (Ruby 1.9.1)
    * V8
 
 Package: uwsgi-plugin-alarm-curl
@@ -381,6 +383,19 @@ Description: Erlang plugin for uWSGI
  the same core.
  .
  This package provides Erlang plugin for uWSGI.
+
+Package: uwsgi-plugin-rbthreads
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
+ uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
+Description: Ruby native threads plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Ruby 1.9 native threads plugin for uWSGI.
 
 Package: uwsgi-plugin-fiber
 Architecture: any
@@ -515,6 +530,19 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.1)
  This package provides Lua WSAPI plugin for uWSGI (linked with Lua 5.1
  runtime).
 
+Package: uwsgi-plugin-lua5.2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Lua WSAPI plugin for uWSGI (Lua 5.2)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Lua WSAPI plugin for uWSGI (linked with Lua 5.2
+ runtime).
+
 Package: uwsgi-plugin-psgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
@@ -584,18 +612,6 @@ Description: Python 3 WSGI plugin for uWSGI
  .
  This package provides Python 3 WSGI plugin for uWSGI (linked with Python 3.X
  runtime).
-
-Package: uwsgi-plugin-rack-ruby1.8
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Rack plugin for uWSGI (Ruby 1.8)
- uWSGI presents a complete stack for networked/clustered web applications,
- implementing message/object passing, caching, RPC and process management.
- It is designed to be fully modular. This means that different plugins can be
- used in order to add compatibility with tons of different technology on top of
- the same core.
- .
- This package provides Rack plugin for uWSGI (linked with Ruby 1.8 runtime).
 
 Package: uwsgi-plugin-rack-ruby1.9.1
 Architecture: any

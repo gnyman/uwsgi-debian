@@ -1,4 +1,4 @@
-uwsgi (1.9.15-1) UNRELEASED; urgency=low
+uwsgi (1.9.15-1) experimental; urgency=low
 
   [ upstream ]
   * New release.
@@ -22,8 +22,18 @@ uwsgi (1.9.15-1) UNRELEASED; urgency=low
   * Have git-import-orig suppress upstream .gitignore file and enable
     signed tags.
   * Git-ignore quilt .pc dir.
+  * Update source paths for example files, and stop installing files
+    either dropped upstream or now treated as tests.
+  * Stop building against Ruby 1.8.  Raise priority of Ruby 1.9.1 rack
+    plugin.
+    Stop build-depending on ruby1.8 or ruby1.8-dev.
+  * Add plugin package rbthreads, for Ruby 1.9 native threads.
+  * Add plugin package lua5.2, for Lua WSAPI linked with Lua 5.2.
+  * Build-depend on libcap-dev on Linux archs, for capabilities support.
+    Closes: bug#718414. Thanks to Bastian Blank.
+  * Build-depend on libmatheval-dev, for math support in routing system.
 
- -- Jonas Smedegaard <dr@jones.dk>  Fri, 13 Sep 2013 22:40:43 +0200
+ -- Jonas Smedegaard <dr@jones.dk>  Sat, 14 Sep 2013 05:51:10 +0200
 
 uwsgi (1.9.13-5) unstable; urgency=medium
 
