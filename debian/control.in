@@ -15,6 +15,7 @@ Build-Depends:
  libjansson-dev,
  libldap2-dev,
  liblua5.1-0-dev,
+ liblua5.2-dev,
  libperl-dev,
  libpq-dev,
  libcurl4-openssl-dev,
@@ -295,6 +296,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
  uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}) [@openjdk7_archs@],
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
+ uwsgi-plugin-lua5.2 (= ${binary:Version}),
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
@@ -313,7 +315,7 @@ Description: plugins for integration of uWSGI and application
    * Erlang
    * Java (OpenJDK 6 and 7)
    * JWSGI (OpenJDK 6 and 7)
-   * Lua WSAPI (Lua 5.1)
+   * Lua WSAPI (Lua 5.1 and 5.2)
    * PHP
    * Perl PSGI
    * Python WSGI (Python/Python 3)
@@ -524,6 +526,19 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.1)
  the same core.
  .
  This package provides Lua WSAPI plugin for uWSGI (linked with Lua 5.1
+ runtime).
+
+Package: uwsgi-plugin-lua5.2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Lua WSAPI plugin for uWSGI (Lua 5.2)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Lua WSAPI plugin for uWSGI (linked with Lua 5.2
  runtime).
 
 Package: uwsgi-plugin-psgi
