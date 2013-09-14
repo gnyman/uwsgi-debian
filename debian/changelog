@@ -1,15 +1,27 @@
-uwsgi (1.9.13-6) UNRELEASED; urgency=low
+uwsgi (1.9.15-1) UNRELEASED; urgency=low
 
+  [ upstream ]
+  * New release.
+
+  [ Jonas Smedegaard ]
   * Auto-resolve V8- and greenlet-supported architectures.
     Relax arch-specific package relations:
     + For V8 include kfreebsd-* and mipsel.
     + For greenlet include all except ia64.
-  * Unfuzz patches with shortening quilt options.
+  * Update patches:
+    + Drop patches applied upstream:
+      - 000000_01_adjust_lua_plugin_buildscript.patch
+      - alarm_speech-flags.patch
+    + Drop patch no longer applying (one example script dropped
+      upstream, another now treated as a test script):
+      - 000000_04_strip_uwsgi_shebang_from_examples.patch
+    + Unfuzz patches with shortening quilt options.
   * Add upstream git as alternate source.
   * Add CDBS upstream-tarball.mk snippet, to implement get-orig-source
     target.
   * Have git-import-orig suppress upstream .gitignore file and enable
     signed tags.
+  * Git-ignore quilt .pc dir.
 
  -- Jonas Smedegaard <dr@jones.dk>  Fri, 13 Sep 2013 22:40:43 +0200
 
