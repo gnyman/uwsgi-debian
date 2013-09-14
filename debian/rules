@@ -87,7 +87,7 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	lua5.1 \
 	jvm-openjdk-7 jwsgi-openjdk-7 \
 	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)) \
-	rack-ruby1.9.1 fiber
+	rack-ruby1.9.1 rbthreads fiber
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
@@ -451,6 +451,18 @@ debian/stamp-plugin-greenlet-python:
 	done
 	touch $@
 
+# Build rbthreads plugin
+debian/stamp-plugin-rbthreads:
+	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
+		$(subst stamp-plugin-,,$(notdir $@)) \
+	))
+	UWSGICONFIG_RUBYPATH=/usr/bin/ruby1.9.1 \
+	$(PYTHON) $(UWSGI_BUILDER) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME) \
+		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+		         $(PLUGIN_NAME)
+	touch $@
+
 # Build fiber plugin
 debian/stamp-plugin-fiber:
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
@@ -586,6 +598,15 @@ install/uwsgi-plugin-greenlet-python::
 			< $(CURDIR)/debian/uwsgi-plugin.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
 	done
+
+install/uwsgi-plugin-rbthreads::
+	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
+		$(subst uwsgi-plugin-,,$(notdir $@)) \
+	))
+	sed \
+		-e 's/@@plugin_name@@/$(PLUGIN_NAME)/g' \
+			< $(CURDIR)/debian/uwsgi-plugin.install.in \
+			> $(CURDIR)/debian/$(cdbs_curpkg).install
 
 install/uwsgi-plugin-fiber::
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \

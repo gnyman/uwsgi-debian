@@ -235,6 +235,7 @@ Architecture: any
 Depends: ${misc:Depends},
  uwsgi-infrastructure-plugins (= ${binary:Version}),
  uwsgi-app-integration-plugins (= ${binary:Version}),
+ uwsgi-plugin-rbthreads (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version}) [@greenlet_archs@],
  uwsgi-plugin-php (= ${binary:Version}),
@@ -378,6 +379,19 @@ Description: Erlang plugin for uWSGI
  the same core.
  .
  This package provides Erlang plugin for uWSGI.
+
+Package: uwsgi-plugin-rbthreads
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
+ uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
+Description: Ruby native threads plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Ruby 1.9 native threads plugin for uWSGI.
 
 Package: uwsgi-plugin-fiber
 Architecture: any
