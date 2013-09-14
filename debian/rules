@@ -87,7 +87,7 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	lua5.1 \
 	jvm-openjdk-7 jwsgi-openjdk-7 \
 	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)) \
-	rack-ruby1.8 rack-ruby1.9.1 fiber
+	rack-ruby1.9.1 fiber
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
@@ -185,7 +185,7 @@ clean::
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
 			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) \
-				lua5.1 rack-ruby1.8 rack-ruby1.9.1, \
+				lua5.1 rack-ruby1.9.1, \
 			.$${TEMPLATE_TYPE} \
 		); do \
 			if [ -f $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
@@ -475,8 +475,8 @@ debian/stamp-plugin-lua5.1:
 		         $(PLUGIN_NAME)
 	touch $@
 
-# Build rack_ruby18_plugin.so/rack_ruby191_plugin.so
-debian/stamp-plugin-rack-ruby1.8 debian/stamp-plugin-rack-ruby1.9.1:
+# Build rack_ruby191_plugin.so
+debian/stamp-plugin-rack-ruby1.9.1:
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
@@ -623,12 +623,12 @@ install/uwsgi-plugin-lua5.1::
 		$(CURDIR)/uwsgi_$(PLUGIN_NAME) \
 		> $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME).1
 
-install/uwsgi-plugin-rack-ruby1.8 install/uwsgi-plugin-rack-ruby1.9.1::
+install/uwsgi-plugin-rack-ruby1.9.1::
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
 		$(subst uwsgi-plugin-,,$(notdir $@)) \
 	))
 	$(eval PLUGIN_PRIORITY = $(if \
-		$(findstring uwsgi-plugin-rack-ruby1.8, $@),75,35) \
+		$(findstring uwsgi-plugin-rack-ruby1.9.1, $@),75,35) \
 	)
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
