@@ -316,9 +316,9 @@ install/uwsgi-core::
 	for SUBDIR in conffile jwsgi psgi rack router wsapi wsgi; do \
 		mkdir -p $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/$${SUBDIR}; \
 	done
-	for FILE in logo_uWSGI.png mongrel2-uwsgi.conf myadmin.py simple_logger.py \
-	            staticfilesnmp.py testsignals.py ugreenchat.py uwsgistatus.py \
-	            websockets.py welcome.py; do \
+	for FILE in logo_uWSGI.png mongrel2-uwsgi.conf simple_logger.py \
+	            staticfilesnmp.py uwsgistatus.py \
+	            welcome.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples; \
 	done
 	for FILE in mega.xml multi.ini multi.xml sites.xml uwsgi.xml \
@@ -335,19 +335,16 @@ install/uwsgi-core::
 				examples/uwsgirouter4.py examples/uwsgirouter5.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/router; \
 	done
-	for FILE in mojoapp.pl; do \
+	for FILE in examples/mojoapp.pl; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/psgi; \
 	done
 	for FILE in examples/sputnik.ws; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsapi; \
 	done
-	for FILE in hello_world.py hello_world_rrdtool.py decoratortest.py \
-	            mjpeg_stream.py multiapp.py sigwait.py simple_app.py \
-	            simple_app_wsgi2.py taskqueue.py testapp.py testpy3.py \
-	            uploadtest.py; do \
+	for FILE in examples/mjpeg_stream.py examples/multiapp.py simple_app.py \
+	            simple_app_wsgi2.py examples/taskqueue.py testapp.py testpy3.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsgi; \
 	done
-	chmod a-x $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/ugreenchat.py
 	help2man \
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
 		--section 1 \
