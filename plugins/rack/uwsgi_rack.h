@@ -41,9 +41,6 @@ struct uwsgi_rack {
         VALUE dispatcher;
         VALUE rb_uwsgi_io_class;
         ID call;
-        VALUE fibers[200];
-
-        pthread_mutex_t gvl;
 
 	char *rbshell;
 	int rb_shell_oneshot;
@@ -57,8 +54,7 @@ struct uwsgi_rack {
 
 	char *gemset;
 
-	int rb_threads;
-
+	struct uwsgi_string_list *libdir;
 };
 
 void uwsgi_rack_init_api(void);

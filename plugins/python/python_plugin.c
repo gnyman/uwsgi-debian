@@ -121,6 +121,9 @@ struct uwsgi_option uwsgi_python_options[] = {
 	{"pyargv", required_argument, 0, "manually set sys.argv", uwsgi_opt_set_str, &up.argv, 0},
 	{"optimize", required_argument, 'O', "set python optimization level", uwsgi_opt_set_int, &up.optimize, 0},
 
+
+	{"pecan", required_argument, 0, "load a pecan config file", uwsgi_opt_set_str, &up.pecan, 0},
+
 	{"paste", required_argument, 0, "load a paste.deploy config file", uwsgi_opt_set_str, &up.paste, 0},
 	{"paste-logger", no_argument, 0, "enable paste fileConfig logger", uwsgi_opt_true, &up.paste_logger, 0},
 
@@ -1058,6 +1061,7 @@ void uwsgi_python_init_apps() {
         up.loaders[LOADER_DYN] = uwsgi_dyn_loader;
         up.loaders[LOADER_UWSGI] = uwsgi_uwsgi_loader;
         up.loaders[LOADER_FILE] = uwsgi_file_loader;
+        up.loaders[LOADER_PECAN] = uwsgi_pecan_loader;
         up.loaders[LOADER_PASTE] = uwsgi_paste_loader;
         up.loaders[LOADER_EVAL] = uwsgi_eval_loader;
         up.loaders[LOADER_MOUNT] = uwsgi_mount_loader;
@@ -1122,6 +1126,9 @@ next:
 
 	if (up.file_config != NULL) {
 		init_uwsgi_app(LOADER_FILE, up.file_config, uwsgi.wsgi_req, up.main_thread, PYTHON_APP_TYPE_WSGI);
+	}
+	if (up.pecan != NULL) {
+		init_uwsgi_app(LOADER_PECAN, up.pecan, uwsgi.wsgi_req, up.main_thread, PYTHON_APP_TYPE_WSGI);
 	}
 	if (up.paste != NULL) {
 		init_uwsgi_app(LOADER_PASTE, up.paste, uwsgi.wsgi_req, up.main_thread, PYTHON_APP_TYPE_WSGI);
@@ -1732,7 +1739,7 @@ int uwsgi_python_mule_msg(char *message, size_t len) {
 	return 1;
 }
 
-void uwsgi_python_harakiri(int wid) {
+static void uwsgi_python_harakiri(int wid) {
 
 	if (up.tracebacker) {
 
@@ -1762,7 +1769,7 @@ void uwsgi_python_harakiri(int wid) {
 	import logging
 	logging.basicConfig(filename='/tmp/pippo.log')
 */
-ssize_t uwsgi_python_logger(struct uwsgi_logger *ul, char *message, size_t len) {
+static ssize_t uwsgi_python_logger(struct uwsgi_logger *ul, char *message, size_t len) {
 	if (!Py_IsInitialized()) return -1;
 
 	UWSGI_GET_GIL
@@ -1800,7 +1807,7 @@ clear:
 	return -1;
 }
 
-void uwsgi_python_on_load() {
+static void uwsgi_python_on_load() {
 	uwsgi_register_logger("python", uwsgi_python_logger);
 }
 

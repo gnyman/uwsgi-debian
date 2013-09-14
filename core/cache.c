@@ -204,6 +204,7 @@ static void uwsgi_cache_add_items(struct uwsgi_cache *uc) {
 next:
                 usl = usl->next;
         }
+
 }
 
 static void uwsgi_cache_load_files(struct uwsgi_cache *uc) {
@@ -488,6 +489,27 @@ char *uwsgi_cache_get3(struct uwsgi_cache *uc, char *key, uint16_t keylen, uint6
                 *valsize = uci->valsize;
 		if (expires)
 			*expires = uci->expires;
+                uci->hits++;
+                uc->hits++;
+                return uc->data + (uci->first_block * uc->blocksize);
+        }
+
+        uc->miss++;
+
+        return NULL;
+}
+
+char *uwsgi_cache_get4(struct uwsgi_cache *uc, char *key, uint16_t keylen, uint64_t * valsize, uint64_t *hits) {
+
+        uint64_t index = uwsgi_cache_get_index(uc, key, keylen);
+
+        if (index) {
+                struct uwsgi_cache_item *uci = cache_item(index);
+                if (uci->flags & UWSGI_CACHE_FLAG_UNGETTABLE)
+                        return NULL;
+                *valsize = uci->valsize;
+                if (hits)
+                        *hits = uci->hits;
                 uci->hits++;
                 uc->hits++;
                 return uc->data + (uci->first_block * uc->blocksize);
@@ -1899,3 +1921,36 @@ void uwsgi_cache_setup_nodes(struct uwsgi_cache *uc) {
 	}
 }
 
+struct uwsgi_cache_item *uwsgi_cache_keys(struct uwsgi_cache *uc, uint64_t *pos, struct uwsgi_cache_item **uci) {
+
+	// security check
+	if (*pos >= uc->hashsize) return NULL;
+	// iterate hashtable
+	uint64_t orig_pos = *pos;
+	for(;*pos<uc->hashsize;(*pos)++) {
+		// get the cache slot
+		uint64_t slot = uc->hashtable[*pos];
+		if (*pos == orig_pos && *uci) {
+			slot = (*uci)->next;	
+		}
+		if (slot == 0) continue;
+
+		*uci = cache_item(slot);
+		return *uci;
+	}
+
+	(*pos)++;
+	return NULL;
+}
+
+void uwsgi_cache_rlock(struct uwsgi_cache *uc) {
+	uwsgi_rlock(uc->lock);
+}
+
+void uwsgi_cache_rwunlock(struct uwsgi_cache *uc) {
+	uwsgi_rwunlock(uc->lock);
+}
+
+char *uwsgi_cache_item_key(struct uwsgi_cache_item *uci) {
+	return uci->key;
+}

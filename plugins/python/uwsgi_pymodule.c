@@ -4,7 +4,7 @@ extern struct uwsgi_server uwsgi;
 extern struct uwsgi_python up;
 extern struct uwsgi_plugin python_plugin;
 
-PyObject *py_uwsgi_signal_wait(PyObject * self, PyObject * args) {
+static PyObject *py_uwsgi_signal_wait(PyObject * self, PyObject * args) {
 
         struct wsgi_request *wsgi_req = py_current_wsgi_req();
 	int wait_for_specific_signal = 0;
@@ -41,7 +41,7 @@ PyObject *py_uwsgi_signal_wait(PyObject * self, PyObject * args) {
         return PyString_FromString("");
 }
 
-PyObject *py_uwsgi_signal_received(PyObject * self, PyObject * args) {
+static PyObject *py_uwsgi_signal_received(PyObject * self, PyObject * args) {
 
         struct wsgi_request *wsgi_req = py_current_wsgi_req();
 
@@ -172,12 +172,12 @@ char *uwsgi_encode_pydict(PyObject * pydict, uint16_t * size) {
 
 }
 
-PyObject *py_uwsgi_listen_queue(PyObject * self, PyObject * args) {
+static PyObject *py_uwsgi_listen_queue(PyObject * self, PyObject * args) {
 
 	return PyInt_FromLong(uwsgi.shared->options[UWSGI_OPTION_BACKLOG_STATUS]);
 }
 
-PyObject *py_uwsgi_close(PyObject * self, PyObject * args) {
+static PyObject *py_uwsgi_close(PyObject * self, PyObject * args) {
 
 	int fd;
 
@@ -193,7 +193,7 @@ PyObject *py_uwsgi_close(PyObject * self, PyObject * args) {
 
 }
 
-PyObject *py_uwsgi_add_cron(PyObject * self, PyObject * args) {
+static PyObject *py_uwsgi_add_cron(PyObject * self, PyObject * args) {
 
 	uint8_t uwsgi_signal;
 	int minute, hour, day, month, week;
@@ -211,7 +211,7 @@ PyObject *py_uwsgi_add_cron(PyObject * self, PyObject * args) {
 }
 
 
-PyObject *py_uwsgi_add_timer(PyObject * self, PyObject * args) {
+static PyObject *py_uwsgi_add_timer(PyObject * self, PyObject * args) {
 
 	uint8_t uwsgi_signal;
 	int secs;
@@ -819,7 +819,7 @@ PyObject *py_uwsgi_advanced_sendfile(PyObject * self, PyObject * args) {
 	}
 #ifdef PYTHREE
 	else if (PyUnicode_Check(what)) {
-		filename = PyBytes_AsString(PyUnicode_AsASCIIString(what));
+		filename = PyBytes_AsString(PyUnicode_AsLatin1String(what));
 
 		fd = open(filename, O_RDONLY);
 		if (fd < 0) {
@@ -1805,6 +1805,7 @@ PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args, PyObject *kw) {
 		if (PyString_Check(pybody)) {
 			body = PyString_AsString(pybody);
 			body_len = PyString_Size(pybody);
+			Py_INCREF(pybody);
 			uwsgi_py_dict_del(spool_dict, "body");
 		}
 	}
@@ -1896,6 +1897,10 @@ PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args, PyObject *kw) {
 	i = spool_request(uspool, spool_filename, uwsgi.workers[0].requests + 1, async_id, spool_buffer, cur_buf - spool_buffer, priority, at, body, body_len);
 
 	UWSGI_GET_GIL
+
+	if (pybody) {
+		Py_DECREF(pybody);
+	}
 	
 	if (priority) {
 		free(priority);
@@ -3104,6 +3109,35 @@ PyObject *py_uwsgi_cache_num(PyObject * self, PyObject * args) {
 
 }
 
+PyObject *py_uwsgi_cache_keys(PyObject * self, PyObject * args) {
+	char *cache = NULL;
+        struct uwsgi_cache_item *uci = NULL;
+        uint64_t pos = 0;
+
+        if (!PyArg_ParseTuple(args, "|s:cache_keys", &cache)) {
+                return NULL;
+        }
+
+	struct uwsgi_cache *uc = uwsgi_cache_by_name(cache);
+	if (!uc) {
+		return PyErr_Format(PyExc_ValueError, "no local uWSGI cache available");
+	}
+
+	PyObject *l = PyList_New(0);
+
+	uwsgi_rlock(uc->lock);
+        for(;;) {
+                uci = uwsgi_cache_keys(uc, &pos, &uci);
+                if (!uci) break;
+		PyObject *ci = PyString_FromStringAndSize(uci->key, uci->keysize);
+		PyList_Append(l, ci);
+		Py_DECREF(ci);
+        }
+	uwsgi_rwunlock(uc->lock);
+	return l;
+}
+
+
 static PyMethodDef uwsgi_cache_methods[] = {
 	{"cache_get", py_uwsgi_cache_get, METH_VARARGS, ""},
 	{"cache_set", py_uwsgi_cache_set, METH_VARARGS, ""},
@@ -3116,6 +3150,7 @@ static PyMethodDef uwsgi_cache_methods[] = {
 	{"cache_mul", py_uwsgi_cache_mul, METH_VARARGS, ""},
 	{"cache_div", py_uwsgi_cache_div, METH_VARARGS, ""},
 	{"cache_num", py_uwsgi_cache_num, METH_VARARGS, ""},
+	{"cache_keys", py_uwsgi_cache_keys, METH_VARARGS, ""},
 	{NULL, NULL},
 };
 
@@ -3477,7 +3512,7 @@ clear:
 	return Py_None;
 }
 
-PyObject *py_snmp_decr_gauge(PyObject * self, PyObject * args) {
+static PyObject *py_snmp_decr_gauge(PyObject * self, PyObject * args) {
 
 	uint8_t oid_num;
 	uint64_t oid_val = 1;
@@ -3510,7 +3545,7 @@ clear:
 	return Py_None;
 }
 
-PyObject *py_snmp_set_community(PyObject * self, PyObject * args) {
+static PyObject *py_snmp_set_community(PyObject * self, PyObject * args) {
 
         char *snmp_community;
 
