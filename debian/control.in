@@ -38,6 +38,7 @@ Build-Depends:
  libgeoip-dev,
  libv8-dev [@v8_archs@],
  libxslt1-dev,
+ libcap-dev [linux-any],
  pkg-config,
  python,
  python-all-dev,
