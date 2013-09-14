@@ -1,3 +1,4 @@
+from functools import partial
 import sys
 from threading import Thread
 
@@ -26,7 +27,13 @@ def get_free_signal():
 
 
 def manage_spool_request(vars):
-    ret = spooler_functions[vars['ud_spool_func']](vars)
+    f = spooler_functions[vars['ud_spool_func']]
+    if 'args' in vars:
+        args = pickle.loads(vars.pop('args'))
+        kwargs = pickle.loads(vars.pop('kwargs'))
+        ret = f(*args, **kwargs)
+    else:
+        ret = f(vars)
     if not 'ud_spool_ret' in vars:
         return ret
     return int(vars['ud_spool_ret'])
@@ -42,24 +49,44 @@ uwsgi.post_fork_hook = postfork_chain_hook
 
 class postfork(object):
     def __init__(self, f):
-        postfork_chain.append(f)
+        if callable(f):
+            self.wid = 0
+            self.f = f
+        else:
+            self.f = None
+            self.wid = f
+        postfork_chain.append(self)
+    def __call__(self, *args, **kwargs):
+        if self.f:
+            if self.wid > 0 and self.wid != uwsgi.worker_id():
+                return
+            return self.f()
+        self.f = args[0]
 
 
-class spoolraw(object):
+class _spoolraw(object):
 
     def __call__(self, *args, **kwargs):
         arguments = self.base_dict
-        if len(args) > 0:
-            arguments.update(args[0])
-        if kwargs:
-            arguments.update(kwargs)
+        if not self.pass_arguments:
+            if len(args) > 0:
+                arguments.update(args[0])
+            if kwargs:
+                arguments.update(kwargs)
+        else:
+            spooler_args = {}
+            for key in ('message_dict', 'spooler', 'priority', 'at', 'body'):
+                if key in kwargs:
+                    spooler_args.update({key: kwargs.pop(key)})
+            arguments.update(spooler_args)
+            arguments.update({'args': pickle.dumps(args), 'kwargs': pickle.dumps(kwargs)})
         return uwsgi.spool(arguments)
 
     # For backward compatibility (uWSGI < 1.9.13)
     def spool(self, *args, **kwargs):
         return self.__class__.__call__(self, *args, **kwargs)
 
-    def __init__(self, f):
+    def __init__(self, f, pass_arguments):
         if not 'spooler' in uwsgi.opt:
             raise Exception(
                 "you have to enable the uWSGI spooler to use @%s decorator" % self.__class__.__name__)
@@ -67,21 +94,40 @@ class spoolraw(object):
         spooler_functions[self.f.__name__] = self.f
         # For backward compatibility (uWSGI < 1.9.13)
         self.f.spool = self.__call__
+        self.pass_arguments = pass_arguments
         self.base_dict = {'ud_spool_func': self.f.__name__}
 
 
-class spool(spoolraw):
+class _spool(_spoolraw):
 
     def __call__(self, *args, **kwargs):
         self.base_dict['ud_spool_ret'] = str(uwsgi.SPOOL_OK)
-        return spoolraw.__call__(self, *args, **kwargs)
+        return _spoolraw.__call__(self, *args, **kwargs)
 
 
-class spoolforever(spoolraw):
+class _spoolforever(_spoolraw):
 
     def __call__(self, *args, **kwargs):
         self.base_dict['ud_spool_ret'] = str(uwsgi.SPOOL_RETRY)
-        return spoolraw.__call__(self, *args, **kwargs)
+        return _spoolraw.__call__(self, *args, **kwargs)
+
+
+def spool_decorate(f=None, pass_arguments=False, _class=_spoolraw):
+    if not f:
+        return partial(_class, pass_arguments=pass_arguments)
+    return _class(f, pass_arguments)
+
+
+def spoolraw(f=None, pass_arguments=False):
+    return spool_decorate(f, pass_arguments)
+
+
+def spool(f=None, pass_arguments=False):
+    return spool_decorate(f, pass_arguments, _spool)
+
+
+def spoolforever(f=None, pass_arguments=False):
+    return spool_decorate(f, pass_arguments, _spoolforever)
 
 
 class mulefunc(object):

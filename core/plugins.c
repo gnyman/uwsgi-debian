@@ -24,7 +24,7 @@ static void uwsgi_plugin_parse_section(char *filename) {
 }
 #endif
 
-int plugin_already_loaded(const char *plugin) {
+struct uwsgi_plugin *uwsgi_plugin_get(const char *plugin) {
 	int i;
 
 	for (i = 0; i < 256; i++) {
@@ -33,7 +33,7 @@ int plugin_already_loaded(const char *plugin) {
 #ifdef UWSGI_DEBUG
 				uwsgi_log("%s plugin already available\n", plugin);
 #endif
-				return 1;
+				return uwsgi.p[i];
 			}
 		}
 		if (uwsgi.p[i]->alias) {
@@ -41,7 +41,7 @@ int plugin_already_loaded(const char *plugin) {
 #ifdef UWSGI_DEBUG
 				uwsgi_log("%s plugin already available\n", plugin);
 #endif
-				return 1;
+				return uwsgi.p[i];
 			}
 		}
 	}
@@ -53,7 +53,7 @@ int plugin_already_loaded(const char *plugin) {
 #ifdef UWSGI_DEBUG
 				uwsgi_log("%s plugin already available\n", plugin);
 #endif
-				return 1;
+				return uwsgi.p[i];
 			}
 		}
 		if (uwsgi.gp[i]->alias) {
@@ -61,13 +61,20 @@ int plugin_already_loaded(const char *plugin) {
 #ifdef UWSGI_DEBUG
 				uwsgi_log("%s plugin already available\n", plugin);
 #endif
-				return 1;
+				return uwsgi.p[i];
 			}
 		}
 	}
 
+	return NULL;
+}
+
+int plugin_already_loaded(const char *plugin) {
+	struct uwsgi_plugin *up = uwsgi_plugin_get(plugin);
+	if (up) return 1;
 	return 0;
 }
+
 
 void *uwsgi_load_plugin(int modifier, char *plugin, char *has_option) {
 
@@ -89,6 +96,12 @@ void *uwsgi_load_plugin(int modifier, char *plugin, char *has_option) {
 		modifier = atoi(plugin_name);
 		plugin_name = colon + 1;
 		colon[0] = ':';
+	}
+
+	char *init_func = strchr(plugin_name, '|');
+	if (init_func) {
+		init_func[0] = 0;
+		init_func++;	
 	}
 
 	if (!uwsgi_endswith(plugin_name, "_plugin.so")) {
@@ -150,6 +163,12 @@ success:
 			uwsgi_log("!!! UNABLE to load uWSGI plugin: %s !!!\n", dlerror());
 	}
 	else {
+		if (init_func) {
+			void (*plugin_init_func)() = dlsym(plugin_handle, init_func);
+			if (plugin_init_func) {
+				plugin_init_func();
+			}
+		}
 		char *plugin_entry_symbol = uwsgi_concat2n(plugin_symbol_name_start, strlen(plugin_symbol_name_start) - 3, "", 0);
 		up = dlsym(plugin_handle, plugin_entry_symbol);
 		if (!up) {

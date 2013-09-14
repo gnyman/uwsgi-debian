@@ -10,6 +10,7 @@ struct uwsgi_http uhttp;
 
 struct uwsgi_option http_options[] = {
 	{"http", required_argument, 0, "add an http router/server on the specified address", uwsgi_opt_corerouter, &uhttp, 0},
+	{"httprouter", required_argument, 0, "add an http router/server on the specified address", uwsgi_opt_corerouter, &uhttp, 0},
 #ifdef UWSGI_SSL
 	{"https", required_argument, 0, "add an https router/server on the specified address with specified certificate and key", uwsgi_opt_https, &uhttp, 0},
 	{"https2", required_argument, 0, "add an https/spdy router/server using keyval options", uwsgi_opt_https2, &uhttp, 0},
@@ -207,8 +208,19 @@ int http_headers_parse(struct corerouter_peer *peer) {
 	while (ptr < watermark) {
 		if (*ptr == '?' && !query_string) {
 			// PATH_INFO must be url-decoded !!!
-			hr->path_info_len = ptr - base;
-			hr->path_info = uwsgi_malloc(hr->path_info_len);
+			if (!hr->path_info) {
+				hr->path_info_len = ptr - base;
+				hr->path_info = uwsgi_malloc(hr->path_info_len);
+			}
+			else {
+				size_t new_path_info = ptr - base;
+				if (new_path_info > hr->path_info_len) {
+					char *tmp_buf = realloc(hr->path_info, new_path_info);
+					if (!tmp_buf) return -1;
+					hr->path_info = tmp_buf;
+				}
+				hr->path_info_len = new_path_info;
+			}
 			http_url_decode(base, &hr->path_info_len, hr->path_info);
 			if (uwsgi_buffer_append_keyval(out, "PATH_INFO", 9, hr->path_info, hr->path_info_len)) return -1;
 			query_string = ptr + 1;
@@ -219,8 +231,19 @@ int http_headers_parse(struct corerouter_peer *peer) {
 			if (uwsgi_buffer_append_keyval(out, "REQUEST_URI", 11, base, ptr - base)) return -1;
 			if (!query_string) {
 				// PATH_INFO must be url-decoded !!!
-				hr->path_info_len = ptr - base;
-				hr->path_info = uwsgi_malloc(hr->path_info_len);
+				if (!hr->path_info) {
+                                	hr->path_info_len = ptr - base;
+                                	hr->path_info = uwsgi_malloc(hr->path_info_len);
+                        	}
+                        	else {
+                                	size_t new_path_info = ptr - base;
+                                	if (new_path_info > hr->path_info_len) {
+                                        	char *tmp_buf = realloc(hr->path_info, new_path_info);
+                                        	if (!tmp_buf) return -1;
+                                        	hr->path_info = tmp_buf;
+                                	}
+                                	hr->path_info_len = new_path_info;
+                        	}
 				http_url_decode(base, &hr->path_info_len, hr->path_info);
 				if (uwsgi_buffer_append_keyval(out, "PATH_INFO", 9, hr->path_info, hr->path_info_len)) return -1;
 				if (uwsgi_buffer_append_keyval(out, "QUERY_STRING", 12, "", 0)) return -1;
@@ -430,6 +453,9 @@ ssize_t hr_instance_connected(struct corerouter_peer* peer) {
 
 	cr_peer_connected(peer, "hr_instance_connected()");
 
+	// we are connected, we cannot retry anymore
+        peer->can_retry = 0;
+
 	// prepare for write
 	peer->out_pos = 0;
 
@@ -566,8 +592,10 @@ ssize_t hr_instance_read(struct corerouter_peer *peer) {
 		}
 #endif
 		else if (hr->force_chunked) {
+			peer->in->limit = 0;
 			if (uwsgi_buffer_insert_chunked(peer->in, 0, len)) return -1;
 			if (uwsgi_buffer_append(peer->in, "\r\n", 2)) return -1;
+			peer->in->len = UMIN(peer->in->len, UMAX16);
 		}
 	}
 
@@ -705,7 +733,7 @@ ssize_t http_parse(struct corerouter_peer *main_peer) {
 			if (hr->websockets > 2 && hr->websocket_key_len > 0) {
 				hr->raw_body = 1;
 			}
-
+			new_peer->can_retry = 1;
                 	cr_connect(new_peer, hr_instance_connected);
 			break;
 		}
@@ -775,7 +803,31 @@ ssize_t hr_recv_stud4(struct corerouter_peer * main_peer) {
 
 }
 
+// retry connection to the backend
+static int hr_retry(struct corerouter_peer *peer) {
+
+        struct uwsgi_corerouter *ucr = peer->session->corerouter;
+
+        if (peer->instance_address_len > 0) goto retry;
+
+        if (ucr->mapper(ucr, peer)) {
+                return -1;
+        }
+
+        if (peer->instance_address_len == 0) {
+                return -1;
+        }
+
+retry:
+        // start async connect (again)
+        cr_connect(peer, hr_instance_connected);
+        return 0;
+}
+
+
 int http_alloc_session(struct uwsgi_corerouter *ucr, struct uwsgi_gateway_socket *ugs, struct corerouter_session *cs, struct sockaddr *sa, socklen_t s_len) {
+	// set the retry hook
+        cs->retry = hr_retry;
 	struct http_session *hr = (struct http_session *) cs;
 	// set the modifier1
 	cs->main_peer->modifier1 = uhttp.modifier1;

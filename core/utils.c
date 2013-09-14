@@ -191,6 +191,8 @@ void daemonize(char *logfile) {
 // get current working directory
 char *uwsgi_get_cwd() {
 
+	if (uwsgi.force_cwd) return uwsgi.force_cwd;
+
 	// set this to static to avoid useless reallocations in stats mode
 	static size_t newsize = 256;
 
@@ -370,17 +372,48 @@ void uwsgi_as_root() {
 #endif
 		}
 
+
+		struct uwsgi_string_list *usl;
+		uwsgi_foreach(usl, uwsgi.wait_for_interface) {
+			if (!uwsgi.wait_for_interface_timeout) {
+				uwsgi.wait_for_interface_timeout = 60;
+			}
+			uwsgi_log("waiting for interface %s (max %d seconds) ...\n", usl->value, uwsgi.wait_for_interface_timeout);
+			int counter = 0;
+			for(;;) {
+				if (counter > uwsgi.wait_for_interface_timeout) {
+					uwsgi_log("interface %s unavailable after %d seconds\n", usl->value, counter);
+					exit(1);
+				}
+				unsigned int index = if_nametoindex(usl->value);
+				if (index > 0) {
+					uwsgi_log("interface %s found with index %u\n", usl->value, index);
+					break;
+				}	
+				else {
+					sleep(1);
+					counter++;
+				}
+			}
+		}
+		
+
 		// now run the scripts needed by root
-		struct uwsgi_string_list *usl = uwsgi.exec_as_root;
-		while (usl) {
+		uwsgi_foreach(usl, uwsgi.exec_as_root) {
 			uwsgi_log("running \"%s\" (as root)...\n", usl->value);
 			int ret = uwsgi_run_command_and_wait(NULL, usl->value);
 			if (ret != 0) {
 				uwsgi_log("command \"%s\" exited with non-zero code: %d\n", usl->value, ret);
 				exit(1);
 			}
-			usl = usl->next;
 		}
+
+		uwsgi_foreach(usl, uwsgi.call_as_root) {
+                        if (uwsgi_call_symbol(usl->value)) {
+                                uwsgi_log("unaable to call function \"%s\"\n", usl->value);
+                        }
+                }
+
 
 		if (uwsgi.gidname) {
 			struct group *ugroup = getgrnam(uwsgi.gidname);
@@ -480,6 +513,31 @@ void uwsgi_as_root() {
 					exit(1);
 				}
 			}
+			struct uwsgi_string_list *usl;
+			size_t ags = 0;
+			uwsgi_foreach(usl, uwsgi.additional_gids) ags++;
+			if (ags > 0) {
+				gid_t *ags_list = uwsgi_calloc(sizeof(gid_t) * ags);
+				size_t g_pos = 0;
+				uwsgi_foreach(usl, uwsgi.additional_gids) {
+					ags_list[g_pos] = atoi(usl->value);
+					if (!ags_list[g_pos]) {
+						struct group *g = getgrnam(usl->value);
+						if (g) {
+							ags_list[g_pos] = g->gr_gid;
+						}
+						else {
+							uwsgi_log("unable to find group %s\n", usl->value);
+							exit(1);
+						}
+					}
+					g_pos++;
+				}
+				if (setgroups(ags, ags_list)) {
+					uwsgi_error("setgroups()");
+					exit(1);
+				}
+			}
 			int additional_groups = getgroups(0, NULL);
 			if (additional_groups > 0) {
 				gid_t *gids = uwsgi_calloc(sizeof(gid_t) * additional_groups);
@@ -536,17 +594,41 @@ void uwsgi_as_root() {
 		}
 #endif
 
+		if (uwsgi.refork) {
+			uwsgi_log("re-fork()ing...\n");
+			pid_t pid = fork();
+			if (pid < 0) {
+				uwsgi_error("fork()");
+				exit(1);
+			}
+			if (pid > 0) {
+				// block all signals
+        			sigset_t smask;
+        			sigfillset(&smask);
+        			sigprocmask(SIG_BLOCK, &smask, NULL);
+				int status;
+				if (waitpid(pid, &status, 0) < 0) {
+					uwsgi_error("waitpid()");
+				}
+				_exit(0);
+			}
+		}	
+
 		// now run the scripts needed by the user
-		usl = uwsgi.exec_as_user;
-		while (usl) {
+		uwsgi_foreach(usl, uwsgi.exec_as_user) {
 			uwsgi_log("running \"%s\" (as uid: %d gid: %d) ...\n", usl->value, (int) getuid(), (int) getgid());
 			int ret = uwsgi_run_command_and_wait(NULL, usl->value);
 			if (ret != 0) {
 				uwsgi_log("command \"%s\" exited with non-zero code: %d\n", usl->value, ret);
 				exit(1);
 			}
-			usl = usl->next;
 		}
+
+		uwsgi_foreach(usl, uwsgi.call_as_user) {
+                        if (uwsgi_call_symbol(usl->value)) {
+                                uwsgi_log("unaable to call function \"%s\"\n", usl->value);
+                        }
+                }
 
 		// we could now patch the binary
 		if (uwsgi.unprivileged_binary_patch) {
@@ -1241,34 +1323,6 @@ int uwsgi_get_app_id(struct wsgi_request *wsgi_req, char *key, uint16_t key_len,
 	return -1;
 }
 
-int uwsgi_count_options(struct uwsgi_option *uopt) {
-
-	struct uwsgi_option *aopt;
-	int count = 0;
-
-	while ((aopt = uopt)) {
-		if (!aopt->name)
-			break;
-		count++;
-		uopt++;
-	}
-
-	return count;
-}
-
-struct uwsgi_option *uwsgi_opt_get(char *name) {
-	struct uwsgi_option *op = uwsgi.options;
-
-	while (op->name) {
-		if (!strcmp(name, op->name)) {
-			return op;
-		}
-		op++;
-	}
-
-	return NULL;
-}
-
 char *uwsgi_substitute(char *src, char *what, char *with) {
 
 	int count = 0;
@@ -1345,408 +1399,6 @@ int uwsgi_is_link(char *filename) {
 	if (S_ISLNK(st.st_mode))
 		return 1;
 	return 0;
-}
-
-
-int uwsgi_logic_opt_if_opt(char *key, char *value) {
-
-	// check for env-value syntax
-	char *equal = strchr(uwsgi.logic_opt_data, '=');
-	if (equal)
-		*equal = 0;
-
-	char *p = uwsgi_get_exported_opt(uwsgi.logic_opt_data);
-	if (equal)
-		*equal = '=';
-
-	if (p) {
-		if (equal) {
-			if (strcmp(equal + 1, p))
-				return 0;
-		}
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", p), 0);
-		return 1;
-	}
-
-	return 0;
-}
-
-
-int uwsgi_logic_opt_if_not_opt(char *key, char *value) {
-
-	// check for env-value syntax
-	char *equal = strchr(uwsgi.logic_opt_data, '=');
-	if (equal)
-		*equal = 0;
-
-	char *p = uwsgi_get_exported_opt(uwsgi.logic_opt_data);
-	if (equal)
-		*equal = '=';
-
-	if (p) {
-		if (equal) {
-			if (!strcmp(equal + 1, p))
-				return 0;
-		}
-		else {
-			return 0;
-		}
-	}
-
-	add_exported_option(key, uwsgi_substitute(value, "%(_)", p), 0);
-	return 1;
-}
-
-
-
-int uwsgi_logic_opt_if_env(char *key, char *value) {
-
-	// check for env-value syntax
-	char *equal = strchr(uwsgi.logic_opt_data, '=');
-	if (equal)
-		*equal = 0;
-
-	char *p = getenv(uwsgi.logic_opt_data);
-	if (equal)
-		*equal = '=';
-
-	if (p) {
-		if (equal) {
-			if (strcmp(equal + 1, p))
-				return 0;
-		}
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", p), 0);
-		return 1;
-	}
-
-	return 0;
-}
-
-int uwsgi_logic_opt_if_not_env(char *key, char *value) {
-
-	// check for env-value syntax
-	char *equal = strchr(uwsgi.logic_opt_data, '=');
-	if (equal)
-		*equal = 0;
-
-	char *p = getenv(uwsgi.logic_opt_data);
-	if (equal)
-		*equal = '=';
-
-	if (p) {
-		if (equal) {
-			if (!strcmp(equal + 1, p))
-				return 0;
-		}
-		else {
-			return 0;
-		}
-	}
-
-	add_exported_option(key, uwsgi_substitute(value, "%(_)", p), 0);
-	return 1;
-}
-
-int uwsgi_logic_opt_if_reload(char *key, char *value) {
-	if (uwsgi.is_a_reload) {
-		add_exported_option(key, value, 0);
-		return 1;
-	}
-	return 0;
-}
-
-int uwsgi_logic_opt_if_not_reload(char *key, char *value) {
-	if (!uwsgi.is_a_reload) {
-		add_exported_option(key, value, 0);
-		return 1;
-	}
-	return 0;
-}
-
-int uwsgi_logic_opt_if_file(char *key, char *value) {
-
-	if (uwsgi_is_file(uwsgi.logic_opt_data)) {
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", uwsgi.logic_opt_data), 0);
-		return 1;
-	}
-
-	return 0;
-}
-
-int uwsgi_logic_opt_if_not_file(char *key, char *value) {
-
-	if (!uwsgi_is_file(uwsgi.logic_opt_data)) {
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", uwsgi.logic_opt_data), 0);
-		return 1;
-	}
-
-	return 0;
-}
-
-int uwsgi_logic_opt_if_dir(char *key, char *value) {
-
-	if (uwsgi_is_dir(uwsgi.logic_opt_data)) {
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", uwsgi.logic_opt_data), 0);
-		return 1;
-	}
-
-	return 0;
-}
-
-int uwsgi_logic_opt_if_not_dir(char *key, char *value) {
-
-	if (!uwsgi_is_dir(uwsgi.logic_opt_data)) {
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", uwsgi.logic_opt_data), 0);
-		return 1;
-	}
-
-	return 0;
-}
-
-int uwsgi_logic_opt_if_plugin(char *key, char *value) {
-
-        if (plugin_already_loaded(uwsgi.logic_opt_data)) {
-                add_exported_option(key, uwsgi_substitute(value, "%(_)", uwsgi.logic_opt_data), 0);
-                return 1;
-        }
-
-        return 0;
-}
-
-int uwsgi_logic_opt_if_not_plugin(char *key, char *value) {
-
-        if (!plugin_already_loaded(uwsgi.logic_opt_data)) {
-                add_exported_option(key, uwsgi_substitute(value, "%(_)", uwsgi.logic_opt_data), 0);
-                return 1;
-        }
-
-        return 0;
-}
-
-
-
-int uwsgi_logic_opt_if_exists(char *key, char *value) {
-
-	if (uwsgi_file_exists(uwsgi.logic_opt_data)) {
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", uwsgi.logic_opt_data), 0);
-		return 1;
-	}
-
-	return 0;
-}
-
-int uwsgi_logic_opt_if_not_exists(char *key, char *value) {
-
-	if (!uwsgi_file_exists(uwsgi.logic_opt_data)) {
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", uwsgi.logic_opt_data), 0);
-		return 1;
-	}
-
-	return 0;
-}
-
-
-int uwsgi_logic_opt_for(char *key, char *value) {
-
-	char *p = strtok(uwsgi.logic_opt_data, " ");
-	while (p) {
-		add_exported_option(key, uwsgi_substitute(value, "%(_)", p), 0);
-		p = strtok(NULL, " ");
-	}
-
-	return 1;
-}
-
-int uwsgi_logic_opt_for_glob(char *key, char *value) {
-
-	glob_t g;
-	int i;
-        if (glob(uwsgi.logic_opt_data, GLOB_MARK | GLOB_NOCHECK, NULL, &g)) {
-                uwsgi_error("uwsgi_logic_opt_for_glob()");
-                return 0;
-        }
-
-	for (i = 0; i < (int) g.gl_pathc; i++) {
-                add_exported_option(key, uwsgi_substitute(value, "%(_)", g.gl_pathv[i]), 0);
-        }
-
-	globfree(&g);
-
-        return 1;
-}
-
-int uwsgi_logic_opt_for_times(char *key, char *value) {
-
-	int num = atoi(uwsgi.logic_opt_data);
-        int i;
-	char str_num[11];
-
-        for (i = 1; i <= num; i++) {
-		int ret = uwsgi_num2str2(i, str_num);
-		// security check
-		if (ret < 0 || ret > 11) {
-			exit(1);
-		}
-                add_exported_option(key, uwsgi_substitute(value, "%(_)", str_num), 0);
-        }
-
-        return 1;
-}
-
-
-
-void add_exported_option(char *key, char *value, int configured) {
-
-	struct uwsgi_string_list *blacklist = uwsgi.blacklist;
-	struct uwsgi_string_list *whitelist = uwsgi.whitelist;
-
-	while (blacklist) {
-		if (!strcmp(key, blacklist->value)) {
-			uwsgi_log("uWSGI error: forbidden option \"%s\" (by blacklist)\n", key);
-			exit(1);
-		}
-		blacklist = blacklist->next;
-	}
-
-	if (whitelist) {
-		int allowed = 0;
-		while (whitelist) {
-			if (!strcmp(key, whitelist->value)) {
-				allowed = 1;
-				break;
-			}
-			whitelist = whitelist->next;
-		}
-		if (!allowed) {
-			uwsgi_log("uWSGI error: forbidden option \"%s\" (by whitelist)\n", key);
-			exit(1);
-		}
-	}
-
-	if (uwsgi.blacklist_context) {
-		if (uwsgi_list_has_str(uwsgi.blacklist_context, key)) {
-			uwsgi_log("uWSGI error: forbidden option \"%s\" (by blacklist)\n", key);
-			exit(1);
-		}
-	}
-
-	if (uwsgi.whitelist_context) {
-                if (!uwsgi_list_has_str(uwsgi.whitelist_context, key)) {
-                        uwsgi_log("uWSGI error: forbidden option \"%s\" (by whitelist)\n", key);
-                        exit(1);
-                }
-        }
-
-	if (uwsgi.logic_opt_running)
-		goto add;
-
-	if (!strcmp(key, "end") || !strcmp(key, "endfor") || !strcmp(key, "endif")) {
-		if (uwsgi.logic_opt_data) {
-			free(uwsgi.logic_opt_data);
-		}
-		uwsgi.logic_opt = NULL;
-		uwsgi.logic_opt_arg = NULL;
-		uwsgi.logic_opt_cycles = 0;
-		uwsgi.logic_opt_data = NULL;
-	}
-
-	if (uwsgi.logic_opt) {
-		if (uwsgi.logic_opt_data) {
-			free(uwsgi.logic_opt_data);
-		}
-		uwsgi.logic_opt_data = uwsgi_str(uwsgi.logic_opt_arg);
-		uwsgi.logic_opt_cycles++;
-		uwsgi.logic_opt_running = 1;
-		uwsgi.logic_opt(key, value);
-		uwsgi.logic_opt_running = 0;
-		return;
-	}
-
-add:
-
-	if (!uwsgi.exported_opts) {
-		uwsgi.exported_opts = uwsgi_malloc(sizeof(struct uwsgi_opt *));
-	}
-	else {
-		uwsgi.exported_opts = realloc(uwsgi.exported_opts, sizeof(struct uwsgi_opt *) * (uwsgi.exported_opts_cnt + 1));
-		if (!uwsgi.exported_opts) {
-			uwsgi_error("realloc()");
-			exit(1);
-		}
-	}
-
-	int id = uwsgi.exported_opts_cnt;
-	uwsgi.exported_opts[id] = uwsgi_malloc(sizeof(struct uwsgi_opt));
-	uwsgi.exported_opts[id]->key = key;
-	uwsgi.exported_opts[id]->value = value;
-	uwsgi.exported_opts[id]->configured = configured;
-	uwsgi.exported_opts_cnt++;
-	uwsgi.dirty_config = 1;
-
-	struct uwsgi_option *op = uwsgi_opt_get(key);
-	if (op) {
-		// requires master ?
-		if (op->flags & UWSGI_OPT_MASTER) {
-			uwsgi.master_process = 1;
-		}
-		// requires log_master ?
-		if (op->flags & UWSGI_OPT_LOG_MASTER) {
-			uwsgi.master_process = 1;
-			uwsgi.log_master = 1;
-		}
-		if (op->flags & UWSGI_OPT_REQ_LOG_MASTER) {
-			uwsgi.master_process = 1;
-			uwsgi.log_master = 1;
-			uwsgi.req_log_master = 1;
-		}
-		// requires threads ?
-		if (op->flags & UWSGI_OPT_THREADS) {
-			uwsgi.has_threads = 1;
-		}
-		// requires cheaper mode ?
-		if (op->flags & UWSGI_OPT_CHEAPER) {
-			uwsgi.cheaper = 1;
-		}
-		// requires virtualhosting ?
-		if (op->flags & UWSGI_OPT_VHOST) {
-			uwsgi.vhost = 1;
-		}
-		// requires memusage ?
-		if (op->flags & UWSGI_OPT_MEMORY) {
-			uwsgi.force_get_memusage = 1;
-		}
-		// requires auto procname ?
-		if (op->flags & UWSGI_OPT_PROCNAME) {
-			uwsgi.auto_procname = 1;
-		}
-		// requires lazy ?
-		if (op->flags & UWSGI_OPT_LAZY) {
-			uwsgi.lazy = 1;
-		}
-		// requires no_initial ?
-		if (op->flags & UWSGI_OPT_NO_INITIAL) {
-			uwsgi.no_initial_output = 1;
-		}
-		// requires no_server ?
-		if (op->flags & UWSGI_OPT_NO_SERVER) {
-			uwsgi.no_server = 1;
-		}
-		// requires post_buffering ?
-		if (op->flags & UWSGI_OPT_POST_BUFFERING) {
-			if (!uwsgi.post_buffering)
-				uwsgi.post_buffering = 4096;
-		}
-		// requires building mime dict ?
-		if (op->flags & UWSGI_OPT_MIME) {
-			uwsgi.build_mime_dict = 1;
-		}
-		// immediate ?
-		if (op->flags & UWSGI_OPT_IMMEDIATE) {
-			op->func(key, value, op->data);
-			uwsgi.exported_opts[id]->configured = 1;
-		}
-	}
-
 }
 
 void *uwsgi_malloc(size_t size) {
@@ -1987,6 +1639,9 @@ static char hex2num(char *str) {
 	else if (str[0] >= 'A' && str[0] <= 'F') {
 		val += (str[0] & 0x0F) + 9;
 	}
+	else if (str[0] >= 'a' && str[0] <= 'f') {
+		val += (str[0] & 0x0F) + 9;
+	}
 	else {
 		return 0;
 	}
@@ -1997,6 +1652,9 @@ static char hex2num(char *str) {
 		val += str[1] & 0x0F;
 	}
 	else if (str[1] >= 'A' && str[1] <= 'F') {
+		val += (str[1] & 0x0F) + 9;
+	}
+	else if (str[1] >= 'a' && str[1] <= 'f') {
 		val += (str[1] & 0x0F) + 9;
 	}
 	else {
@@ -2356,23 +2014,9 @@ void uwsgi_exec_command_with_args(char *cmdline) {
 	exit(1);
 }
 
-int uwsgi_run_command_and_wait(char *command, char *arg) {
+static int uwsgi_run_command_do(char *command, char *arg) {
 
 	char *argv[4];
-	int waitpid_status = 0;
-	pid_t pid = fork();
-	if (pid < 0) {
-		return -1;
-	}
-
-	if (pid > 0) {
-		if (waitpid(pid, &waitpid_status, 0) < 0) {
-			uwsgi_error("waitpid()");
-			return -1;
-		}
-
-		return WEXITSTATUS(waitpid_status);
-	}
 
 #ifdef __linux__
 	if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0)) {
@@ -2399,6 +2043,54 @@ int uwsgi_run_command_and_wait(char *command, char *arg) {
 	//never here
 	exit(1);
 }
+
+int uwsgi_run_command_and_wait(char *command, char *arg) {
+
+        int waitpid_status = 0;
+        pid_t pid = fork();
+        if (pid < 0) {
+                return -1;
+        }
+
+        if (pid > 0) {
+                if (waitpid(pid, &waitpid_status, 0) < 0) {
+                        uwsgi_error("uwsgi_run_command_and_wait()/waitpid()");
+                        return -1;
+                }
+
+                return WEXITSTATUS(waitpid_status);
+        }
+	return uwsgi_run_command_do(command, arg);
+}
+
+int uwsgi_run_command_putenv_and_wait(char *command, char *arg, char **envs, unsigned int nenvs) {
+
+        int waitpid_status = 0;
+        pid_t pid = fork();
+        if (pid < 0) {
+                return -1; 
+        }
+
+        if (pid > 0) {
+                if (waitpid(pid, &waitpid_status, 0) < 0) {
+                        uwsgi_error("uwsgi_run_command_and_wait()/waitpid()");
+                        return -1;
+                }
+
+                return WEXITSTATUS(waitpid_status);
+        }
+
+	unsigned int i;
+	for(i=0;i<nenvs;i++) {
+		if (putenv(envs[i])) {
+			uwsgi_error("uwsgi_run_command_putenv_and_wait()/putenv()");
+			exit(1);
+		}
+	}
+
+        return uwsgi_run_command_do(command, arg);
+}
+
 
 pid_t uwsgi_run_command(char *command, int *stdin_fd, int stdout_fd) {
 
@@ -2597,11 +2289,13 @@ char *uwsgi_get_binary_path(char *argvzero) {
 	uint32_t len = uwsgi.page_size;
 	if (_NSGetExecutablePath(buf, &len) == 0) {
 		// return only absolute path
+#ifndef OLD_REALPATH
 		char *newbuf = realpath(buf, NULL);
 		if (newbuf) {
 			free(buf);
 			return newbuf;
 		}
+#endif
 	}
 	free(buf);
 #elif defined(__sun__)
@@ -2741,9 +2435,6 @@ static struct uwsgi_unshare_id uwsgi_unshare_list[] = {
 #ifdef CLONE_FILES
 	{"files", CLONE_FILES},
 #endif
-#ifdef CLONE_FS
-	{"fs", CLONE_FS},
-#endif
 #ifdef CLONE_NEWIPC
 	{"ipc", CLONE_NEWIPC},
 #endif
@@ -2755,6 +2446,7 @@ static struct uwsgi_unshare_id uwsgi_unshare_list[] = {
 #endif
 #ifdef CLONE_NEWNS
 	{"ns", CLONE_NEWNS},
+	{"fs", CLONE_NEWNS},
 	{"mount", CLONE_NEWNS},
 #endif
 #ifdef CLONE_SYSVSEM
@@ -2778,7 +2470,7 @@ static int uwsgi_get_unshare_id(char *name) {
 	return -1;
 }
 
-void uwsgi_build_unshare(char *what) {
+void uwsgi_build_unshare(char *what, int *mask) {
 
 	char *list = uwsgi_str(what);
 
@@ -2786,7 +2478,7 @@ void uwsgi_build_unshare(char *what) {
 	while (p != NULL) {
 		int u_id = uwsgi_get_unshare_id(p);
 		if (u_id != -1) {
-			uwsgi.unshare |= u_id;
+			*mask |= u_id;
 		}
 		p = strtok(NULL, ",");
 	}
@@ -3263,16 +2955,38 @@ char *uwsgi_check_touches(struct uwsgi_string_list *touch_list) {
 }
 
 char *uwsgi_chomp(char *str) {
-	size_t i;
-	for (i = 0; i < strlen(str); i++) {
+	ssize_t slen = (ssize_t) strlen(str), i ;
+	if (!slen) return str;
+	slen--;
+	for (i = slen; i >= 0; i--) {
 		if (str[i] == '\r' || str[i] == '\n') {
 			str[i] = 0;
+		}
+		else {
 			return str;
 		}
 	}
 
 	return str;
 }
+
+char *uwsgi_chomp2(char *str) {
+        ssize_t slen = (ssize_t) strlen(str), i ;
+        if (!slen) return str;
+        slen--;
+        for (i = slen; i >= 0; i--) {
+                if (str[i] == '\r' || str[i] == '\n' || str[i] == '\t' || str[i] == ' ') {
+                        str[i] = 0;
+                }
+                else {
+                        return str;
+                }
+        }
+
+        return str;
+}
+
+
 
 int uwsgi_tmpfd() {
 	char *tmpdir = getenv("TMPDIR");
@@ -3704,6 +3418,13 @@ error:
 	return -1;
 }
 
+int uwsgi_call_symbol(char *symbol) {
+	void (*func)(void) = dlsym(RTLD_DEFAULT, symbol);
+	if (!func) return -1;
+	func();
+	return 0;
+}
+
 int uwsgi_plugin_modifier1(char *plugin) {
 	int ret = -1;
 	char *symbol_name = uwsgi_concat2(plugin, "_plugin");
@@ -4054,4 +3775,91 @@ void create_msg_pipe(int *fd, int bufsize) {
 
 char *uwsgi_binary_path() {
 	return uwsgi.binary_path ? uwsgi.binary_path : "uwsgi";
+}
+
+void uwsgi_envdir(char *edir) {
+	DIR *d = opendir(edir);
+	if (!d) {
+		uwsgi_error("[uwsgi-envdir] opendir()");
+		exit(1);
+	}
+	struct dirent *de;
+	while ((de = readdir(d)) != NULL) {
+		// skip hidden files
+		if (de->d_name[0] == '.') continue;
+		struct stat st;
+		char *filename = uwsgi_concat3(edir, "/", de->d_name);
+		if (stat(filename, &st)) {
+			uwsgi_log("[uwsgi-envdir] error stating %s\n", filename);
+			uwsgi_error("[uwsgi-envdir] stat()");
+			exit(1);
+		}
+
+		if (!S_ISREG(st.st_mode)) {
+			free(filename);
+			continue;
+		}
+	
+		// unsetenv
+		if (st.st_size == 0) {
+#ifdef UNSETENV_VOID
+			unsetenv(de->d_name);
+#else
+			if (unsetenv(de->d_name)) {
+				uwsgi_log("[uwsgi-envdir] unable to unset %s\n", de->d_name);
+				uwsgi_error("[uwsgi-envdir] unsetenv");
+				exit(1);
+			}
+#endif
+			free(filename);
+			continue;
+		}
+
+		// read the content of the file
+		size_t size = 0;
+        	char *content = uwsgi_open_and_read(filename, &size, 1, NULL);
+		if (!content) {
+			uwsgi_log("[uwsgi-envdir] unable to open %s\n", filename);
+			uwsgi_error_open(filename);
+			exit(1);
+		}
+		free(filename);
+
+		// HACK, envdir states we only need to strip the end of the string ....
+		uwsgi_chomp2(content);
+		// ... and substitute 0 with \n
+		size_t slen = strlen(content);
+		size_t i;
+		for(i=0;i<slen;i++) {
+			if (content[i] == 0) {
+				content[i] = '\n';
+			}
+		}
+
+		if (setenv(de->d_name, content, 1)) {
+			uwsgi_log("[uwsgi-envdir] unable to set %s\n", de->d_name);
+                        uwsgi_error("[uwsgi-envdir] setenv");
+			exit(1);
+		}
+
+		free(content);
+	}
+}
+
+void uwsgi_envdirs(struct uwsgi_string_list *envdirs) {
+	struct uwsgi_string_list *usl = envdirs;
+	while(usl) {
+		uwsgi_envdir(usl->value);
+		usl = usl->next;
+	}	
+}
+
+void uwsgi_opt_envdir(char *opt, char *value, void *foobar) {
+	uwsgi_envdir(value);
+}
+
+void uwsgi_exit(int status) {
+	uwsgi.last_exit_code = status;
+	// disable macro expansion
+	(exit)(status);
 }
