@@ -5,6 +5,11 @@ uwsgi (1.9.13-6) UNRELEASED; urgency=low
     + For V8 include kfreebsd-* and mipsel.
     + For greenlet include all except ia64.
   * Unfuzz patches with shortening quilt options.
+  * Add upstream git as alternate source.
+  * Add CDBS upstream-tarball.mk snippet, to implement get-orig-source
+    target.
+  * Have git-import-orig suppress upstream .gitignore file and enable
+    signed tags.
 
  -- Jonas Smedegaard <dr@jones.dk>  Fri, 13 Sep 2013 22:40:43 +0200
 
