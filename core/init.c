@@ -357,6 +357,7 @@ void uwsgi_setup_workers() {
 #ifdef UWSGI_ROUTING
 	uwsgi_fixup_routes(uwsgi.routes);
 	uwsgi_fixup_routes(uwsgi.error_routes);
+	uwsgi_fixup_routes(uwsgi.response_routes);
 	uwsgi_fixup_routes(uwsgi.final_routes);
 #endif
 
@@ -448,6 +449,19 @@ void sanitize_args() {
 	if (uwsgi.shared->options[UWSGI_OPTION_MAX_WORKER_LIFETIME] > 0 && uwsgi.shared->options[UWSGI_OPTION_MIN_WORKER_LIFETIME] >= uwsgi.shared->options[UWSGI_OPTION_MAX_WORKER_LIFETIME]) {
 		uwsgi_log("invalid min-worker-lifetime value (%d), must be lower than max-worker-lifetime (%d)\n",
 			uwsgi.shared->options[UWSGI_OPTION_MIN_WORKER_LIFETIME], uwsgi.shared->options[UWSGI_OPTION_MAX_WORKER_LIFETIME]);
+		exit(1);
+	}
+
+	if (uwsgi.cheaper_rss_limit_soft && uwsgi.shared->options[UWSGI_OPTION_MEMORY_DEBUG] != 1 && uwsgi.force_get_memusage != 1) {
+		uwsgi_log("enabling cheaper-rss-limit-soft requires enabling also memory-report\n");
+		exit(1);
+	}
+	if (uwsgi.cheaper_rss_limit_hard && !uwsgi.cheaper_rss_limit_soft) {
+		uwsgi_log("enabling cheaper-rss-limit-hard requires setting also cheaper-rss-limit-soft\n");
+		exit(1);
+	}
+	if ( uwsgi.cheaper_rss_limit_soft && uwsgi.cheaper_rss_limit_hard <= uwsgi.cheaper_rss_limit_soft) {
+		uwsgi_log("cheaper-rss-limit-hard value must be higher than cheaper-rss-limit-soft value\n");
 		exit(1);
 	}
 

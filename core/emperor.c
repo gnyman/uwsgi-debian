@@ -620,7 +620,7 @@ void emperor_stop(struct uwsgi_instance *c_ui) {
 	// remove uWSGI instance
 
 	if (write(c_ui->pipe[0], "\0", 1) != 1) {
-		uwsgi_error("write()");
+		uwsgi_error("emperor_stop()/write()");
 	}
 
 	c_ui->status = 1;
@@ -634,7 +634,7 @@ void emperor_respawn(struct uwsgi_instance *c_ui, time_t mod) {
 
 	// reload the uWSGI instance
 	if (write(c_ui->pipe[0], "\1", 1) != 1) {
-		uwsgi_error("write()");
+		uwsgi_error("emperor_respawn/write()");
 	}
 
 	// push the config to the config pipe (if needed)
@@ -862,14 +862,28 @@ int uwsgi_emperor_vassal_start(struct uwsgi_instance *n_ui) {
 
 		// once the config is sent we can run hooks (they can fail)
 		// exec hooks have access to all of the currently defined vars + UWSGI_VASSAL_PID, UWSGI_VASSAL_UID, UWSGI_VASSAL_GID, UWSGI_VASSAL_CONFIG
+		uwsgi_hooks_run(uwsgi.hook_as_emperor, "as-emperor", 0);
 		struct uwsgi_string_list *usl;
+		uwsgi_foreach(usl, uwsgi.mount_as_emperor) {
+                                uwsgi_log("mounting \"%s\" (as-emperor for vassal \"%s\" pid: %d uid: %d gid: %d)...\n", usl->value, n_ui->name, n_ui->pid, n_ui->uid, n_ui->gid);
+                                if (uwsgi_mount_hook(usl->value)) {
+                                        exit(1);
+                                }
+                        }
+
+                        uwsgi_foreach(usl, uwsgi.umount_as_emperor) {
+                                uwsgi_log("un-mounting \"%s\" (as-emperor for vassal \"%s\" pid: %d uid: %d gid: %d)...\n", usl->value, n_ui->name, n_ui->pid, n_ui->uid, n_ui->gid);
+                                if (uwsgi_umount_hook(usl->value)) {
+                                        exit(1);
+                                }
+                        }
 		uwsgi_foreach(usl, uwsgi.exec_as_emperor) {
 			uwsgi_log("running \"%s\" (as-emperor for vassal \"%s\" pid: %d uid: %d gid: %d)...\n", usl->value, n_ui->name, n_ui->pid, n_ui->uid, n_ui->gid);
 			char *argv[4];
 			argv[0] = uwsgi_concat2("UWSGI_VASSAL_CONFIG=", n_ui->name);
-			char argv_pid[17+11]; snprintf(argv_pid, 17 + 11, "UWSGI_VASSAL_PID=%d", n_ui->pid); argv[1] = argv_pid;
-			char argv_uid[17+11]; snprintf(argv_uid, 17 + 11, "UWSGI_VASSAL_UID=%d", n_ui->uid); argv[2] = argv_uid;
-			char argv_gid[17+11]; snprintf(argv_gid, 17 + 11, "UWSGI_VASSAL_GID=%d", n_ui->gid); argv[3] = argv_gid;
+			char argv_pid[17+11]; snprintf(argv_pid, 17 + 11, "UWSGI_VASSAL_PID=%d", (int) n_ui->pid); argv[1] = argv_pid;
+			char argv_uid[17+11]; snprintf(argv_uid, 17 + 11, "UWSGI_VASSAL_UID=%d", (int) n_ui->uid); argv[2] = argv_uid;
+			char argv_gid[17+11]; snprintf(argv_gid, 17 + 11, "UWSGI_VASSAL_GID=%d", (int) n_ui->gid); argv[3] = argv_gid;
                         int ret = uwsgi_run_command_putenv_and_wait(NULL, usl->value, argv, 4);
                         uwsgi_log("command \"%s\" exited with code: %d\n", usl->value, ret);
 			free(argv[0]);
@@ -1130,6 +1144,22 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 			int start_hook_ret = uwsgi_run_command_and_wait(uwsgi.vassals_start_hook, n_ui->name);
 			uwsgi_log("[emperor] %s start-hook returned %d\n", n_ui->name, start_hook_ret);
 		}
+
+		uwsgi_hooks_run(uwsgi.hook_as_vassal, "as-vassal", 1);
+
+		uwsgi_foreach(usl, uwsgi.mount_as_vassal) {
+                                uwsgi_log("mounting \"%s\" (as-vassal)...\n", usl->value);
+                                if (uwsgi_mount_hook(usl->value)) {
+                                        exit(1);
+                                }
+                        }
+
+                        uwsgi_foreach(usl, uwsgi.umount_as_vassal) {
+                                uwsgi_log("un-mounting \"%s\" (as-vassal)...\n", usl->value);
+                                if (uwsgi_umount_hook(usl->value)) {
+                                        exit(1);
+                                }
+                        }
 
 		// run exec hooks (cannot fail)
 		uwsgi_foreach(usl, uwsgi.exec_as_vassal) {
