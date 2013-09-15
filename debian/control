@@ -24,7 +24,7 @@ Build-Depends:
  libsqlite3-dev,
  libxml2-dev,
  libyaml-dev,
- libzmq-dev,
+ libzmq-dev [!kfreebsd-any],
  libphp5-embed,
  php5-dev,
  libonig-dev,
@@ -45,7 +45,7 @@ Build-Depends:
  python-all-dev,
  python-greenlet-dev [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390 s390x sparc],
  python3-all-dev,
- openjdk-6-jdk,
+ openjdk-6-jdk [amd64 armel armhf i386 ia64 mips mipsel powerpc s390 s390x sparc],
  openjdk-7-jdk [amd64 armel armhf i386 ia64 kfreebsd-amd64 kfreebsd-i386 powerpc s390 s390x sparc],
  ruby1.9.1,
  ruby1.9.1-dev,
@@ -172,7 +172,7 @@ Description: fast, self-healing application container server (core)
     - coroae
     - echo
     - emperor_amqp
-    - emperor_zeromq
+    - emperor_zeromq (on supported architectures)
     - fastrouter
     - http
     - logfile
@@ -293,9 +293,9 @@ Package: uwsgi-app-integration-plugins
 Architecture: any
 Depends: ${misc:Depends},
  uwsgi-plugin-erlang (= ${binary:Version}),
- uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
+ uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}) [amd64 armel armhf i386 ia64 mips mipsel powerpc s390 s390x sparc],
  uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 ia64 kfreebsd-amd64 kfreebsd-i386 powerpc s390 s390x sparc],
- uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
+ uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}) [amd64 armel armhf i386 ia64 mips mipsel powerpc s390 s390x sparc],
  uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 ia64 kfreebsd-amd64 kfreebsd-i386 powerpc s390 s390x sparc],
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
  uwsgi-plugin-lua5.2 (= ${binary:Version}),
@@ -450,7 +450,7 @@ Description: greenlet plugin for uWSGI (Python)
  This package provides greenlet plugin for uWSGI with Python WSGI plugin.
 
 Package: uwsgi-plugin-jvm-openjdk-6
-Architecture: any
+Architecture: amd64 armel armhf i386 ia64 mips mipsel powerpc s390 s390x sparc
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
   openjdk-6-jre-headless
 Description: Java plugin for uWSGI (OpenJDK 6)
@@ -478,7 +478,7 @@ Description: Java plugin for uWSGI (OpenJDK 7)
  runtime).
 
 Package: uwsgi-plugin-jwsgi-openjdk-6
-Architecture: any
+Architecture: amd64 armel armhf i386 ia64 mips mipsel powerpc s390 s390x sparc
 Depends: ${shlibs:Depends}, ${misc:Depends},
  uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}), openjdk-6-jre-headless
 Description: JWSGI plugin for uWSGI (OpenJDK 6)
@@ -716,6 +716,7 @@ Description: debugging symbols for Apache2 mod_proxy_uwsgi
 
 Package: libapache2-mod-uwsgi
 Architecture: any
+Section: httpd
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
 Conflicts: libapache2-mod-ruwsgi
 Replaces: libapache2-mod-ruwsgi
@@ -743,6 +744,7 @@ Description: debugging symbols for Apache2 mod_uwsgi
 
 Package: libapache2-mod-ruwsgi
 Architecture: any
+Section: httpd
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
 Conflicts: libapache2-mod-uwsgi
 Replaces: libapache2-mod-uwsgi

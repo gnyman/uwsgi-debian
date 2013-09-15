@@ -1,3 +1,18 @@
+uwsgi (1.9.16-1) unstable; urgency=low
+
+  [ upstream ]
+  * New release.
+
+  [ Jonas Smedegaard ]
+  * Fix use packaging section httpd for libapache2-mod-uwsgi and
+    libapache2-mod-ruwsgi.
+  * Auto-resolve openjdk6-supported architectures.
+  * Exclude build-dependency on libzmq-dev for kfreebsd-any, and avoid
+    building module zeromq there.
+  * Unfuzz patches.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Sun, 15 Sep 2013 12:43:52 +0200
+
 uwsgi (1.9.15-1) experimental; urgency=low
 
   [ upstream ]
