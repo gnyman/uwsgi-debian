@@ -45,7 +45,7 @@ Build-Depends:
  python-all-dev,
  python-greenlet-dev [@greenlet_archs@],
  python3-all-dev,
- openjdk-6-jdk,
+ openjdk-6-jdk [@openjdk6_archs@],
  openjdk-7-jdk [@openjdk7_archs@],
  ruby1.9.1,
  ruby1.9.1-dev,
@@ -293,9 +293,9 @@ Package: uwsgi-app-integration-plugins
 Architecture: any
 Depends: ${misc:Depends},
  uwsgi-plugin-erlang (= ${binary:Version}),
- uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}),
+ uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}) [@openjdk6_archs@],
  uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}) [@openjdk7_archs@],
- uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}),
+ uwsgi-plugin-jwsgi-openjdk-6 (= ${binary:Version}) [@openjdk6_archs@],
  uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}) [@openjdk7_archs@],
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
  uwsgi-plugin-lua5.2 (= ${binary:Version}),
@@ -450,7 +450,7 @@ Description: greenlet plugin for uWSGI (Python)
  This package provides greenlet plugin for uWSGI with Python WSGI plugin.
 
 Package: uwsgi-plugin-jvm-openjdk-6
-Architecture: any
+Architecture: @openjdk6_archs@
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
   openjdk-6-jre-headless
 Description: Java plugin for uWSGI (OpenJDK 6)
@@ -478,7 +478,7 @@ Description: Java plugin for uWSGI (OpenJDK 7)
  runtime).
 
 Package: uwsgi-plugin-jwsgi-openjdk-6
-Architecture: any
+Architecture: @openjdk6_archs@
 Depends: ${shlibs:Depends}, ${misc:Depends},
  uwsgi-plugin-jvm-openjdk-6 (= ${binary:Version}), openjdk-6-jre-headless
 Description: JWSGI plugin for uWSGI (OpenJDK 6)
