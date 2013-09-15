@@ -251,6 +251,7 @@ binary-post-install/uwsgi::
 
 build/uwsgi-core:: uwsgi-core
 
+# TODO: resolve list more generically (to avoid e.g. ZeroMQ exception)
 uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 	$(PYTHON) $(UWSGI_BUILDER) \
 		--build $(CURDIR)/debian/buildconf/uwsgi-core.ini
@@ -269,7 +270,7 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 			coroae \
 			echo \
 			emperor_amqp \
-			emperor_zeromq \
+			$(if $(filter-out kfreebsd-%,DEB_HOST_ARCH),emperor_zeromq) \
 			fastrouter \
 			http \
 			logfile \
