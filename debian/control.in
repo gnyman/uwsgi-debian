@@ -716,6 +716,7 @@ Description: debugging symbols for Apache2 mod_proxy_uwsgi
 
 Package: libapache2-mod-uwsgi
 Architecture: any
+Section: httpd
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
 Conflicts: libapache2-mod-ruwsgi
 Replaces: libapache2-mod-ruwsgi
@@ -743,6 +744,7 @@ Description: debugging symbols for Apache2 mod_uwsgi
 
 Package: libapache2-mod-ruwsgi
 Architecture: any
+Section: httpd
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
 Conflicts: libapache2-mod-uwsgi
 Replaces: libapache2-mod-uwsgi
