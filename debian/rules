@@ -1,6 +1,7 @@
 #!/usr/bin/make -f
 
 include /usr/share/cdbs/1/rules/upstream-tarball.mk
+include /usr/share/cdbs/1/class/python-vars.mk
 include /usr/share/cdbs/1/rules/debhelper.mk
 
 # resolve supported architectures for arch-varying build-dependencies
@@ -29,7 +30,6 @@ export CPPFLAGS=$(shell dpkg-buildflags --get CPPFLAGS)
 # Common variables
 # ================
 
-PYTHON=/usr/bin/python
 APXS2=/usr/bin/apxs2
 APR_CONFIG=/usr/bin/apr-config
 APU_CONFIG=/usr/bin/apu-config
@@ -253,7 +253,7 @@ build/uwsgi-core:: uwsgi-core
 
 # TODO: resolve list more generically (to avoid e.g. ZeroMQ exception)
 uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--build $(CURDIR)/debian/buildconf/uwsgi-core.ini
 	
 	set -e; for PLUGIN_NAME in \
@@ -306,7 +306,7 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 			ugreen \
 			zergpool \
 			; do \
-		$(PYTHON) $(UWSGI_BUILDER) \
+		$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$${PLUGIN_NAME} \
 				     $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 				     $${PLUGIN_NAME}; \
@@ -370,7 +370,7 @@ debian/buildconf/uwsgi-plugin.ini:
 		> $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 
 uwsgi-core-local:
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--build $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 
 # Ordinary building of uWSGI plugins
@@ -378,7 +378,7 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(PLUGIN_NAME)
@@ -393,7 +393,7 @@ debian/stamp-plugin-jvm-openjdk-6 debian/stamp-plugin-jwsgi-openjdk-6:
 	$(eval JAVA_ARCH := $(shell /usr/share/javahelper/java-arch.sh))
 	UWSGICONFIG_JVM_INCPATH='/usr/lib/jvm/java-6-openjdk-$(DEB_HOST_ARCH)/include/' \
 	UWSGICONFIG_JVM_LIBPATH='/usr/lib/jvm/java-6-openjdk-$(DEB_HOST_ARCH)/jre/lib/$(JAVA_ARCH)/server/' \
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_SRC_SUBDIR) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(PLUGIN_NAME)
@@ -408,7 +408,7 @@ debian/stamp-plugin-jvm-openjdk-7 debian/stamp-plugin-jwsgi-openjdk-7:
 	$(eval JAVA_ARCH := $(shell /usr/share/javahelper/java-arch.sh))
 	UWSGICONFIG_JVM_INCPATH='/usr/lib/jvm/java-7-openjdk-$(DEB_HOST_ARCH)/include/' \
 	UWSGICONFIG_JVM_LIBPATH='/usr/lib/jvm/java-7-openjdk-$(DEB_HOST_ARCH)/jre/lib/$(JAVA_ARCH)/server/' \
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_SRC_SUBDIR) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(PLUGIN_NAME)
@@ -418,12 +418,12 @@ debian/stamp-plugin-jvm-openjdk-7 debian/stamp-plugin-jwsgi-openjdk-7:
 $(patsubst %,debian/stamp-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS_DOTTED))
-	for PYTHON_VERSION in $(PYVERS); do \
-		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) \
+	$(foreach python_version,$(PYVERS), \
+		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/pyerl \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-			         pyerl_python$$(echo $${PYTHON_VERSION} | tr -d .); \
-	done
+			         pyerl_python$(subst .,,$(python_version)); \
+	)
 	sed -e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-pyerl.dirs.in \
 			> $(CURDIR)/debian/uwsgi-plugin-pyerl-$(PYTHON_KIND).dirs
@@ -433,12 +433,12 @@ $(patsubst %,debian/stamp-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS_DOTTED))
-	for PYTHON_VERSION in $(PYVERS); do \
-		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) \
+	$(foreach python_version,$(PYVERS), \
+		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/python \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini\
-			         python$$(echo $${PYTHON_VERSION} | tr -d .); \
-	done
+			         python$(subst .,,$(python_version)); \
+	)
 	sed -e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.dirs.in \
 			> $(CURDIR)/debian/uwsgi-plugin-$(PYTHON_KIND).dirs
@@ -446,12 +446,12 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 
 # Build greenlet plugin
 debian/stamp-plugin-greenlet-python:
-	for PYTHON_VERSION in $(PYTHON_VERS_DOTTED); do \
-		$(PYTHON)$${PYTHON_VERSION} $(UWSGI_BUILDER) \
+	$(foreach python_version,$(PYTHON_VERS_DOTTED), \
+		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/greenlet \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-			         greenlet_python$$(echo $${PYTHON_VERSION} | tr -d .); \
-	done
+			         greenlet_python$(subst .,,$(python_version)); \
+	)
 	touch $@
 
 # Build rbthreads plugin
@@ -460,7 +460,7 @@ debian/stamp-plugin-rbthreads:
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
 	UWSGICONFIG_RUBYPATH=/usr/bin/ruby1.9.1 \
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(PLUGIN_NAME)
@@ -472,7 +472,7 @@ debian/stamp-plugin-fiber:
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
 	UWSGICONFIG_RUBYPATH=/usr/bin/ruby1.9.1 \
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_NAME) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(PLUGIN_NAME)
@@ -484,7 +484,7 @@ debian/stamp-plugin-lua5.1 debian/stamp-plugin-lua5.2:
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
 	UWSGICONFIG_LUA_IMPLEMENTATION=$(call target_name_tail, $@) \
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/lua \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(PLUGIN_NAME)
@@ -496,7 +496,7 @@ debian/stamp-plugin-rack-ruby1.9.1:
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(call target_name_tail, $@) \
-	$(PYTHON) $(UWSGI_BUILDER) \
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/rack \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(PLUGIN_NAME)
