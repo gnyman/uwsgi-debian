@@ -40,9 +40,9 @@ PHP_API = $(shell php-config --phpapi)
 DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
 # Dotted versions of Python runtimes (like 'X.Y').
-PYTHON_VERS_DOTTED=$(shell pyversions -vs)
+PYTHON_VERS_DOTTED=$(shell pyversions -vr)
 PYTHON_DEFAULT_DOTTED=$(shell pyversions -dv)
-PYTHON3_VERS_DOTTED=$(shell py3versions -vs)
+PYTHON3_VERS_DOTTED=$(shell py3versions -vr)
 PYTHON3_DEFAULT_DOTTED=$(shell py3versions -dv)
 
 # Dotless versions of Python runtimes (like 'XY').
