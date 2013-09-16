@@ -128,6 +128,9 @@ $(foreach PLUGIN_PKG_NAME, $(UWSGI_PLUGIN_PKGS_NAMES), $(eval \
 
 DEB_INSTALL_DOCS_ALL += $(DEB_SRCDIR)/CONTRIBUTORS
 
+DEB_DH_INSTALL_ARGS_python-uwsgidecorators = uwsgidecorators.py $(python_installdir)
+DEB_DH_INSTALL_ARGS_python3-uwsgidecorators = 2to3/uwsgidecorators.py $(python_installdir)
+
 DEB_DH_SHLIBDEPS_ARGS_uwsgi-plugin-php = -l/usr/lib/php5 -- --ignore-missing-info
 
 CDBS_DEPENDS_uwsgi-plugin-php = phpapi-$(PHP_API)
@@ -148,6 +151,8 @@ clean::
 	for PYTHON_VERSION in $(PYTHON_VERS) $(PYTHON3_VERS); do \
 		$(RM) $(CURDIR)/uwsgi_python$${PYTHON_VERSION}; \
 	done
+	# converted Python modules
+	rm -rf 2to3
 	# intermediate compiled files
 	find $(CURDIR) \
 		\! -path '$(CURDIR)/debian/*' \( -name '*.o' -o -name '*.pyc' \) -type f \
@@ -740,13 +745,9 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
 			> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE} ; \
 	done
 
-# Some other packages
-# -------------------
-
-binary-install/python-uwsgidecorators::
-	dh_install -p $(cdbs_curpkg) uwsgidecorators.py $(python_installdir)
-
-binary-install/python3-uwsgidecorators::
-	dh_install -p $(cdbs_curpkg) uwsgidecorators.py $(python_installdir)
-	2to3 --write --nobackups --no-diffs \
-		$(CURDIR)/debian/$(cdbs_curpkg)/$(python_installdir)/uwsgidecorators.py
+# convert Python 2.x module to Python 3
+build/python3-uwsgidecorators:: 2to3/uwsgidecorators.py
+2to3/uwsgidecorators.py:
+	mkdir -p 2to3
+	2to3 --output-dir=2to3 --write --nobackups --no-diffs \
+		uwsgidecorators.py
