@@ -133,11 +133,11 @@ DEB_INSTALL_DOCS_ALL += $(DEB_SRCDIR)/CONTRIBUTORS
 
 DEB_DH_SHLIBDEPS_ARGS_uwsgi-plugin-php = -l/usr/lib/php5 -- --ignore-missing-info
 
-DEB_DH_GENCONTROL_ARGS_uwsgi-plugin-php = -- -Vuwsgi:php:Depends="phpapi-$(PHP_API)"
+CDBS_DEPENDS_uwsgi-plugin-php = phpapi-$(PHP_API)
 
-DEB_DH_GENCONTROL_ARGS_libapache2-mod-proxy-uwsgi = -- -Vuwsgi:apache2:Depends="apache2-api-$(APACHE2_API)"
-DEB_DH_GENCONTROL_ARGS_libapache2-mod-uwsgi = -- -Vuwsgi:apache2:Depends="apache2-api-$(APACHE2_API)"
-DEB_DH_GENCONTROL_ARGS_libapache2-mod-ruwsgi = -- -Vuwsgi:apache2:Depends="apache2-api-$(APACHE2_API)"
+CDBS_DEPENDS_libapache2-mod-proxy-uwsgi = apache2-api-$(APACHE2_API)
+CDBS_DEPENDS_libapache2-mod-uwsgi = apache2-api-$(APACHE2_API)
+CDBS_DEPENDS_libapache2-mod-ruwsgi = apache2-api-$(APACHE2_API)
 
 # Rules
 # =====
