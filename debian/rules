@@ -51,9 +51,6 @@ PYTHON_DEFAULT=$(subst .,,$(PYTHON_DEFAULT_DOTTED))
 PYTHON3_VERS=$(subst .,,$(PYTHON3_VERS_DOTTED))
 PYTHON3_DEFAULT=$(subst .,,$(PYTHON3_DEFAULT_DOTTED))
 
-PYTHON_MAJOR_VER := 2
-PYTHON3_MAJOR_VER := 3
-
 # Standard directories, where dh_pythonX helper looking for Python modules.
 # Note: path is provided in debhelper format (without leading slash).
 PYTHON_DIST_PACKAGES_DIR = usr/lib/python$(PYTHON_DEFAULT_DOTTED)/dist-packages
