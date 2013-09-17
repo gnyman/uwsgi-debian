@@ -1,6 +1,5 @@
-000000_02_remove_assignments_to_LD_RUN_PATH.patch
+1001_avoid_setting_RPATH.patch
 fix-reload-process-name.patch
-python-plugin_remove_assignments_to_LD_RUN_PATH.patch
 remove-php-libs.patch
 fix-php-ldflags.patch
 emperor-pg-fix-cflags.patch
