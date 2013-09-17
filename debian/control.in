@@ -34,7 +34,7 @@ Build-Depends:
  libwrap0-dev,
  libgnustep-gui-dev,
  libgnustep-base-dev,
- libcoro-perl (<= 6.090),
+ libcoro-perl,
  libgeoip-dev,
  libv8-dev [@v8_archs@],
  libxslt1-dev,
