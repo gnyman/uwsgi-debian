@@ -53,7 +53,7 @@ Build-Depends:
 Standards-Version: 3.9.4
 Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://anonscm.debian.org/collab-maint/uwsgi.git
-Vcs-Browser: http://anonscm.debian.org/?p=collab-maint/uwsgi.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/uwsgi.git
 
 Package: uwsgi
 Architecture: any
