@@ -232,16 +232,6 @@ clean::
 	$(RM) $(CURDIR)/debian/stamp-*
 	$(RM) $(CURDIR)/uwsgibuild.*
 
-# uwsgi package
-# -------------
-
-binary-post-install/uwsgi::
-	for SUBDIR in apps-available apps-enabled; do \
-		cp \
-			$(CURDIR)/debian/uwsgi.etc.$${SUBDIR}.README \
-			$(CURDIR)/debian/$(cdbs_curpkg)/etc/$(cdbs_curpkg)/$${SUBDIR}/README; \
-	done
-
 # uwsgi-core package
 # ------------------
 
