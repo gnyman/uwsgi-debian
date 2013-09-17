@@ -39,17 +39,11 @@ PHP_API = $(shell php-config --phpapi)
 
 DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
-# Dotted versions of Python runtimes (like 'X.Y').
-PYTHON_VERS_DOTTED=$(shell pyversions -vr)
-PYTHON_DEFAULT_DOTTED=$(shell pyversions -dv)
-PYTHON3_VERS_DOTTED=$(shell py3versions -vr)
-PYTHON3_DEFAULT_DOTTED=$(shell py3versions -dv)
-
 # Dotless versions of Python runtimes (like 'XY').
-PYTHON_VERS=$(subst .,,$(PYTHON_VERS_DOTTED))
-PYTHON_DEFAULT=$(subst .,,$(PYTHON_DEFAULT_DOTTED))
-PYTHON3_VERS=$(subst .,,$(PYTHON3_VERS_DOTTED))
-PYTHON3_DEFAULT=$(subst .,,$(PYTHON3_DEFAULT_DOTTED))
+PYTHON_VERS=$(subst .,,$(cdbs_python_supported_versions))
+PYTHON_DEFAULT=$(subst .,,$(cdbs_python_current_version))
+PYTHON3_VERS=$(subst .,,$(cdbs_python3_supported_versions))
+PYTHON3_DEFAULT=$(subst .,,$(cdbs_python3_current_version))
 
 # Python install path for dh_install, as expected by dh_pythonX helpers
 # * major and minor included for python 2.x, else only major
@@ -419,7 +413,7 @@ debian/stamp-plugin-jvm-openjdk-7 debian/stamp-plugin-jwsgi-openjdk-7:
 # Build pyerl_python2x_plugin.so/pyerl_python3x_plugin.so
 $(patsubst %,debian/stamp-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS_DOTTED))
+	$(eval PYVERS = $(cdbs_python$(PYTHON_KIND:python%=%)_supported_versions))
 	$(foreach python_version,$(PYVERS), \
 		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/pyerl \
@@ -434,7 +428,7 @@ $(patsubst %,debian/stamp-plugin-pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 # Build python2x_plugin.so/python3x_plugin.so
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS_DOTTED))
+	$(eval PYVERS = $(cdbs_python$(PYTHON_KIND:python%=%)_supported_versions))
 	$(foreach python_version,$(PYVERS), \
 		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/python \
@@ -448,7 +442,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)):
 
 # Build greenlet plugin
 debian/stamp-plugin-greenlet-python:
-	$(foreach python_version,$(PYTHON_VERS_DOTTED), \
+	$(foreach python_version,$(cdbs_python_supported_versions), \
 		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/greenlet \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
