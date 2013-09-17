@@ -1,5 +1,5 @@
 1001_avoid_setting_RPATH.patch
-fix-reload-process-name.patch
-remove-php-libs.patch
-fix-php-ldflags.patch
-emperor-pg-fix-cflags.patch
+1002_fix-reload-process-name.patch
+1003_remove-php-libs.patch
+1004_fix-php-ldflags.patch
+1005_emperor-pg-fix-cflags.patch
