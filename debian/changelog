@@ -1,3 +1,26 @@
+uwsgi (1.9.16-2) UNRELEASED; urgency=low
+
+  * Relax build-dependency on apache2-dev to be unversioned: Declared
+    version satisfied by all releases ever made officially for Debian.
+    Add apache2-threaded-dev as fallback, to ease backporting.
+  * Fix tighten build-dependency on libcoro-perl: Version in Wheezy
+    cause FTBFS (at least on i386).
+  * Tidy rules and control files:
+    + Use CDBS_DEPENDS_* for binary package relations.
+    + Resolve Python versions supported by this project (not all
+      versions supported by target host - which is semantically
+      different even though currently produces same result).
+    + Drop unused variables PYTHON_MAJOR_VER and PYTHON3_MAJOR_VER.
+    + Fix use unversioned Python binary when default version, to comply
+      with Debian Python Policy §§ 1.4.1, 1.4.2.
+    + Simplify Python module install, using CDBS python-module.mk.
+    + Convert Python 2.x module to Python 3 during build (not install).
+    + Simplify installation of plain files.
+  * Fix Vcs-Browser URL.
+    Closes: bug#723016. Thanks to Matthijs.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 17 Sep 2013 06:25:04 +0200
+
 uwsgi (1.9.16-1) unstable; urgency=low
 
   [ upstream ]

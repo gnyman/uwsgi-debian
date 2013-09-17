@@ -6,7 +6,7 @@ Uploaders: Jonas Smedegaard <dr@jones.dk>
 Build-Depends:
  cdbs,
  debhelper (>= 8),
- apache2-dev (>> 2.4~),
+ apache2-dev | apache2-threaded-dev,
  erlang-dev,
  help2man,
  javahelper,
@@ -34,7 +34,7 @@ Build-Depends:
  libwrap0-dev,
  libgnustep-gui-dev,
  libgnustep-base-dev,
- libcoro-perl,
+ libcoro-perl (<= 6.090),
  libgeoip-dev,
  libv8-dev [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel],
  libxslt1-dev,
@@ -53,7 +53,7 @@ Build-Depends:
 Standards-Version: 3.9.4
 Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://anonscm.debian.org/collab-maint/uwsgi.git
-Vcs-Browser: http://anonscm.debian.org/?p=collab-maint/uwsgi.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/uwsgi.git
 
 Package: uwsgi
 Architecture: any
@@ -665,7 +665,7 @@ Description: V8 JavaScript plugin for uWSGI
 Package: uwsgi-plugin-php
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- ${uwsgi:php:Depends}, libphp5-embed
+ ${cdbs:Depends}, libphp5-embed
 Description: PHP plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -689,7 +689,7 @@ Description: XSLT request plugin for uWSGI
 
 Package: libapache2-mod-proxy-uwsgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${cdbs:Depends}
 Description: uwsgi proxy module for Apache2 (mod_uwsgi)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -717,7 +717,7 @@ Description: debugging symbols for Apache2 mod_proxy_uwsgi
 Package: libapache2-mod-uwsgi
 Architecture: any
 Section: httpd
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${cdbs:Depends}
 Conflicts: libapache2-mod-ruwsgi
 Replaces: libapache2-mod-ruwsgi
 Description: uwsgi module for Apache2 (mod_uwsgi)
@@ -745,7 +745,7 @@ Description: debugging symbols for Apache2 mod_uwsgi
 Package: libapache2-mod-ruwsgi
 Architecture: any
 Section: httpd
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${uwsgi:apache2:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${cdbs:Depends}
 Conflicts: libapache2-mod-uwsgi
 Replaces: libapache2-mod-uwsgi
 Description: uwsgi module for Apache2 (mod_Ruwsgi)
