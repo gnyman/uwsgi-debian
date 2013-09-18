@@ -1,10 +1,8 @@
-uwsgi (1.9.16-2) UNRELEASED; urgency=low
+uwsgi (1.9.16-2) unstable; urgency=low
 
   * Relax build-dependency on apache2-dev to be unversioned: Declared
     version satisfied by all releases ever made officially for Debian.
     Add apache2-threaded-dev as fallback, to ease backporting.
-  * Fix tighten build-dependency on libcoro-perl: Version in Wheezy
-    cause FTBFS (at least on i386).
   * Tidy rules and control files:
     + Use CDBS_DEPENDS_* for binary package relations.
     + Resolve Python versions supported by this project (not all
@@ -18,8 +16,17 @@ uwsgi (1.9.16-2) UNRELEASED; urgency=low
     + Simplify installation of plain files.
   * Fix Vcs-Browser URL.
     Closes: bug#723016. Thanks to Matthijs.
+  * Update patches:
+    + Merge together as patch 1001 the 2 patches that strips setting
+      LD_RUN_PATH in LDFLAGS.
+    + Prefix remaining patches with a number.
+    + Add README in patch dir documenting numbering micro-policy.
+    + Add patch 1006 to link dynamically against libperl.
+  * Fix limit build-dependency on libzmq-dev to exclude the Hurd (in
+    addition to kFreeBSD, but for different reason - libzmq-dev is not
+    in itself Linux-specific).
 
- -- Jonas Smedegaard <dr@jones.dk>  Tue, 17 Sep 2013 06:25:04 +0200
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 18 Sep 2013 18:08:16 +0200
 
 uwsgi (1.9.16-1) unstable; urgency=low
 
