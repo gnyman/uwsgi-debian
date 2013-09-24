@@ -142,6 +142,15 @@ int uwsgi_calc_cheaper(void) {
 		}
 	}
 
+	// then check for fifo
+	if (uwsgi.cheaper_fifo_delta != 0) {
+		if (!ignore_algo) {
+			needed_workers = uwsgi.cheaper_fifo_delta;
+			ignore_algo = 1;
+		}
+		uwsgi.cheaper_fifo_delta = 0;
+	}
+
 	if (!ignore_algo) needed_workers = uwsgi.cheaper_algo();
 
 	if (needed_workers > 0) {
@@ -177,6 +186,11 @@ int uwsgi_calc_cheaper(void) {
 	}
 
 	return 1;
+}
+
+// fake algo to allow control with the fifo
+int uwsgi_cheaper_algo_manual(void) {
+	return 0;
 }
 
 /*
@@ -353,23 +367,30 @@ void uwsgi_reload(char **argv) {
 	int i;
 	int waitpid_status;
 
-	// call a series of waitpid to ensure all processes (gateways, mules and daemons) are dead
-	for (i = 0; i < (ushared->gateways_cnt + uwsgi.daemons_cnt + uwsgi.mules_cnt); i++) {
-		waitpid(WAIT_ANY, &waitpid_status, WNOHANG);
+	if (!uwsgi.master_is_reforked) {
+
+		// call a series of waitpid to ensure all processes (gateways, mules and daemons) are dead
+		for (i = 0; i < (ushared->gateways_cnt + uwsgi.daemons_cnt + uwsgi.mules_cnt); i++) {
+			waitpid(WAIT_ANY, &waitpid_status, WNOHANG);
+		}
+
+		// call master cleanup hooks
+		uwsgi_master_cleanup_hooks();
+
+		// call atexit user exec
+		uwsgi_exec_atexit();
+
+		if (uwsgi.exit_on_reload) {
+			uwsgi_log("uWSGI: GAME OVER (insert coin)\n");
+			exit(0);
+		}
+
+		uwsgi_log("binary reloading uWSGI...\n");
+	}
+	else {
+		uwsgi_log("fork()'ing uWSGI...\n");
 	}
 
-	// call master cleanup hooks
-	uwsgi_master_cleanup_hooks();
-
-	// call atexit user exec
-	uwsgi_exec_atexit();
-
-	if (uwsgi.exit_on_reload) {
-		uwsgi_log("uWSGI: GAME OVER (insert coin)\n");
-		exit(0);
-	}
-
-	uwsgi_log("binary reloading uWSGI...\n");
 	uwsgi_log("chdir() to %s\n", uwsgi.cwd);
 	if (chdir(uwsgi.cwd)) {
 		uwsgi_error("chdir()");
@@ -556,6 +577,7 @@ void uwsgi_fixup_fds(int wid, int muleid, struct uwsgi_gateway *ug) {
 			}
 		}
 
+		if (uwsgi.master_fifo_fd > -1) close(uwsgi.master_fifo_fd);
 	}
 
 
@@ -1511,4 +1533,54 @@ static void add_reload_fds(struct uwsgi_string_list *list, char *type) {
 void uwsgi_add_reload_fds() {
 	add_reload_fds(uwsgi.reload_on_fd, "graceful");
 	add_reload_fds(uwsgi.brutal_reload_on_fd, "brutal");
+}
+
+void uwsgi_refork_master() {
+	pid_t pid = fork();
+	if (pid < 0) {
+		uwsgi_error("uwsgi_refork_master()/fork()");
+		return;
+	}
+
+	if (pid > 0) {
+		uwsgi_log_verbose("new master copy spawned with pid %d\n", (int) pid);
+		return;
+	}
+
+	// detach from the old master
+	setsid();
+
+	uwsgi.master_is_reforked = 1;
+	uwsgi_reload(uwsgi.argv);
+	// never here
+	exit(1);
+}
+
+void uwsgi_cheaper_increase() {
+	uwsgi.cheaper_fifo_delta++;
+}
+
+void uwsgi_cheaper_decrease() {
+        uwsgi.cheaper_fifo_delta--;
+}
+
+void uwsgi_go_cheap() {
+	int i;
+	int waitpid_status;
+	if (uwsgi.status.is_cheap) return;
+	uwsgi_log_verbose("going cheap...\n");
+	uwsgi.status.is_cheap = 1;
+                for (i = 1; i <= uwsgi.numproc; i++) {
+                        uwsgi.workers[i].cheaped = 1;
+                        if (uwsgi.workers[i].pid == 0)
+                                continue;
+			uwsgi_log("killing worker %d (pid: %d)\n", i, (int) uwsgi.workers[i].pid);
+                        kill(uwsgi.workers[i].pid, SIGKILL);
+                        if (waitpid(uwsgi.workers[i].pid, &waitpid_status, 0) < 0) {
+                                if (errno != ECHILD)
+                                        uwsgi_error("uwsgi_go_cheap()/waitpid()");
+                        }
+                }
+                uwsgi_add_sockets_to_queue(uwsgi.master_queue, -1);
+                uwsgi_log("cheap mode enabled: waiting for socket connection...\n");
 }

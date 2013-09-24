@@ -488,7 +488,6 @@ void uwsgi_logvar_add(struct wsgi_request *wsgi_req, char *key, uint8_t keylen, 
 
 void uwsgi_check_logrotate(void) {
 
-	char message[1024];
 	int need_rotation = 0;
 	int need_reopen = 0;
 
@@ -512,68 +511,79 @@ void uwsgi_check_logrotate(void) {
 	}
 
 	if (need_rotation) {
-
-		char *rot_name = uwsgi.log_backupname;
-		int need_free = 0;
-		if (rot_name == NULL) {
-			char *ts_str = uwsgi_num2str((int) uwsgi_now());
-			rot_name = uwsgi_concat3(uwsgi.logfile, ".", ts_str);
-			free(ts_str);
-			need_free = 1;
-		}
-		int ret = snprintf(message, 1024, "[%d] logsize: %llu, triggering rotation to %s...\n", (int) uwsgi_now(), (unsigned long long) uwsgi.shared->logsize, rot_name);
-		if (ret > 0) {
-			if (write(uwsgi.original_log_fd, message, ret) != ret) {
-				// very probably this will never be printed
-				uwsgi_error("write()");
-			}
-		}
-		if (rename(uwsgi.logfile, rot_name) == 0) {
-			// reopen logfile dup'it and eventually gracefully reload workers;
-			int fd = open(uwsgi.logfile, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP);
-			if (fd < 0) {
-				uwsgi_error_open(uwsgi.logfile);
-				grace_them_all(0);
-			}
-			else {
-				if (dup2(fd, uwsgi.original_log_fd) < 0) {
-					uwsgi_error("dup2()");
-					grace_them_all(0);
-				}
-				close(fd);
-			}
-		}
-		else {
-			uwsgi_error("unable to rotate log: rename()");
-		}
-		if (need_free)
-			free(rot_name);
+		uwsgi_log_rotate();
 	}
 	else if (need_reopen) {
-		int ret = snprintf(message, 1024, "[%d] logsize: %llu, triggering log-reopen...\n", (int) uwsgi_now(), (unsigned long long) uwsgi.shared->logsize);
-		if (ret > 0) {
-			if (write(uwsgi.original_log_fd, message, ret) != ret) {
-				// very probably this will never be printed
-				uwsgi_error("write()");
-			}
-		}
-
-		// reopen logfile;
-		close(uwsgi.original_log_fd);
-		uwsgi.original_log_fd = open(uwsgi.logfile, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP);
-		if (uwsgi.original_log_fd < 0) {
-			uwsgi_error_open(uwsgi.logfile);
-			grace_them_all(0);
-		}
-		ret = snprintf(message, 1024, "[%d] %s reopened.\n", (int) uwsgi_now(), uwsgi.logfile);
-		if (ret > 0) {
-			if (write(uwsgi.original_log_fd, message, ret) != ret) {
-				// very probably this will never be printed
-				uwsgi_error("write()");
-			}
-		}
-		uwsgi.shared->logsize = lseek(uwsgi.original_log_fd, 0, SEEK_CUR);
+		uwsgi_log_reopen();
 	}
+}
+
+void uwsgi_log_rotate() {
+	char message[1024];
+	if (!uwsgi.logfile) return;
+	char *rot_name = uwsgi.log_backupname;
+                int need_free = 0;
+                if (rot_name == NULL) {
+                        char *ts_str = uwsgi_num2str((int) uwsgi_now());
+                        rot_name = uwsgi_concat3(uwsgi.logfile, ".", ts_str);
+                        free(ts_str);
+                        need_free = 1;
+                }
+                int ret = snprintf(message, 1024, "[%d] logsize: %llu, triggering rotation to %s...\n", (int) uwsgi_now(), (unsigned long long) uwsgi.shared->logsize, rot_name);
+                if (ret > 0) {
+                        if (write(uwsgi.original_log_fd, message, ret) != ret) {
+                                // very probably this will never be printed
+                                uwsgi_error("write()");
+                        }
+                }
+                if (rename(uwsgi.logfile, rot_name) == 0) {
+                        // reopen logfile dup'it and eventually gracefully reload workers;
+                        int fd = open(uwsgi.logfile, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP);
+                        if (fd < 0) {
+                                uwsgi_error_open(uwsgi.logfile);
+                                grace_them_all(0);
+                        }
+                        else {
+                                if (dup2(fd, uwsgi.original_log_fd) < 0) {
+                                        uwsgi_error("dup2()");
+                                        grace_them_all(0);
+                                }
+                                close(fd);
+                        }
+                }
+                else {
+                        uwsgi_error("unable to rotate log: rename()");
+                }
+                if (need_free)
+                        free(rot_name);
+}
+
+void uwsgi_log_reopen() {
+	char message[1024];
+	if (!uwsgi.logfile) return;
+	int ret = snprintf(message, 1024, "[%d] logsize: %llu, triggering log-reopen...\n", (int) uwsgi_now(), (unsigned long long) uwsgi.shared->logsize);
+        if (ret > 0) {
+                        if (write(uwsgi.original_log_fd, message, ret) != ret) {
+                                // very probably this will never be printed
+                                uwsgi_error("write()");
+                        }
+                }
+
+                // reopen logfile;
+                close(uwsgi.original_log_fd);
+                uwsgi.original_log_fd = open(uwsgi.logfile, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP);
+                if (uwsgi.original_log_fd < 0) {
+                        uwsgi_error_open(uwsgi.logfile);
+                        grace_them_all(0);
+                }
+                ret = snprintf(message, 1024, "[%d] %s reopened.\n", (int) uwsgi_now(), uwsgi.logfile);
+                if (ret > 0) {
+                        if (write(uwsgi.original_log_fd, message, ret) != ret) {
+                                // very probably this will never be printed
+                                uwsgi_error("write()");
+                        }
+                }
+                uwsgi.shared->logsize = lseek(uwsgi.original_log_fd, 0, SEEK_CUR);
 }
 
 
@@ -1401,6 +1411,16 @@ static void uwsgi_log_func_do(struct uwsgi_string_list *encoders, struct uwsgi_l
 	size_t new_msg_len = len;
 	while(usl) {
 		struct uwsgi_log_encoder *ule = (struct uwsgi_log_encoder *) usl->custom_ptr;
+		if (ule->use_for) {
+			if (ul && ul->id) {
+				if (strcmp(ule->use_for, ul->id)) {
+					goto next;
+				}
+			}
+			else {
+				goto next;
+			}
+		}
 		size_t rlen = 0;
 		char *buf = ule->func(ule, new_msg, new_msg_len, &rlen);
 		if (new_msg != msg) {
@@ -1408,6 +1428,7 @@ static void uwsgi_log_func_do(struct uwsgi_string_list *encoders, struct uwsgi_l
         	}
 		new_msg = buf;
 		new_msg_len = rlen;
+next:
 		usl = usl->next;
 	}
 	if (ul) {
@@ -1625,21 +1646,28 @@ void uwsgi_setup_log_encoders() {
 	uwsgi_foreach(usl, uwsgi.requested_log_encoders) {
 		char *space = strchr(usl->value, ' ');
 		if (space) *space = 0;
+		char *use_for = strchr(usl->value, ':');
+		if (use_for) *use_for = 0;
 		struct uwsgi_log_encoder *ule = uwsgi_log_encoder_by_name(usl->value);
 		if (!ule) {
 			uwsgi_log("log encoder \"%s\" not found\n", usl->value);
 			exit(1);
 		}
-		if (space) *space = ' ';
 		struct uwsgi_log_encoder *ule2 = uwsgi_malloc(sizeof(struct uwsgi_log_encoder));
 		memcpy(ule2, ule, sizeof(struct uwsgi_log_encoder)); 
+		if (use_for) {
+			ule2->use_for = uwsgi_str(use_for+1);
+			*use_for = ':';
+		}
 		// we use a copy
 		if (space) {
+			*space = ' ';
 			ule2->args = uwsgi_str(space+1);
 		}
 		else {
 			ule2->args = uwsgi_str("");
 		}
+
 		usl->custom_ptr = ule2;
 		uwsgi_log("[log-encoder] registered %s\n", usl->value);
 	}
@@ -1647,21 +1675,27 @@ void uwsgi_setup_log_encoders() {
 	uwsgi_foreach(usl, uwsgi.requested_log_req_encoders) {
                 char *space = strchr(usl->value, ' ');
                 if (space) *space = 0;
+		char *use_for = strchr(usl->value, ':');
+		if (use_for) *use_for = 0;
                 struct uwsgi_log_encoder *ule = uwsgi_log_encoder_by_name(usl->value);
                 if (!ule) {
                         uwsgi_log("log encoder \"%s\" not found\n", usl->value);
                         exit(1);
                 }
-                if (space) *space = ' ';
-                struct uwsgi_log_encoder *ule2 = uwsgi_malloc(sizeof(struct uwsgi_log_encoder));
+		struct uwsgi_log_encoder *ule2 = uwsgi_malloc(sizeof(struct uwsgi_log_encoder));
                 memcpy(ule2, ule, sizeof(struct uwsgi_log_encoder));
+                if (use_for) {
+			ule2->use_for = uwsgi_str(use_for+1);
+                        *use_for = ':';
+                }
                 // we use a copy
-		if (space) {
-                	ule2->args = uwsgi_str(space+1);
-		}
-		else {
-			ule2->args = uwsgi_str("");
-		}
+                if (space) {
+                        *space = ' ';
+                        ule2->args = uwsgi_str(space+1);
+                }
+                else {
+                        ule2->args = uwsgi_str("");
+                }
                 usl->custom_ptr = ule2;
 		uwsgi_log("[log-req-encoder] registered %s\n", usl->value);
         }
