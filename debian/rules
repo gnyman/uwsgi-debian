@@ -305,9 +305,9 @@ install/uwsgi-core::
 	for SUBDIR in conffile jwsgi psgi rack router wsapi wsgi; do \
 		mkdir -p $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/$${SUBDIR}; \
 	done
-	for FILE in logo_uWSGI.png mongrel2-uwsgi.conf simple_logger.py \
-	            staticfilesnmp.py uwsgistatus.py \
-	            welcome.py; do \
+	for FILE in logo_uWSGI.png mongrel2-uwsgi.conf examples/simple_logger.py \
+	            examples/staticfilesnmp.py examples/uwsgistatus.py \
+	            examples/welcome.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples; \
 	done
 	for FILE in mega.xml multi.ini multi.xml sites.xml uwsgi.xml \
@@ -330,8 +330,8 @@ install/uwsgi-core::
 	for FILE in examples/sputnik.ws; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsapi; \
 	done
-	for FILE in examples/mjpeg_stream.py examples/multiapp.py simple_app.py \
-	            simple_app_wsgi2.py examples/taskqueue.py testapp.py testpy3.py; do \
+	for FILE in examples/mjpeg_stream.py examples/multiapp.py examples/simple_app.py \
+	            examples/simple_app_wsgi2.py examples/taskqueue.py; do \
 		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsgi; \
 	done
 	help2man \
