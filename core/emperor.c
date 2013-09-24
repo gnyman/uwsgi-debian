@@ -1031,6 +1031,12 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 			uct = uct->next;
 		}
 
+		uct = uwsgi.vassals_includes;
+                while (uct) {
+                        counter += 2;
+                        uct = uct->next;
+                }
+
 		char **vassal_argv = uwsgi_malloc(sizeof(char *) * counter);
 		// set args
 		vassal_argv[0] = uwsgi.binary_path;
@@ -1093,6 +1099,15 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 			counter += 2;
 			uct = uct->next;
 		}
+
+		uct = uwsgi.vassals_includes;
+                while (uct) {
+                        vassal_argv[counter] = "--include";
+                        vassal_argv[counter + 1] = uct->value;
+                        counter += 2;
+                        uct = uct->next;
+                }
+
 		vassal_argv[counter] = NULL;
 
 		// disable stdin OR map it to the "on demand" socket
@@ -1506,10 +1521,14 @@ void emperor_loop() {
 		while (ui_current) {
 			if (ui_current->last_heartbeat > 0) {
 				if ((ui_current->last_heartbeat + uwsgi.emperor_heartbeat) < uwsgi_now()) {
-					uwsgi_log("[emperor] vassal %s sent no heartbeat in last %d seconds, respawning it...\n", ui_current->name, uwsgi.emperor_heartbeat);
+					uwsgi_log("[emperor] vassal %s sent no heartbeat in last %d seconds, brutally respawning it...\n", ui_current->name, uwsgi.emperor_heartbeat);
 					// set last_heartbeat to 0 avoiding races
 					ui_current->last_heartbeat = 0;
-					emperor_respawn(ui_current, uwsgi_now());
+					if (ui_current->pid > 0) {
+						if (kill(ui_current->pid, SIGKILL)) {
+							uwsgi_error("[emperor] kill()");
+						}
+					}
 				}
 			}
 			ui_current = ui_current->ui_next;

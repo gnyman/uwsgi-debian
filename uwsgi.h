@@ -132,6 +132,8 @@ extern "C" {
 
 #define uwsgi_foreach(x, y) for(x=y;x;x = x->next) 
 
+#define uwsgi_foreach_token(x, y, z, w) for(z=strtok_r(x, y, &w);z;z = strtok_r(NULL, y, &w))
+
 
 #ifndef __need_IOV_MAX
 #define __need_IOV_MAX
@@ -1256,6 +1258,7 @@ struct uwsgi_log_encoder {
 	char *name;
 	char *(*func)(struct uwsgi_log_encoder *, char *, size_t, size_t *);
 	int configured;
+	char *use_for;
 	char *args;
 	void *data;
 	struct uwsgi_log_encoder *next;
@@ -1684,6 +1687,13 @@ struct uwsgi_server {
 	int drop_after_init;
 	int drop_after_apps;
 
+	int master_is_reforked;
+
+	struct uwsgi_string_list *master_fifo;
+	int master_fifo_fd;
+	int master_fifo_slot;
+
+
 	// kill the stack on SIGTERM (instead of brutal reloading)
 	int die_on_term;
 
@@ -1730,6 +1740,8 @@ struct uwsgi_server {
 	uint64_t cheaper_rss_limit_soft;
 	uint64_t cheaper_rss_limit_hard;
 
+	int cheaper_fifo_delta;
+
 	// destroy the stack when idle
 	int die_on_idle;
 
@@ -1774,6 +1786,7 @@ struct uwsgi_server {
 	char *emperor_stats;
 	int emperor_stats_fd;
 	struct uwsgi_string_list *vassals_templates;
+	struct uwsgi_string_list *vassals_includes;
 	// true if loyal to the emperor
 	int loyal;
 
@@ -1952,6 +1965,7 @@ struct uwsgi_server {
 
 	struct uwsgi_hook *hooks;
 
+	struct uwsgi_string_list *hook_asap;
 	struct uwsgi_string_list *hook_pre_jail;
         struct uwsgi_string_list *hook_post_jail;
         struct uwsgi_string_list *hook_in_jail;
@@ -1965,6 +1979,7 @@ struct uwsgi_server {
         struct uwsgi_string_list *hook_as_emperor;
 	
 
+	struct uwsgi_string_list *exec_asap;
 	struct uwsgi_string_list *exec_pre_jail;
 	struct uwsgi_string_list *exec_post_jail;
 	struct uwsgi_string_list *exec_in_jail;
@@ -1977,6 +1992,7 @@ struct uwsgi_server {
         struct uwsgi_string_list *exec_as_vassal;
         struct uwsgi_string_list *exec_as_emperor;
 
+	struct uwsgi_string_list *call_asap;
 	struct uwsgi_string_list *call_pre_jail;
         struct uwsgi_string_list *call_post_jail;
         struct uwsgi_string_list *call_in_jail;
@@ -1995,6 +2011,7 @@ struct uwsgi_server {
         struct uwsgi_string_list *call_as_emperor2;
         struct uwsgi_string_list *call_as_emperor4;
 
+	struct uwsgi_string_list *mount_asap;
 	struct uwsgi_string_list *mount_pre_jail;
         struct uwsgi_string_list *mount_post_jail;
         struct uwsgi_string_list *mount_in_jail;
@@ -2003,6 +2020,7 @@ struct uwsgi_server {
         struct uwsgi_string_list *mount_as_vassal;
         struct uwsgi_string_list *mount_as_emperor;
 
+	struct uwsgi_string_list *umount_asap;
 	struct uwsgi_string_list *umount_pre_jail;
         struct uwsgi_string_list *umount_post_jail;
         struct uwsgi_string_list *umount_in_jail;
@@ -3585,6 +3603,7 @@ int uwsgi_calc_cheaper(void);
 int uwsgi_cheaper_algo_spare(void);
 int uwsgi_cheaper_algo_backlog(void);
 int uwsgi_cheaper_algo_backlog2(void);
+int uwsgi_cheaper_algo_manual(void);
 
 int uwsgi_master_log(void);
 int uwsgi_master_req_log(void);
@@ -4301,6 +4320,24 @@ void uwsgi_log_encoders_register_embedded(void);
 void uwsgi_register_log_encoder(char *, char *(*)(struct uwsgi_log_encoder *, char *, size_t, size_t *));
 
 int uwsgi_accept(int);
+void suspend_resume_them_all(int);
+
+void uwsgi_master_fifo_prepare();
+int uwsgi_master_fifo();
+int uwsgi_master_fifo_manage(int);
+
+void uwsgi_log_rotate();
+void uwsgi_log_reopen();
+void uwsgi_reload_workers();
+void uwsgi_chain_reload();
+void uwsgi_refork_master();
+void uwsgi_update_pidfiles();
+void gracefully_kill_them_all(int);
+void uwsgi_brutally_reload_workers();
+
+void uwsgi_cheaper_increase();
+void uwsgi_cheaper_decrease();
+void uwsgi_go_cheap();
 
 #ifdef __cplusplus
 }

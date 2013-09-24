@@ -187,6 +187,14 @@ int bind_to_unix(char *socket_name, int listen_queue, int chmod_socket, int abst
 		return -1;
 	}
 
+#ifdef __linux__
+        long somaxconn = uwsgi_num_from_file("/proc/sys/net/core/somaxconn", 1);
+        if (somaxconn > 0 && uwsgi.listen_queue > somaxconn) {
+                uwsgi_log("Listen queue size is greater than the system max net.core.somaxconn (%li).\n", somaxconn);
+                uwsgi_nuclear_blast();
+                return -1;
+        }
+#endif
 
 	if (listen(serverfd, listen_queue) != 0) {
 		uwsgi_error("listen()");
@@ -1645,8 +1653,8 @@ void uwsgi_map_sockets() {
 			}
 			if ((int) uwsgi_str_num(usl->value, colon - usl->value) == uwsgi_get_socket_num(uwsgi_sock)) {
 				enabled = 0;
-				char *p = strtok(colon + 1, ",");
-				while (p != NULL) {
+				char *p, *ctx = NULL;
+				uwsgi_foreach_token(colon + 1, ",", p, ctx) {
 					int w = atoi(p);
 					if (w < 1 || w > uwsgi.numproc) {
 						uwsgi_log("invalid worker num: %d\n", w);
@@ -1657,7 +1665,6 @@ void uwsgi_map_sockets() {
 						uwsgi_log("mapped socket %d (%s) to worker %d\n", uwsgi_get_socket_num(uwsgi_sock), uwsgi_sock->name, uwsgi.mywid);
 						break;
 					}
-					p = strtok(NULL, ",");
 				}
 			}
 
@@ -1976,3 +1983,4 @@ int uwsgi_accept(int server_fd) {
 
 
 }
+
