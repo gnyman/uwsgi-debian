@@ -1,3 +1,19 @@
+uwsgi (1.9.17-1) unstable; urgency=low
+
+  [ upstream ]
+  * New release.
+
+  [ Jonas Smedegaard ]
+  * Add patch 2001 to compile verbosely.
+  * Fix adjust uwsgi-core buildconf to autodetect presence of libzmq.
+  * Have apache2 modules only depend on api package when api is
+    resolved, to ease backporting.
+  * Update source paths for example files, and stop installing files now
+    treated as tests.
+  * Unfuzz patches.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 24 Sep 2013 06:10:50 +0200
+
 uwsgi (1.9.16-2) unstable; urgency=low
 
   * Relax build-dependency on apache2-dev to be unversioned: Declared
