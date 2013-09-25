@@ -22,7 +22,7 @@ Last-Update: 2013-09-24
          ret = os.system(cmdline)
          if ret != 0:
              sys.exit(1)
-@@ -1281,7 +1281,7 @@
+@@ -1290,7 +1290,7 @@
          need_pic = ' -L. -luwsgi'
  
      gccline = "%s%s %s -o %s.so %s %s %s %s" % (GCC, need_pic, shared_flag, plugin_dest, ' '.join(uniq_warnings(p_cflags)), ' '.join(gcc_list), ' '.join(uniq_warnings(p_ldflags)), ' '.join(uniq_warnings(p_libs)) )
@@ -31,7 +31,7 @@ Last-Update: 2013-09-24
  
      ret = os.system(gccline)
      if ret != 0:
-@@ -1294,7 +1294,9 @@
+@@ -1303,7 +1303,9 @@
              for rp in requires:
                  f.write("requires=%s\n" % rp)
              f.close()
