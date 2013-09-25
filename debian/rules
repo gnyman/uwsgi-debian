@@ -256,7 +256,7 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 			coroae \
 			echo \
 			emperor_amqp \
-			$(if $(filter-out kfreebsd-%,DEB_HOST_ARCH),emperor_zeromq) \
+			$(if $(filter-out hurd-%,DEB_HOST_ARCH),emperor_zeromq) \
 			fastrouter \
 			http \
 			logfile \
