@@ -1,3 +1,18 @@
+uwsgi (1.9.17.1-1) unstable; urgency=low
+
+  [ upstream ]
+  * New release.
+
+  [ Jonas Smedegaard ]
+  * Add patch 1006 to detect KFreeBSD.
+  * Build-depend on libjail-dev and libkvm-dev on KFreeBSD.
+  * Build-depend on libzmq3-dev (not libzmq-dev), and include KFreebsd
+    (leaving out only Hurd).
+  * Fix exclude building plugin emperor_zeromq on Hurd, and no longer
+    exclude on KFreeBSD.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 25 Sep 2013 04:23:38 +0200
+
 uwsgi (1.9.17-1) unstable; urgency=low
 
   [ upstream ]
