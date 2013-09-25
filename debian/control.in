@@ -24,7 +24,7 @@ Build-Depends:
  libsqlite3-dev,
  libxml2-dev,
  libyaml-dev,
- libzmq3-dev [!hurd-any],
+ libzmq3-dev [!hurd-any] | libzmq-dev [!kfreebsd-any !hurd-any],
  libphp5-embed,
  php5-dev,
  libonig-dev,
