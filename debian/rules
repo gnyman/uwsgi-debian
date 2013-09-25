@@ -36,6 +36,10 @@ APU_CONFIG=/usr/bin/apu-config
 UWSGI_BUILDER = $(CURDIR)/uwsgiconfig.py
 APACHE2_API = $(shell perl -ne 'print $$1 if m/our\s+\$$API\s+=\s+"(.*)"/' < $(shell which dh_apache2))
 PHP_API = $(shell php-config --phpapi)
+# TODO: Drop this (and its use) when php5-embed ABI is stable in oldstable
+PHP_VERSION := $(shell dpkg-query -W -f '$${Version}' php5-dev)
+# TODO: Drop this (and its use) when php5 5.5.0+dfsg-13 is in oldstable
+PHP_SONAME_ALWAYS_CHANGE := $(shell dpkg --compare-versions '$(PHP_VERSION)' '>=' 5.5.0+dfsg-13~ || echo true)
 
 DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
@@ -128,6 +132,9 @@ DEB_DH_INSTALL_ARGS_python3-uwsgidecorators = 2to3/uwsgidecorators.py $(python_i
 DEB_DH_SHLIBDEPS_ARGS_uwsgi-plugin-php = -l/usr/lib/php5 -- --ignore-missing-info
 
 CDBS_DEPENDS_uwsgi-plugin-php = phpapi-$(PHP_API)
+CDBS_DEPENDS_uwsgi-plugin-php +=, $(if $(PHP_SONAME_ALWAYS_CHANGE),\
+	libphp5-embed (= $(PHP_VERSION)),\
+	libphp5-embed (>= $(PHP_VERSION)~))
 
 CDBS_DEPENDS_libapache2-mod-proxy-uwsgi = $(APACHE2_API:%=apache2-api-%)
 CDBS_DEPENDS_libapache2-mod-uwsgi = $(APACHE2_API:%=apache2-api-%)
