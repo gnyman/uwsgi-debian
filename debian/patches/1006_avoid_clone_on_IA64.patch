@@ -1,0 +1,27 @@
+Description: Fix linkage for GNU/Hurd
+Description: Avoid use of clone() on IA64 where apperently broken
+ Workaround for FTBFS on IA64:
+ https://buildd.debian.org/status/fetch.php?pkg=uwsgi&arch=ia64&ver=1.9.17.1-2&stamp=1380102648
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2013-09-26
+
+--- a/core/emperor.c
++++ b/core/emperor.c
+@@ -817,7 +817,7 @@
+ 	// TODO pre-start hook
+ 
+ 	// a new uWSGI instance will start 
+-#if defined(__linux__) && !defined(OBSOLETE_LINUX_KERNEL)
++#if defined(__linux__) && !defined(OBSOLETE_LINUX_KERNEL) && !defined(__ia64__)
+ 	if (uwsgi.emperor_clone) {
+ 		char stack[PTHREAD_STACK_MIN];
+ 		pid = clone((int (*)(void *))uwsgi_emperor_spawn_vassal, stack + PTHREAD_STACK_MIN, SIGCHLD | uwsgi.emperor_clone, (void *) n_ui);
+@@ -825,7 +825,7 @@
+ 	else {
+ #endif
+ 	pid = fork();
+-#if defined(__linux__) && !defined(OBSOLETE_LINUX_KERNEL)
++#if defined(__linux__) && !defined(OBSOLETE_LINUX_KERNEL) && !defined(__ia64__)
+ 	}
+ #endif
+ 	if (pid < 0) {

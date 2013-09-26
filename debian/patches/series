@@ -5,5 +5,5 @@
 1003_remove-php-libs.patch
 1004_fix-php-ldflags.patch
 1005_emperor-pg-fix-cflags.patch
-1006_fix_include_for_clone_call.patch
+1006_avoid_clone_on_IA64.patch
 2001_verbose_compilation.patch
