@@ -1,3 +1,12 @@
+uwsgi (1.9.17.1-5) unstable; urgency=low
+
+  * Fix extend patch 1006 to avoid more IA64 clone() calls. Tidy DEP3
+    patch header.
+  * Fix extend patch 1007 to cover more linkage.
+  * Unfuzz patch 2001.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Fri, 27 Sep 2013 01:53:54 +0200
+
 uwsgi (1.9.17.1-4) unstable; urgency=low
 
   * Add patch 1006 to not use of clone() in emperor plugin on IA64, as
