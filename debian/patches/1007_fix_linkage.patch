@@ -1,0 +1,18 @@
+Description: Fix linkage for GNU/Hurd and GNU/kFreeBSD
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2013-09-26
+
+--- a/uwsgiconfig.py
++++ b/uwsgiconfig.py
+@@ -597,8 +597,10 @@
+ 
+         self.ldflags = os.environ.get("LDFLAGS", "").split()
+         self.libs = ['-lpthread', '-lm', '-rdynamic']
+-        if uwsgi_os == 'Linux':
++        if uwsgi_os in ('Linux', 'GNU'):
+             self.libs.append('-ldl')
++        if uwsgi_os == 'GNU/kFreeBSD':
++            self.libs.append('-lbsd')
+ 
+         # check for inherit option
+         inherit = self.get('inherit')
