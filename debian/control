@@ -40,7 +40,6 @@ Build-Depends:
  libxslt1-dev,
  libcap-dev [linux-any],
  libmatheval-dev,
- libbsd-dev [kfreebsd-any],
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
  pkg-config,
