@@ -24,7 +24,7 @@ Build-Depends:
  libsqlite3-dev,
  libxml2-dev,
  libyaml-dev,
- libzmq3-dev [!hurd-any],
+ libzmq3-dev [!hurd-any] | libzmq-dev [!kfreebsd-any !hurd-any],
  libphp5-embed,
  php5-dev,
  libonig-dev,
@@ -40,6 +40,7 @@ Build-Depends:
  libxslt1-dev,
  libcap-dev [linux-any],
  libmatheval-dev,
+ libbsd-dev [kfreebsd-any],
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
  pkg-config,
@@ -667,7 +668,7 @@ Description: V8 JavaScript plugin for uWSGI
 Package: uwsgi-plugin-php
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- ${cdbs:Depends}, libphp5-embed
+ ${cdbs:Depends}
 Description: PHP plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
