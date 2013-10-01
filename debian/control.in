@@ -258,7 +258,7 @@ Description: all available plugins for uWSGI
   * application integration
     - PSGI, Rack, WSGI, etc.
   * coroutines
-    - coroae
+    - Coro::AnyEvent
     - fiber
     - greenlet (Python 2)
   * Python<->Erlang bridge (Python 2 and 3)
@@ -552,14 +552,15 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.2)
 Package: uwsgi-plugin-psgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Perl PSGI plugin for uWSGI
+Description: Perl PSGI and Coro::AnyEvent plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Perl PSGI and Coro::AnyEvent plugins for uWSGI.
+ This package provides psgi and coroae plugins for uWSGI, to interface
+ with Perl PSGI, optionally with Coro::AnyEvent.
 
 Package: uwsgi-plugin-pyerl-python
 Architecture: any
