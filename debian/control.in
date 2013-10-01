@@ -79,10 +79,10 @@ Description: fast, self-healing application container server
  different technology on top of the same core.
  .
  This package depends on uWSGI core binary and installs:
-   * init.d script for running uWSGI daemon(s) with options defined in custom
-     user-created configuration files
-   * infrastructure for running daemons (like common locations of communication
-     sockets, logs)
+  * init.d script for running uWSGI daemon(s) with options defined in custom
+    user-created configuration files
+  * infrastructure for running daemons (like common locations of communication
+    sockets, logs)
 
 Package: uwsgi-dbg
 Architecture: any
@@ -157,10 +157,10 @@ Description: fast, self-healing application container server (core)
  different technology on top of the same core.
  .
  This package provides:
-   * executable uWSGI core binary (built without any embedded plugins)
-   * uWSGI usage examples
-   * uWSGI test suite
-   * plugins that do not require additional dependencies:
+  * executable uWSGI core binary (built without any embedded plugins)
+  * uWSGI usage examples
+  * uWSGI test suite
+  * plugins that do not require additional dependencies:
     - admin
     - alarm_speech
     - cache
@@ -230,9 +230,9 @@ Description: fast, self-healing application container server (emperor scripts)
  different technology on top of the same core.
  .
  This package depends on uWSGI core binary and installs:
-   * init.d script for running uWSGI Emperor daemon with options defined in
-     custom user-created configuration files
-   * basic configuration for running uWSGI Emperor daemon
+  * init.d script for running uWSGI Emperor daemon with options defined in
+    custom user-created configuration files
+  * basic configuration for running uWSGI Emperor daemon
 
 Package: uwsgi-plugins-all
 Architecture: any
@@ -253,10 +253,15 @@ Description: all available plugins for uWSGI
  the same core.
  .
  This dependency package provides all available plugins for uWSGI:
-   * infrastructure plugins (HTTP serving, RPC, etc.)
-   * plugins for integration of uWSGI and application (PSGI, Rack, WSGI,
-     etc.)
-   * coroae and fiber loop engines, greenlet (Python 2), pyerl (Python 2 and 3)
+  * infrastructure
+    - HTTP serving, RPC, etc.
+  * application integration
+    - PSGI, Rack, WSGI, etc.
+  * coroutines
+    - coroae
+    - fiber
+    - greenlet (Python 2)
+  * pyerl (Python 2 and 3)
 
 Package: uwsgi-infrastructure-plugins
 Architecture: any
@@ -279,16 +284,16 @@ Description: infrastructure plugins for uWSGI
  the same core.
  .
  This dependency package provides infrastructure plugins for uWSGI:
-   * alarm curl
-   * alarm XMPP
-   * curl cron
-   * PostgreSQL emperor
-   * graylog2
-   * GeoIP
-   * LDAP
-   * router access
-   * sqlite3
-   * XSLT request
+  * alarm curl
+  * alarm XMPP
+  * curl cron
+  * PostgreSQL emperor
+  * graylog2
+  * GeoIP
+  * LDAP
+  * router access
+  * sqlite3
+  * XSLT request
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -315,15 +320,15 @@ Description: plugins for integration of uWSGI and application
  .
  This dependency package provides plugins for integration of uWSGI and
  application:
-   * Erlang
-   * Java (OpenJDK 6 and 7)
-   * JWSGI (OpenJDK 6 and 7)
-   * Lua WSAPI (Lua 5.1 and 5.2)
-   * PHP
-   * Perl PSGI
-   * Python WSGI (Python 2 and 3)
-   * Rack (Ruby 1.9.1)
-   * V8
+  * Erlang
+  * Java (OpenJDK 6 and 7)
+  * JWSGI (OpenJDK 6 and 7)
+  * Lua WSAPI (Lua 5.1 and 5.2)
+  * PHP
+  * Perl PSGI
+  * Python WSGI (Python 2 and 3)
+  * Rack (Ruby 1.9.1)
+  * V8
 
 Package: uwsgi-plugin-alarm-curl
 Architecture: any
