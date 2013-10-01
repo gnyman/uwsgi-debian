@@ -126,6 +126,7 @@ $(foreach PLUGIN_PKG_NAME, $(UWSGI_PLUGIN_PKGS_NAMES), $(eval \
 
 DEB_INSTALL_DOCS_ALL += $(DEB_SRCDIR)/CONTRIBUTORS
 
+DEB_DH_INSTALL_ARGS_uwsgi-plugin-psgi = coroae_plugin.so usr/lib/uwsgi/plugins
 DEB_DH_INSTALL_ARGS_python-uwsgidecorators = uwsgidecorators.py $(python_installdir)
 DEB_DH_INSTALL_ARGS_python3-uwsgidecorators = 2to3/uwsgidecorators.py $(python_installdir)
 
