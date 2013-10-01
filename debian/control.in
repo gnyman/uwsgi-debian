@@ -261,7 +261,7 @@ Description: all available plugins for uWSGI
     - coroae
     - fiber
     - greenlet (Python 2)
-  * pyerl (Python 2 and 3)
+  * Python<->Erlang bridge (Python 2 and 3)
 
 Package: uwsgi-infrastructure-plugins
 Architecture: any
@@ -566,28 +566,30 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
  uwsgi-plugin-python (= ${binary:Version}),
  uwsgi-plugin-erlang (= ${binary:Version})
-Description: pyerl plugin for uWSGI (Python 2)
+Description: Python<->Erlang bridge plugin for uWSGI (Python 2)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides pyerl plugin for uWSGI with Python 2 WSGI plugin.
+ This package provides pyerl (Python<->Erlang bridge) plugin for uWSGI
+ with Python 2 WSGI plugin.
 
 Package: uwsgi-plugin-pyerl-python3
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
  uwsgi-plugin-python3 (= ${binary:Version}),
  uwsgi-plugin-erlang (= ${binary:Version})
-Description: pyerl plugin for uWSGI (Python 3)
+Description: Python<->Erlang bridge plugin for uWSGI (Python 3)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides pyerl plugin for uWSGI with Python 3 WSGI plugin.
+ This package provides pyerl (Python<->Erlang bridge) plugin for uWSGI
+ with Python 3 WSGI plugin.
 
 Package: uwsgi-plugin-python
 Architecture: any
