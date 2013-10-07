@@ -259,7 +259,7 @@ Description: all available plugins for uWSGI
     - PSGI, Rack, WSGI, etc.
   * coroutines
     - Coro::AnyEvent
-    - fiber
+    - Fiber (Ruby 1.9.1)
     - greenlet (Python 2)
   * Python<->Erlang bridge (Python 2 and 3)
 
@@ -407,16 +407,18 @@ Package: uwsgi-plugin-fiber
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
  uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
-Description: fiber loop engine plugin for uWSGI
+Description: Fiber plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Ruby 1.9 fiber loop engine plugin for uWSGI. Fibers are
- a form of coroutine, useful for implementing cooperative multitasking in your
- Ruby 1.9.x apps.
+ This package provides Fiber plugin for uWSGI
+ with Ruby 1.9.1.
+ .
+ Fibers are a form of coroutine, useful for implementing cooperative
+ multitasking.
 
 Package: uwsgi-plugin-geoip
 Architecture: any
