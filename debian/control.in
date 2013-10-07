@@ -455,7 +455,8 @@ Description: greenlet plugin for uWSGI (Python 2)
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides greenlet plugin for uWSGI with Python 2 WSGI plugin.
+ This package provides greenlet plugin for uWSGI
+ with Python 2 WSGI interface.
 
 Package: uwsgi-plugin-jvm-openjdk-6
 Architecture: @openjdk6_archs@
@@ -577,7 +578,7 @@ Description: Python<->Erlang bridge plugin for uWSGI (Python 2)
  the same core.
  .
  This package provides pyerl (Python<->Erlang bridge) plugin for uWSGI
- with Python 2 WSGI plugin.
+ with Python 2 WSGI interface.
 
 Package: uwsgi-plugin-pyerl-python3
 Architecture: any
@@ -592,37 +593,37 @@ Description: Python<->Erlang bridge plugin for uWSGI (Python 3)
  the same core.
  .
  This package provides pyerl (Python<->Erlang bridge) plugin for uWSGI
- with Python 3 WSGI plugin.
+ with Python 3 WSGI interface.
 
 Package: uwsgi-plugin-python
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Provides: httpd-wsgi
 Suggests: python-uwsgidecorators
-Description: Python 2 WSGI plugin for uWSGI
+Description: WSGI plugin for uWSGI (Python 2)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Python WSGI plugin for uWSGI (linked with Python 2
- runtime).
+ This package provides Python WSGI plugin for uWSGI
+ (linked with Python 2 runtime).
 
 Package: uwsgi-plugin-python3
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
 Provides: httpd-wsgi
 Suggests: python3-uwsgidecorators
-Description: Python 3 WSGI plugin for uWSGI
+Description: WSGI plugin for uWSGI (Python 3)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Python 3 WSGI plugin for uWSGI (linked with Python 3
- runtime).
+ This package provides Python 3 WSGI plugin for uWSGI
+ (linked with Python 3 runtime).
 
 Package: uwsgi-plugin-rack-ruby1.9.1
 Architecture: any
@@ -789,8 +790,8 @@ Description: module of decorators for elegant access to uWSGI API (Python 2)
  to allow a more elegant approach to uWSGI API. Provided decorators helps with
  creating of RPC functions, timers, filemonitors.
  .
- This package provides uwsgidecorators module, accessible from Python 2
- runtime.
+ This package provides uwsgidecorators module
+ for Python 2.
 
 Package: python3-uwsgidecorators
 Architecture: all
@@ -801,11 +802,11 @@ Description: module of decorators for elegant access to uWSGI API (Python 3)
  to allow a more elegant approach to uWSGI API. Provided decorators helps with
  creating of RPC functions, timers, filemonitors.
  .
- This package provides uwsgidecorators module, accessible from Python 3
- runtime.
+ This package provides uwsgidecorators module
+ for Python 3.
  .
- uwsgidecorators module doesn't targeted at Python 3 officially, so some
- decorators may not work or work improperly.
+ uwsgidecorators module is not targeted at Python 3 officially, so some
+ decorators may work improperly or not at all.
 
 Package: uwsgi-extra
 Architecture: all
