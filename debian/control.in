@@ -468,8 +468,8 @@ Description: Java plugin for uWSGI (OpenJDK 6)
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Java plugin for uWSGI (linked with OpenJDK Java 6
- runtime).
+ This package provides Java plugin for uWSGI
+ (linked with OpenJDK Java 6 runtime).
 
 Package: uwsgi-plugin-jvm-openjdk-7
 Architecture: @openjdk7_archs@
@@ -482,8 +482,8 @@ Description: Java plugin for uWSGI (OpenJDK 7)
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Java plugin for uWSGI (linked with OpenJDK Java 7
- runtime).
+ This package provides Java plugin for uWSGI
+ (linked with OpenJDK Java 7 runtime).
 
 Package: uwsgi-plugin-jwsgi-openjdk-6
 Architecture: @openjdk6_archs@
@@ -496,8 +496,8 @@ Description: JWSGI plugin for uWSGI (OpenJDK 6)
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides JWSGI plugin for uWSGI (linked with OpenJDK Java 6
- runtime).
+ This package provides JWSGI plugin for uWSGI
+ (linked with OpenJDK Java 6 runtime).
 
 Package: uwsgi-plugin-jwsgi-openjdk-7
 Architecture: @openjdk7_archs@
@@ -510,8 +510,8 @@ Description: JWSGI plugin for uWSGI (OpenJDK 7)
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides JWSGI plugin for uWSGI (linked with OpenJDK Java 7
- runtime).
+ This package provides JWSGI plugin for uWSGI
+ (linked with OpenJDK Java 7 runtime).
 
 Package: uwsgi-plugin-ldap
 Architecture: any
@@ -535,8 +535,8 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.1)
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Lua WSAPI plugin for uWSGI (linked with Lua 5.1
- runtime).
+ This package provides Lua WSAPI plugin for uWSGI
+ (linked with Lua 5.1 runtime).
 
 Package: uwsgi-plugin-lua5.2
 Architecture: any
@@ -548,8 +548,8 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.2)
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Lua WSAPI plugin for uWSGI (linked with Lua 5.2
- runtime).
+ This package provides Lua WSAPI plugin for uWSGI
+ (linked with Lua 5.2 runtime).
 
 Package: uwsgi-plugin-psgi
 Architecture: any
@@ -634,7 +634,8 @@ Description: Rack plugin for uWSGI (Ruby 1.9.1)
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Rack plugin for uWSGI (linked with Ruby 1.9.1 runtime).
+ This package provides Rack plugin for uWSGI
+ (linked with Ruby 1.9.1 runtime).
 
 Package: uwsgi-plugin-router-access
 Architecture: any
