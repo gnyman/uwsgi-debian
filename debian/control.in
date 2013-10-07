@@ -62,7 +62,6 @@ Architecture: any
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
  lsb-base, initscripts (>= 2.88dsf-13.3)
-Recommends: sqlite3
 Description: fast, self-healing application container server
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -292,7 +291,7 @@ Description: infrastructure plugins for uWSGI
   * GeoIP
   * LDAP
   * router access
-  * sqlite3
+  * SQLite 3
   * XSLT request
 
 Package: uwsgi-app-integration-plugins
@@ -652,15 +651,16 @@ Description: Access router plugin for uWSGI
 Package: uwsgi-plugin-sqlite3
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: sqlite3 configurations plugin for uWSGI
+Recommends: sqlite3
+Description: SQLite 3 configurations plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides sqlite plugin for uWSGI, which allows loading
- configurations from sqlite3 db.
+ This package provides sqlite3 plugin for uWSGI, to load configurations
+ from SQLite 3 database.
 
 Package: uwsgi-plugin-v8
 Architecture: @v8_archs@
