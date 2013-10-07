@@ -1,0 +1,5 @@
+examples/*
+
+logo_uWSGI.png
+mongrel2-uwsgi.conf
+vassals

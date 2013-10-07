@@ -98,8 +98,6 @@ libapache2mod_to_orig = $(subst -,_,$(subst ruwsgi,Ruwsgi,$(1)))
 # There is special-case template, not listed here: uwsgi.load
 LIBAPACHE2_MOD_PKG_TEMPLATES = install postinst prerm
 
-UWSGI_CORE_DOCS_STAGING_DIR = $(CURDIR)/debian/uwsgi-core-docs-staging
-
 # Discards directory-part of target and returns substring after last '-'
 # character
 target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
@@ -180,8 +178,6 @@ clean::
 	))
 	# instantiated build configurations
 	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
-	# staging directory of uwsgi-core documentation
-	$(RM) -r $(UWSGI_CORE_DOCS_STAGING_DIR)
 	# instantiated uwsgi-plugin-X templates
 	$(RM) $(call files_instantiated_in_debian_dir, \
 		uwsgi-plugin-, $(filter-out jwsgi-openjdk-6 jwsgi-openjdk-7, $(UWSGI_PLUGIN_PKGS_NAMES)), \
@@ -306,42 +302,24 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 				     $${PLUGIN_NAME}; \
 	done
 
+# move installed examples into subdirs by type
+ex_types = conffile psgi rack router wsapi wsgi
+ex_conffile = mega.xml multi.* sites.xml uwsgi.xml vassals werkzeug_strict.yml werkzeug.*
+ex_rack = config.ru config2.ru fibers.*
+ex_router = router.lua uwsgirouter*
+ex_psgi = mojoapp.pl
+ex_wsapi = *.ws
+ex_wsgi = mjpeg_stream.py multiapp.py simple_app.py simple_app_wsgi2.py taskqueue.py
+ex_drop = bootstrap* config*.lua config??.ru corostream.pl debug.ini
+ex_drop += flaskpost.py heavytest.* info_uwsgi.php logic.ini
+ex_drop += protected.ini welcome.ini welcome3.py
+binary-post-install/uwsgi-core::
+	set -e; \
+	cd debian/$(cdbs_curpkg)/usr/share/doc/$(cdbs_curpkg)/examples; \
+	$(foreach type, $(ex_types),mkdir $(type); mv -t $(type) $(ex_$(type));) \
+	rm $(ex_drop)
+
 install/uwsgi-core::
-	test -e $(UWSGI_CORE_DOCS_STAGING_DIR) \
-		|| mkdir $(UWSGI_CORE_DOCS_STAGING_DIR)
-	cp -r $(CURDIR)/tests $(UWSGI_CORE_DOCS_STAGING_DIR)
-	for SUBDIR in conffile jwsgi psgi rack router wsapi wsgi; do \
-		mkdir -p $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/$${SUBDIR}; \
-	done
-	for FILE in logo_uWSGI.png mongrel2-uwsgi.conf examples/simple_logger.py \
-	            examples/staticfilesnmp.py examples/uwsgistatus.py \
-	            examples/welcome.py; do \
-		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples; \
-	done
-	for FILE in mega.xml multi.ini multi.xml sites.xml uwsgi.xml \
-	            werkzeug_strict.yml werkzeug.js werkzeug.yml; do \
-		cp $(CURDIR)/examples/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile; \
-	done
-	cp -r $(CURDIR)/vassals $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/conffile
-	for FILE in examples/config.ru examples/config2.ru examples/fibers.ru \
-				examples/fibers.yml; do \
-		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/rack; \
-	done
-	for FILE in examples/router.lua examples/uwsgirouter.py \
-				examples/uwsgirouter2.py examples/uwsgirouter3.py \
-				examples/uwsgirouter4.py examples/uwsgirouter5.py; do \
-		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/router; \
-	done
-	for FILE in examples/mojoapp.pl; do \
-		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/psgi; \
-	done
-	for FILE in examples/sputnik.ws; do \
-		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsapi; \
-	done
-	for FILE in examples/mjpeg_stream.py examples/multiapp.py examples/simple_app.py \
-	            examples/simple_app_wsgi2.py examples/taskqueue.py; do \
-		cp $(CURDIR)/$${FILE} $(UWSGI_CORE_DOCS_STAGING_DIR)/examples/wsgi; \
-	done
 	help2man \
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
 		--section 1 \
