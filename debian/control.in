@@ -283,9 +283,9 @@ Description: infrastructure plugins for uWSGI
  the same core.
  .
  This dependency package provides infrastructure plugins for uWSGI:
-  * alarm curl
+  * alarm cURL
   * alarm XMPP
-  * curl cron
+  * cURL cron
   * PostgreSQL emperor
   * graylog2
   * GeoIP
@@ -332,7 +332,7 @@ Description: plugins for integration of uWSGI and application
 Package: uwsgi-plugin-alarm-curl
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Alarm curl plugin for uWSGI
+Description: cURL alarm plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
@@ -356,7 +356,7 @@ Description: Alarm XMPP plugin for uWSGI
 Package: uwsgi-plugin-curl-cron
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: curl cron plugin for uWSGI
+Description: cURL cron plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
