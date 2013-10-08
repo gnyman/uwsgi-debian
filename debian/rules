@@ -3,6 +3,7 @@
 include /usr/share/cdbs/1/rules/upstream-tarball.mk
 include /usr/share/cdbs/1/class/python-module.mk
 include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/javahelper/java-vars.mk
 
 # resolve supported architectures for arch-varying build-dependencies
 # (in maintainer mode only: uses network and messes with control file)
@@ -76,13 +77,15 @@ UWSGI_PLUGINS_NAMES = $(call \
 UWSGI_PLUGINS_SRC_DIR = plugins
 
 UWSGI_PLUGIN_PYTHON_PKG_KINDS = python python3
+JAVA_KINDS = openjdk-6 openjdk-7
+
+JAVA_PLUGIN_PKGS = $(foreach stem,jvm jwsgi,$(patsubst %,$(stem)-%,$(JAVA_KINDS)))
 
 PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGIN_PYTHON_PKG_KINDS) \
 	greenlet-python \
-	jvm-openjdk-6 jwsgi-openjdk-6 \
+	$(JAVA_PLUGIN_PKGS) \
 	lua5.1 lua5.2 \
-	jvm-openjdk-7 jwsgi-openjdk-7 \
 	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)) \
 	rack-ruby1.9.1 rbthreads fiber
 
@@ -180,7 +183,7 @@ clean::
 	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 	# instantiated uwsgi-plugin-X templates
 	$(RM) $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(filter-out jwsgi-openjdk-6 jwsgi-openjdk-7, $(UWSGI_PLUGIN_PKGS_NAMES)), \
+		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(JAVA_KINDS)), $(UWSGI_PLUGIN_PKGS_NAMES)), \
 		.install \
 	)
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
@@ -356,30 +359,16 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):
 		         $(PLUGIN_NAME)
 	touch $@
 
-# Build jvm_openjdk6.so and jwsgi_openjdk6.so
-debian/stamp-plugin-jvm-openjdk-6 debian/stamp-plugin-jwsgi-openjdk-6:
+# Build Java plugins
+$(patsubst %,debian/stamp-plugin-%,$(JAVA_PLUGIN_PKGS)):
+	$(eval OPENJDK_VERSION = $(lastword $(subst -, ,$@)))
+	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(DEB_HOST_ARCH))
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
 	$(eval PLUGIN_SRC_SUBDIR = $(firstword $(subst _, ,$(PLUGIN_NAME))))
-	$(eval JAVA_ARCH := $(shell /usr/share/javahelper/java-arch.sh))
-	UWSGICONFIG_JVM_INCPATH='/usr/lib/jvm/java-6-openjdk-$(DEB_HOST_ARCH)/include/' \
-	UWSGICONFIG_JVM_LIBPATH='/usr/lib/jvm/java-6-openjdk-$(DEB_HOST_ARCH)/jre/lib/$(JAVA_ARCH)/server/' \
-	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_SRC_SUBDIR) \
-		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-		         $(PLUGIN_NAME)
-	touch $@
-
-# Build jvm_openjdk7.so and jwsgi_openjdk7.so
-debian/stamp-plugin-jvm-openjdk-7 debian/stamp-plugin-jwsgi-openjdk-7:
-	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
-		$(subst stamp-plugin-,,$(notdir $@)) \
-	))
-	$(eval PLUGIN_SRC_SUBDIR = $(firstword $(subst _, ,$(PLUGIN_NAME))))
-	$(eval JAVA_ARCH := $(shell /usr/share/javahelper/java-arch.sh))
-	UWSGICONFIG_JVM_INCPATH='/usr/lib/jvm/java-7-openjdk-$(DEB_HOST_ARCH)/include/' \
-	UWSGICONFIG_JVM_LIBPATH='/usr/lib/jvm/java-7-openjdk-$(DEB_HOST_ARCH)/jre/lib/$(JAVA_ARCH)/server/' \
+	UWSGICONFIG_JVM_INCPATH='$(JAVA_HOME)/include/' \
+	UWSGICONFIG_JVM_LIBPATH='$(JVM_SERVER_DIR)' \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_SRC_SUBDIR) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
@@ -493,7 +482,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS))::
 		$(CURDIR)/uwsgi_$(PLUGIN_NAME) \
 		> $(CURDIR)/debian/uwsgi_$(PLUGIN_NAME).1; \
 
-install/uwsgi-plugin-jvm-openjdk-6 install/uwsgi-plugin-jvm-openjdk-7::
+$(patsubst %,install/uwsgi-plugin-jvm-%,$(JAVA_KINDS))::
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
 		$(subst uwsgi-plugin-,,$(notdir $@)) \
 	))
