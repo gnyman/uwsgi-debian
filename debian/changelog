@@ -1,3 +1,14 @@
+uwsgi (1.9.17.1-6) unstable; urgency=low
+
+  * Fix avoid emperor_zeromq plugin on GNU/Hurd.
+  * Move non-core plugin coroae (Perl Coro::AnyEvent) to package
+    uwsgi-plugin-psgi.
+  * Various minor improvements to short and long descriptions.
+  * Fix have uwsgi-plugin-sqlite3 (not uwsgi) recommend sqlite3.
+  * Simplify example file grouping and Java in rules file.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 09 Oct 2013 22:48:06 +0200
+
 uwsgi (1.9.17.1-5) unstable; urgency=low
 
   * Fix extend patch 1006 to avoid more IA64 clone() calls. Tidy DEP3
