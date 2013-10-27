@@ -1673,18 +1673,7 @@ void uwsgi_map_sockets() {
 
 		if (!enabled) {
 			close(uwsgi_sock->fd);
-			int fd = open("/dev/null", O_RDONLY);
-			if (fd < 0) {
-				uwsgi_error_open("/dev/null");
-				exit(1);
-			}
-			if (fd != uwsgi_sock->fd) {
-				if (dup2(fd, uwsgi_sock->fd) < 0) {
-					uwsgi_error("dup2()");
-					exit(1);
-				}
-				close(fd);
-			}
+			uwsgi_remap_fd(uwsgi_sock->fd, "/dev/null");
 			uwsgi_sock->disabled = 1;
 		}
 
@@ -1714,6 +1703,10 @@ void uwsgi_bind_sockets() {
 	while (uwsgi_sock) {
 		if (!uwsgi_sock->bound && !uwsgi_socket_is_already_bound(uwsgi_sock->name)) {
 			char *tcp_port = strrchr(uwsgi_sock->name, ':');
+			int current_defer_accept = uwsgi.no_defer_accept;
+                        if (uwsgi_sock->no_defer) {
+                                uwsgi.no_defer_accept = 1;
+                        }
 			if (tcp_port == NULL) {
 				uwsgi_sock->fd = bind_to_unix(uwsgi_sock->name, uwsgi.listen_queue, uwsgi.chmod_socket, uwsgi.abstract_socket);
 				uwsgi_sock->family = AF_UNIX;
@@ -1747,6 +1740,7 @@ void uwsgi_bind_sockets() {
 				uwsgi_log("unable to create server socket on: %s\n", uwsgi_sock->name);
 				exit(1);
 			}
+			uwsgi.no_defer_accept = current_defer_accept;
 		}
 		uwsgi_sock->bound = 1;
 		uwsgi_sock = uwsgi_sock->next;
@@ -1877,7 +1871,20 @@ setup_proto:
 			if (uwsgi.offload_threads > 0)
 				uwsgi_sock->can_offload = 1;
 		}
-
+		else if (requested_protocol && !strcmp("raw", requested_protocol)) {
+			uwsgi_sock->proto = uwsgi_proto_raw_parser;
+                        uwsgi_sock->proto_accept = uwsgi_proto_base_accept;
+                        uwsgi_sock->proto_prepare_headers = uwsgi_proto_base_prepare_headers;
+                        uwsgi_sock->proto_add_header = uwsgi_proto_base_add_header;
+                        uwsgi_sock->proto_fix_headers = uwsgi_proto_base_fix_headers;
+                        uwsgi_sock->proto_read_body = uwsgi_proto_base_read_body;
+                        uwsgi_sock->proto_write = uwsgi_proto_base_write;
+                        uwsgi_sock->proto_write_headers = uwsgi_proto_base_write;
+                        uwsgi_sock->proto_sendfile = uwsgi_proto_base_sendfile;
+                        uwsgi_sock->proto_close = uwsgi_proto_base_close;
+                        if (uwsgi.offload_threads > 0)
+                                uwsgi_sock->can_offload = 1;
+		}
 		else if (requested_protocol && (!strcmp("fastcgi", requested_protocol) || !strcmp("fcgi", requested_protocol))) {
 			uwsgi_sock->proto = uwsgi_proto_fastcgi_parser;
 			uwsgi_sock->proto_accept = uwsgi_proto_base_accept;

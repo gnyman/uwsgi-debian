@@ -53,8 +53,6 @@ extern "C" {
                         }
 
 
-#define uwsgi_check_scheme(file) (!uwsgi_startswith(file, "emperor://", 10) || !uwsgi_startswith(file, "http://", 7) || !uwsgi_startswith(file, "data://", 7) || !uwsgi_startswith(file, "sym://", 6) || !uwsgi_startswith(file, "fd://", 5) || !uwsgi_startswith(file, "exec://", 7) || !uwsgi_startswith(file, "section://", 10))
-
 #define uwsgi_n64(x) strtoul(x, NULL, 10)
 
 #define ushared uwsgi.shared
@@ -197,7 +195,11 @@ extern "C" {
 #endif
 #include <netdb.h>
 
-#ifdef __FreeBSD__
+#if defined(__GNU_kFreeBSD__)
+#include <bsd/unistd.h>
+#endif
+
+#if defined(__FreeBSD__) || defined(__GNU_kFreeBSD__)
 #include <sys/sysctl.h>
 #include <sys/param.h>
 #include <sys/cpuset.h>
@@ -237,7 +239,7 @@ extern "C" {
 #include <linux/limits.h>
 #endif
 
-#if defined(__linux) || defined(__FreeBSD__)
+#if defined(__linux) || defined(__FreeBSD__) || defined(__GNU_kFreeBSD__)
 #include <sys/mount.h>
 #endif
 
@@ -308,6 +310,9 @@ extern int pivot_root(const char *new_root, const char *put_old);
 #ifdef __linux__
 #include <sys/sendfile.h>
 #include <sys/epoll.h>
+#elif defined(__GNU_kFreeBSD__)
+#include <sys/sendfile.h>
+#include <sys/event.h>
 #elif defined(__sun__)
 #include <sys/sendfile.h>
 #include <sys/devpoll.h>
@@ -554,7 +559,7 @@ struct uwsgi_gateway_socket {
 
 	// could be useful for ssl
 	void *ctx;
-	// could be useful ofr plugins
+	// could be useful for plugins
 	int mode;
 
 };
@@ -585,6 +590,7 @@ struct uwsgi_daemon {
 	char *legion;
 #endif
 
+	int control;
 	struct uwsgi_daemon *next;
 };
 
@@ -1516,6 +1522,8 @@ struct wsgi_request {
 	char *transformed_chunk;
 	size_t transformed_chunk_len;
 
+	int is_raw;
+
 	struct msghdr msg;
 	union {
 		struct cmsghdr cmsg;
@@ -1555,7 +1563,7 @@ struct uwsgi_signal_rb_timer {
 struct uwsgi_cheaper_algo {
 
 	char *name;
-	int (*func) (void);
+	int (*func) (int);
 	struct uwsgi_cheaper_algo *next;
 };
 
@@ -1718,6 +1726,8 @@ struct uwsgi_server {
 	uint64_t http_modifier2;
 	uint64_t scgi_modifier1;
 	uint64_t scgi_modifier2;
+	uint64_t raw_modifier1;
+	uint64_t raw_modifier2;
 
 	// enable lazy mode
 	int lazy;
@@ -1727,7 +1737,7 @@ struct uwsgi_server {
 	int cheaper;
 	char *requested_cheaper_algo;
 	struct uwsgi_cheaper_algo *cheaper_algos;
-	int (*cheaper_algo) (void);
+	int (*cheaper_algo) (int);
 	int cheaper_step;
 	uint64_t cheaper_overload;
 	// minimal number of running workers in cheaper mode
@@ -1751,7 +1761,9 @@ struct uwsgi_server {
 	// true if run under the emperor
 	int has_emperor;
 	char *emperor_procname;
+	char *emperor_proxy;
 	int emperor_fd;
+	int emperor_fd_proxy;
 	int emperor_queue;
 	int emperor_nofollow;
 	int emperor_tyrant;
@@ -1763,6 +1775,7 @@ struct uwsgi_server {
 	int emperor_max_throttle;
 	int emperor_magic_exec;
 	int emperor_heartbeat;
+	int emperor_curse_tolerance;
 	struct uwsgi_string_list *emperor_extra_extension;
 	// search for a file with the specified extension at the same level of the vassal file
 	char *emperor_on_demand_extension;
@@ -1787,6 +1800,8 @@ struct uwsgi_server {
 	int emperor_stats_fd;
 	struct uwsgi_string_list *vassals_templates;
 	struct uwsgi_string_list *vassals_includes;
+	struct uwsgi_string_list *vassals_templates_before;
+	struct uwsgi_string_list *vassals_includes_before;
 	// true if loyal to the emperor
 	int loyal;
 
@@ -1863,16 +1878,19 @@ struct uwsgi_server {
 #ifdef UWSGI_CAP
 	cap_value_t *cap;
 	int cap_count;
+	cap_value_t *emperor_cap;
+	int emperor_cap_count;
 #endif
 
 #ifdef __linux__
 	int unshare;
+	int unshare2;
 	int emperor_clone;
 	char *pivot_root;
 #endif
 	char *emperor_wrapper;
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__GNU_kFreeBSD__)
 	char *jail;
 	struct uwsgi_string_list *jail_ip4;
 #ifdef AF_INET6
@@ -2194,6 +2212,8 @@ struct uwsgi_server {
 	struct uwsgi_string_list *fs_brutal_reload;
 	struct uwsgi_string_list *fs_signal;
 
+	struct uwsgi_string_list *mountpoints_check;
+
 	int propagate_touch;
 
 	// enable grunt mode
@@ -2262,6 +2282,7 @@ struct uwsgi_server {
 	int harakiri_verbose;
 	int harakiri_no_arh;
 
+	int magic_table_first_round;
 	char *magic_table[256];
 
 	int numproc;
@@ -2547,6 +2568,8 @@ struct uwsgi_server {
 
 	int (*wait_write_hook) (int, int);
 	int (*wait_read_hook) (int, int);
+
+	struct uwsgi_string_list *schemes;
 
 };
 
@@ -2962,6 +2985,7 @@ void uwsgi_register_loop(char *, void (*)(void));
 void *uwsgi_get_loop(char *);
 
 void add_exported_option(char *, char *, int);
+void add_exported_option_do(char *, char *, int, int);
 
 ssize_t uwsgi_send_empty_pkt(int, char *, uint8_t, uint8_t);
 
@@ -3148,8 +3172,10 @@ int uwsgi_str3_num(char *);
 int uwsgi_str4_num(char *);
 
 #ifdef __linux__
+#if !defined(__ia64__)
 	void linux_namespace_start(void *);
 	void linux_namespace_jail(void);
+#endif
 	int uwsgi_netlink_veth(char *, char *);
 	int uwsgi_netlink_veth_attach(char *, pid_t);
 	int uwsgi_netlink_ifup(char *);
@@ -3192,6 +3218,7 @@ int uwsgi_proto_scgi_parser(struct wsgi_request *);
 
 
 int uwsgi_proto_base_accept(struct wsgi_request *, int);
+int uwsgi_proto_raw_parser(struct wsgi_request *);
 void uwsgi_proto_base_close(struct wsgi_request *);
 uint16_t proto_base_add_uwsgi_header(struct wsgi_request *, char *, uint16_t, char *, uint16_t);
 uint16_t proto_base_add_uwsgi_var(struct wsgi_request *, char *, uint16_t, char *, uint16_t);
@@ -3423,7 +3450,8 @@ void uwsgi_linux_ksm_map(void);
 #endif
 
 #ifdef UWSGI_CAP
-void uwsgi_build_cap(char *);
+int uwsgi_build_cap(char *, cap_value_t **);
+void uwsgi_apply_cap(cap_value_t *, int);
 #endif
 
 void uwsgi_register_logger(char *, ssize_t(*func) (struct uwsgi_logger *, char *, size_t));
@@ -3455,6 +3483,7 @@ int uwsgi_manage_opt(char *, char *);
 void uwsgi_opt_print(char *, char *, void *);
 void uwsgi_opt_true(char *, char *, void *);
 void uwsgi_opt_set_str(char *, char *, void *);
+void uwsgi_opt_custom(char *, char *, void *);
 void uwsgi_opt_set_null(char *, char *, void *);
 void uwsgi_opt_set_logger(char *, char *, void *);
 void uwsgi_opt_set_req_logger(char *, char *, void *);
@@ -3463,6 +3492,7 @@ void uwsgi_opt_add_string_list(char *, char *, void *);
 void uwsgi_opt_add_addr_list(char *, char *, void *);
 void uwsgi_opt_add_string_list_custom(char *, char *, void *);
 void uwsgi_opt_add_dyn_dict(char *, char *, void *);
+void uwsgi_opt_binary_append_data(char *, char *, void *);
 #ifdef UWSGI_PCRE
 void uwsgi_opt_pcre_jit(char *, char *, void *);
 void uwsgi_opt_add_regexp_dyn_dict(char *, char *, void *);
@@ -3480,6 +3510,7 @@ void uwsgi_opt_dyn_false(char *, char *, void *);
 void uwsgi_opt_set_placeholder(char *, char *, void *);
 void uwsgi_opt_add_shared_socket(char *, char *, void *);
 void uwsgi_opt_add_socket(char *, char *, void *);
+void uwsgi_opt_add_socket_no_defer(char *, char *, void *);
 void uwsgi_opt_add_lazy_socket(char *, char *, void *);
 void uwsgi_opt_add_cron(char *, char *, void *);
 void uwsgi_opt_add_cron2(char *, char *, void *);
@@ -3563,6 +3594,7 @@ int uwsgi_logic_opt_if_not_plugin(char *, char *);
 
 #ifdef UWSGI_CAP
 void uwsgi_opt_set_cap(char *, char *, void *);
+void uwsgi_opt_set_emperor_cap(char *, char *, void *);
 #endif
 #ifdef __linux__
 void uwsgi_opt_set_unshare(char *, char *, void *);
@@ -3601,16 +3633,16 @@ void uwsgi_manage_zerg(int, int, int *);
 time_t uwsgi_now(void);
 
 int uwsgi_calc_cheaper(void);
-int uwsgi_cheaper_algo_spare(void);
-int uwsgi_cheaper_algo_backlog(void);
-int uwsgi_cheaper_algo_backlog2(void);
-int uwsgi_cheaper_algo_manual(void);
+int uwsgi_cheaper_algo_spare(int);
+int uwsgi_cheaper_algo_backlog(int);
+int uwsgi_cheaper_algo_backlog2(int);
+int uwsgi_cheaper_algo_manual(int);
 
 int uwsgi_master_log(void);
 int uwsgi_master_req_log(void);
 void uwsgi_flush_logs(void);
 
-void uwsgi_register_cheaper_algo(char *, int (*)(void));
+void uwsgi_register_cheaper_algo(char *, int (*)(int));
 
 void uwsgi_setup_locking(void);
 int uwsgi_fcntl_lock(int);
@@ -3819,11 +3851,13 @@ struct uwsgi_instance {
 
 	int on_demand_fd;
 	char *socket_name;
+	time_t cursed_at;
 };
 
 struct uwsgi_instance *emperor_get_by_fd(int);
 struct uwsgi_instance *emperor_get(char *);
 void emperor_stop(struct uwsgi_instance *);
+void emperor_curse(struct uwsgi_instance *);
 void emperor_respawn(struct uwsgi_instance *, time_t);
 void emperor_add(struct uwsgi_emperor_scanner *, char *, time_t, char *, uint32_t, uid_t, gid_t, char *);
 
@@ -4056,6 +4090,7 @@ void uwsgi_legion_atexit(void);
 #endif
 
 struct uwsgi_option *uwsgi_opt_get(char *);
+int uwsgi_opt_exists(char *);
 int uwsgi_valid_fd(int);
 void uwsgi_close_all_fds(void);
 
@@ -4339,6 +4374,19 @@ void uwsgi_brutally_reload_workers();
 void uwsgi_cheaper_increase();
 void uwsgi_cheaper_decrease();
 void uwsgi_go_cheap();
+
+char **uwsgi_split_quoted(char *, size_t, char *, size_t *);
+
+void uwsgi_master_manage_emperor_proxy();
+struct uwsgi_string_list *uwsgi_register_scheme(char *, char * (*)(char *, size_t *, int));
+void uwsgi_setup_schemes(void);
+
+struct uwsgi_string_list *uwsgi_check_scheme(char *);
+
+void uwsgi_remap_fd(int, char *);
+void uwsgi_opt_exit(char *, char *, void *);
+int uwsgi_check_mountpoint(char *);
+void uwsgi_master_check_mountpoints(void);
 
 #ifdef __cplusplus
 }

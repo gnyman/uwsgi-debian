@@ -139,6 +139,10 @@ int uwsgi_daemon_check_pid_reload(pid_t diedpid) {
 		}
 #endif
 		if (ud->pid == diedpid && !ud->pidfile) {
+			if (ud->control) {
+				gracefully_kill_them_all(0);
+				return 0;
+			}
 			uwsgi_spawn_daemon(ud);
 			return 1;
 		}
@@ -231,9 +235,11 @@ void uwsgi_detach_daemons() {
 			// try to gracefully stop daemon, kill it if it won't die
 			// if mercy is not set than wait up to 3 seconds
 			time_t timeout = uwsgi_now() + (uwsgi.reload_mercy ? uwsgi.reload_mercy : 3);
+			int waitpid_status;
 			while (!kill(ud->pid, 0)) {
 				kill(-ud->pid, SIGTERM);
 				sleep(1);
+				waitpid(-ud->pid, &waitpid_status, WNOHANG);
 				if (uwsgi_now() >= timeout) {
 					uwsgi_log("[uwsgi-daemons] daemon did not died in time, killing (pid: %d): %s\n", (int) ud->pid, ud->command);
 					kill(-ud->pid, SIGKILL);
@@ -253,7 +259,6 @@ void uwsgi_spawn_daemon(struct uwsgi_daemon *ud) {
 	// skip unregistered daemons
 	if (!ud->registered) return;
 
-	int devnull = -1;
 	int throttle = 0;
 
 	if (uwsgi.current_time - ud->last_spawn <= 3) {
@@ -299,18 +304,7 @@ void uwsgi_spawn_daemon(struct uwsgi_daemon *ud) {
 
 		if (!uwsgi.daemons_honour_stdin) {
 			// /dev/null will became stdin
-			devnull = open("/dev/null", O_RDONLY);
-			if (devnull < 0) {
-				uwsgi_error("/dev/null open()");
-				exit(1);
-			}
-			if (devnull != 0) {
-				if (dup2(devnull, 0) < 0) {
-					uwsgi_error("dup2()");
-					exit(1);
-				}
-				close(devnull);
-			}
+			uwsgi_remap_fd(0, "/dev/null");
 		}
 
 		if (setsid() < 0) {
@@ -412,6 +406,10 @@ void uwsgi_opt_add_daemon(char *opt, char *value, void *none) {
 	uwsgi_ud->last_spawn = 0;
 	uwsgi_ud->daemonize = daemonize;
 	uwsgi_ud->pidfile = pidfile;
+	uwsgi_ud->control = 0;
+	if (!strcmp(opt, "attach-control-daemon")) {
+		uwsgi_ud->control = 1;
+	}
 #ifdef UWSGI_SSL
 	uwsgi_ud->legion = legion;
 #endif
