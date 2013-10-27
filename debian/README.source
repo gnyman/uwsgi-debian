@@ -1,5 +1,15 @@
+CDBS+git-buildpackage
+---------------------
+
+This source package uses CDBS and git-buildpackage.  NMUs need not (but
+are encouraged to) make special use of these tools.  In particular, the
+debian/control.in file can be completely ignored.
+
+More info here: http://wiki.debian.org/CDBS+git-buildpackage
+
+
 Building new uwsgi-plugin-X package
-===================================
+-----------------------------------
 
 Rules for building uwsgi-plugin-X are created automatically based on
 contents of debian/control.
@@ -22,7 +32,7 @@ Also, _remember to add new plugin_ in Depends: and Description: fields of
 'uwsgi-plugins-all' binary package (in debian/control).
 
 Why #!/bin/bash in uwsgi-pythonX init.d script?
-===============================================
+-----------------------------------------------
 
 For supporting configuration file names with spaces and/or control characters
 Bash-specific features are used (namely, '-d' option of 'read' command and
