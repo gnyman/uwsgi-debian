@@ -4,8 +4,7 @@ Priority: extra
 Maintainer: Janos Guljas <janos@debian.org>
 Uploaders: Jonas Smedegaard <dr@jones.dk>
 Build-Depends:
- cdbs,
- debhelper (>= 8),
+ @cdbs@,
  apache2-dev | apache2-threaded-dev,
  erlang-dev,
  help2man,
@@ -43,7 +42,6 @@ Build-Depends:
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
  pkg-config,
- python,
  python-all-dev,
  python-greenlet-dev [@greenlet_archs@],
  python3-all-dev,
