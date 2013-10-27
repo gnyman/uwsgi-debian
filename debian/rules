@@ -34,7 +34,7 @@ export CPPFLAGS=$(shell dpkg-buildflags --get CPPFLAGS)
 APXS2=/usr/bin/apxs2
 APR_CONFIG=/usr/bin/apr-config
 APU_CONFIG=/usr/bin/apu-config
-UWSGI_BUILDER = $(CURDIR)/uwsgiconfig.py
+UWSGI_BUILDER = $(CURDIR)/uwsgiconfig.py --verbose --debug
 APACHE2_API = $(shell perl -ne 'print $$1 if m/our\s+\$$API\s+=\s+"(.*)"/' < $(shell which dh_apache2))
 PHP_API = $(shell php-config --phpapi)
 # TODO: Drop this (and its use) when php5-embed ABI is stable in oldstable
