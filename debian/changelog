@@ -1,3 +1,26 @@
+uwsgi (1.9.18.2-1) UNRELEASED; urgency=low
+
+  [ upstream ]
+  * New release.
+
+  [ Jonas Smedegaard ]
+  * Drop patches cherry-picked upstream and patches 1006 1007 2001
+    adopted upstream.
+  * Unfuzz remaining patches.
+  * Update copyright file: Extend main licensing with newly introduced
+    linking exception.
+  * Enable new build args --verbose --debug.
+  * Auto-resolve CDBS-related build-dependencies.
+  * Document use of CDBS and git-buildpackage in README.source.
+  * Have libapache2-* packages recommend uwsgi-core and suggest uwsgi.
+  * Relax to build-depend unversioned on debhelper: Needed version
+    satisfied even on oldstable.
+  * Fix build-depend on python3: Needed since 1.2.3+dfsg-1 for
+    dh_python3 call (and for compiling as well).
+  * Drop s390 in all arch-dependent package dependencies.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Sun, 17 Nov 2013 14:06:51 +0100
+
 uwsgi (1.9.17.1-6) unstable; urgency=low
 
   * Fix avoid emperor_zeromq plugin on GNU/Hurd.
