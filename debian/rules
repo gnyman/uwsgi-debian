@@ -137,6 +137,12 @@ CDBS_DEPENDS_uwsgi-plugin-php +=, $(if $(PHP_SONAME_ALWAYS_CHANGE),\
 CDBS_DEPENDS_libapache2-mod-proxy-uwsgi = $(APACHE2_API:%=apache2-api-%)
 CDBS_DEPENDS_libapache2-mod-uwsgi = $(APACHE2_API:%=apache2-api-%)
 CDBS_DEPENDS_libapache2-mod-ruwsgi = $(APACHE2_API:%=apache2-api-%)
+CDBS_RECOMMENDS_libapache2-mod-proxy-uwsgi = uwsgi-core
+CDBS_RECOMMENDS_libapache2-mod-uwsgi = uwsgi-core
+CDBS_RECOMMENDS_libapache2-mod-ruwsgi = uwsgi-core
+CDBS_SUGGESTS_libapache2-mod-proxy-uwsgi = uwsgi
+CDBS_SUGGESTS_libapache2-mod-uwsgi = uwsgi
+CDBS_SUGGESTS_libapache2-mod-ruwsgi = uwsgi
 
 # Rules
 # =====
