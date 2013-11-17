@@ -871,6 +871,70 @@ struct uwsgi_stats *uwsgi_master_generate_stats() {
 		goto end;
 	}
 
+	if (uwsgi.has_metrics) {
+		if (uwsgi_stats_key(us, "metrics"))
+                	goto end;
+
+		if (uwsgi_stats_object_open(us))
+			goto end;
+
+		uwsgi_rlock(uwsgi.metrics_lock);
+		struct uwsgi_metric *um = uwsgi.metrics;
+		while(um) {
+        		int64_t um_val = *um->value;
+
+			if (uwsgi_stats_key(us, um->name)) {
+				uwsgi_rwunlock(uwsgi.metrics_lock);
+                		goto end;
+			}
+
+			if (uwsgi_stats_object_open(us)) {
+				uwsgi_rwunlock(uwsgi.metrics_lock);
+                                goto end;
+			}
+
+			if (uwsgi_stats_keylong(us, "type", (long long) um->type)) {
+        			uwsgi_rwunlock(uwsgi.metrics_lock);
+				goto end;
+			} 
+
+			if (uwsgi_stats_comma(us)) {
+        			uwsgi_rwunlock(uwsgi.metrics_lock);
+				goto end;
+			}
+
+			if (uwsgi_stats_keyval_comma(us, "oid", um->oid ? um->oid : "")) {
+                                uwsgi_rwunlock(uwsgi.metrics_lock);
+                                goto end;
+                        }
+
+			if (uwsgi_stats_keyslong(us, "value", (long long) um_val)) {
+        			uwsgi_rwunlock(uwsgi.metrics_lock);
+				goto end;
+			} 
+
+			if (uwsgi_stats_object_close(us)) {
+                                uwsgi_rwunlock(uwsgi.metrics_lock);
+                                goto end;
+                        }
+
+			um = um->next;
+			if (um) {
+				if (uwsgi_stats_comma(us)) {
+        				uwsgi_rwunlock(uwsgi.metrics_lock);
+					goto end;
+				}
+			}
+		}
+        	uwsgi_rwunlock(uwsgi.metrics_lock);
+
+		if (uwsgi_stats_object_close(us))
+			goto end;
+
+		if (uwsgi_stats_comma(us))
+		goto end;
+	}
+
 	if (uwsgi_stats_key(us, "sockets"))
 		goto end;
 

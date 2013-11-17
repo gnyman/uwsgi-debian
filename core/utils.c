@@ -2,7 +2,6 @@
 
 
 extern struct uwsgi_server uwsgi;
-extern char **environ;
 
 #ifdef __BIG_ENDIAN__
 uint16_t uwsgi_swap16(uint16_t x) {
@@ -207,17 +206,19 @@ void uwsgi_set_cgroup() {
 	if (!uwsgi.cgroup)
 		return;
 
+	if (getuid()) return;
+
 	usl = uwsgi.cgroup;
 
 	while (usl) {
 		int mode = strtol(uwsgi.cgroup_dir_mode, 0, 8);
 		if (mkdir(usl->value, mode)) {
 			if (errno != EEXIST) {
-				uwsgi_error("mkdir()");
+				uwsgi_error("uwsgi_set_cgroup()/mkdir()");
 				exit(1);
 			}
 			if (chmod(usl->value, mode)) {
-				uwsgi_error("chmod()");
+				uwsgi_error("uwsgi_set_cgroup()/chmod()");
 				exit(1);
 			}
 			uwsgi_log("using Linux cgroup %s with mode %o\n", usl->value, mode);
@@ -725,7 +726,7 @@ void uwsgi_as_root() {
 
 	uwsgi_foreach(usl, uwsgi.call_as_root) {
 		if (uwsgi_call_symbol(usl->value)) {
-			uwsgi_log("unaable to call function \"%s\"\n", usl->value);
+			uwsgi_log("unable to call function \"%s\"\n", usl->value);
 		}
 	}
 
@@ -943,7 +944,7 @@ void uwsgi_as_root() {
 
 	uwsgi_foreach(usl, uwsgi.call_as_user) {
 		if (uwsgi_call_symbol(usl->value)) {
-			uwsgi_log("unaable to call function \"%s\"\n", usl->value);
+			uwsgi_log("unable to call function \"%s\"\n", usl->value);
 			exit(1);
 		}
 	}
@@ -1221,7 +1222,7 @@ void uwsgi_linux_ksm_map(void) {
 	}
 
 	// we now have areas
-	if (uwsgi.ksm_mappings_last_size == 0 || uwsgi.ksm_mappings_current_size == 0 || uwsgi.ksm_mappings_current_size != uwsgi.ksm_mappings_last_size) {
+	if (uwsgi.ksm_mappings_last_size == 0 || uwsgi.ksm_mappings_current_size != uwsgi.ksm_mappings_last_size) {
 		dirty = 1;
 	}
 	else {
@@ -1289,7 +1290,7 @@ long uwsgi_num_from_file(char *filename, int quiet) {
 // setup for a new request
 void wsgi_req_setup(struct wsgi_request *wsgi_req, int async_id, struct uwsgi_socket *uwsgi_sock) {
 
-	wsgi_req->app_id = uwsgi.default_app;
+	wsgi_req->app_id = -1;
 
 	wsgi_req->async_id = async_id;
 	wsgi_req->sendfile_fd = -1;
@@ -1549,14 +1550,14 @@ void parse_sys_envs(char **envs) {
 
 	while (*uenvs) {
 		if (!strncmp(*uenvs, "UWSGI_", 6) &&
-        strncmp(*uenvs, "UWSGI_RELOADS=", 14) &&
-        strncmp(*uenvs, "UWSGI_VASSALS_DIR=", 18) &&
-        strncmp(*uenvs, "UWSGI_EMPEROR_FD=", 17) &&
-        strncmp(*uenvs, "UWSGI_BROODLORD_NUM=", 20) &&
-        strncmp(*uenvs, "UWSGI_EMPEROR_FD_CONFIG=", 24) &&
-        strncmp(*uenvs, "UWSGI_EMPEROR_PROXY=", 20) &&
-        strncmp(*uenvs, "UWSGI_JAIL_PID=", 15) &&
-        strncmp(*uenvs, "UWSGI_ORIGINAL_PROC_NAME=", 25)) {
+				strncmp(*uenvs, "UWSGI_RELOADS=", 14) &&
+				strncmp(*uenvs, "UWSGI_VASSALS_DIR=", 18) &&
+				strncmp(*uenvs, "UWSGI_EMPEROR_FD=", 17) &&
+				strncmp(*uenvs, "UWSGI_BROODLORD_NUM=", 20) &&
+				strncmp(*uenvs, "UWSGI_EMPEROR_FD_CONFIG=", 24) &&
+				strncmp(*uenvs, "UWSGI_EMPEROR_PROXY=", 20) &&
+				strncmp(*uenvs, "UWSGI_JAIL_PID=", 15) &&
+				strncmp(*uenvs, "UWSGI_ORIGINAL_PROC_NAME=", 25)) {
 			earg = uwsgi_malloc(strlen(*uenvs + 6) + 1);
 			env_to_arg(*uenvs + 6, earg);
 			eq_pos = strchr(earg, '=');
@@ -1898,33 +1899,6 @@ void uwsgi_unix_signal(int signum, void (*func) (int)) {
 	if (sigaction(signum, &sa, NULL) < 0) {
 		uwsgi_error("sigaction()");
 	}
-}
-
-char *uwsgi_get_exported_opt(char *key) {
-
-	int i;
-
-	for (i = 0; i < uwsgi.exported_opts_cnt; i++) {
-		if (!strcmp(uwsgi.exported_opts[i]->key, key)) {
-			return uwsgi.exported_opts[i]->value;
-		}
-	}
-
-	return NULL;
-}
-
-char *uwsgi_get_optname_by_index(int index) {
-
-	struct uwsgi_option *op = uwsgi.options;
-
-	while (op->name) {
-		if (op->shortcut == index) {
-			return op->name;
-		}
-		op++;
-	}
-
-	return NULL;
 }
 
 int uwsgi_list_has_num(char *list, int num) {
@@ -3166,45 +3140,169 @@ void escape_json(char *src, size_t len, char *dst) {
 	*ptr++ = 0;
 }
 
+/*
+
+build PATH_INFO from raw_uri
+
+it manages:
+
+	percent encoding
+	dot_segments removal
+	stop at the first #
+
+*/
 void http_url_decode(char *buf, uint16_t * len, char *dst) {
 
-	uint16_t i;
-	int percent = 0;
+	enum {
+		zero = 0,
+		percent1,
+		percent2,
+		slash,
+		dot,
+		dotdot
+	} status;
+
+	uint16_t i, current_new_len, new_len = 0;
+
 	char value[2];
-	size_t new_len = 0;
 
 	char *ptr = dst;
 
 	value[0] = '0';
 	value[1] = '0';
 
+	status = zero;
+	int no_slash = 0;
+
+	if (*len > 0 && buf[0] != '/') {
+		status = slash;
+		no_slash = 1;
+	}
+
 	for (i = 0; i < *len; i++) {
-		if (buf[i] == '%') {
-			if (percent == 0) {
-				percent = 1;
-			}
-			else {
-				*ptr++ = '%';
+		char c = buf[i];
+		if (c == '#') break;
+		switch(status) {
+			case zero:
+				if (c == '%') {
+					status = percent1;
+					break;
+				}
+				if (c == '/') {
+					status = slash;
+					break;
+				}
+				*ptr++ = c;
 				new_len++;
-				percent = 0;
-			}
-		}
-		else {
-			if (percent == 1) {
-				value[0] = buf[i];
-				percent = 2;
-			}
-			else if (percent == 2) {
-				value[1] = buf[i];
+				break;
+			case percent1:
+				if (c == '%') {
+					*ptr++ = '%';
+					new_len++;
+					status = zero;
+					break;
+				}
+				value[0] = c;
+				status = percent2;
+				break;
+			case percent2:
+				value[1] = c;
 				*ptr++ = hex2num(value);
-				percent = 0;
 				new_len++;
-			}
-			else {
-				*ptr++ = buf[i];
-				new_len++;
-			}
+				status = zero;
+				break;
+			case slash:
+				if (c == '.') {
+					status = dot;
+					break;
+				}
+				// we could be at the first round (in non slash)
+				if (i > 0 || !no_slash) {
+					*ptr++ = '/'; new_len++;
+				}
+				if (c == '%') {
+					status = percent1;
+					break;
+				}
+				if (c == '/') {
+					status = slash;
+					break;
+				}
+				*ptr++ = c; new_len++;
+				status = zero;
+				break;
+			case dot:
+				if (c == '.') {
+					status = dotdot;
+					break;
+				}
+				if (c == '/') {
+					status = slash;
+					break;
+				}
+				if (i > 1) {
+					*ptr++ = '/'; new_len++;
+				}
+				*ptr++ = '.'; new_len++;
+				if (c == '%') {
+					status = percent1;	
+					break;
+				}
+                                *ptr++ = c; new_len++;
+                                status = zero;
+				break;
+			case dotdot:
+				// here we need to remove a segment
+				if (c == '/') {
+					current_new_len = new_len;
+					while(current_new_len) {
+						current_new_len--;
+						ptr--;
+						if (dst[current_new_len] == '/') {
+							break;
+						}
+					}
+					new_len = current_new_len;
+					status = slash;
+					break;
+				}
+				if (i > 2) {
+					*ptr++ = '/'; new_len++;
+				}
+                                *ptr++ = '.'; new_len++; 
+                                *ptr++ = '.'; new_len++; 
+				if (c == '%') {
+                                        status = percent1;
+                                        break;
+                                }
+                                *ptr++ = c; new_len++;
+                                status = zero;
+                                break;
+			// over engineering
+			default:
+				*ptr++ = c;
+                                new_len++;
+                                break;
 		}
+	}
+
+	switch(status) {
+		case slash:
+		case dot:
+			*ptr++ = '/'; new_len++;
+			break;
+		case dotdot:
+			current_new_len = new_len;
+			while(current_new_len) {
+				if (dst[current_new_len-1] == '/') {
+					break;
+				}
+				current_new_len--;
+			}
+			new_len = current_new_len;
+			break;
+		default:
+			break;
 	}
 
 	*len = new_len;
@@ -3255,8 +3353,10 @@ struct uwsgi_app *uwsgi_add_app(int id, uint8_t modifier1, char *mountpoint, int
 		}
 	}
 
-	if ((mountpoint_len == 0 || (mountpoint_len = -1 && mountpoint[0] == '/')) && uwsgi.default_app == -1) {
-		uwsgi.default_app = id;
+	if (!uwsgi.no_default_app) {
+		if ((mountpoint_len == 0 || (mountpoint_len = -1 && mountpoint[0] == '/')) && uwsgi.default_app == -1) {
+			uwsgi.default_app = id;
+		}
 	}
 
 	return wi;
@@ -3418,7 +3518,11 @@ int uwsgi_write_intfile(char *filename, int n) {
 		uwsgi_error_open(filename);
 		exit(1);
 	}
-	if (fprintf(pidfile, "%d\n", n) <= 0 || ferror(pidfile) || fclose(pidfile)) {
+	if (fprintf(pidfile, "%d\n", n) <= 0 || ferror(pidfile)) {
+		fclose(pidfile);
+		return -1;
+	}
+	if (fclose(pidfile)) {
 		return -1;
 	}
 	return 0;
@@ -3650,26 +3754,6 @@ error:
 	return NULL;
 }
 
-// evaluate a math expression
-#ifdef UWSGI_MATHEVAL
-double uwsgi_matheval(char *expr) {
-#ifdef UWSGI_DEBUG
-	uwsgi_log("matheval expr = %s\n", expr);
-#endif
-	double ret = 0.0;
-	void *e = evaluator_create(expr);
-	if (!e)
-		return ret;
-	ret = evaluator_evaluate(e, 0, NULL, NULL);
-	evaluator_destroy(e);
-	return ret;
-}
-char *uwsgi_matheval_str(char *expr) {
-	double ret = uwsgi_matheval(expr);
-	return uwsgi_num2str((int) ret);
-}
-#endif
-
 int uwsgi_kvlist_parse(char *src, size_t len, char list_separator, char kv_separator, ...) {
 	size_t i;
 	va_list ap;
@@ -3843,27 +3927,22 @@ void uwsgi_uuid(char *buf) {
 	uuid_unparse(uuid_zmq, buf);
 #else
 	int i,r[11];
-  static int srand_called = 0;
-  if (!uwsgi_file_exists("/dev/urandom")) goto fallback;
-  int fd = open("/dev/urandom", O_RDONLY);
-  if (fd < 0) goto fallback;
-  for(i=0;i<11;i++) {
-    if (read(fd, &r[i], 4) != 4) {
-      close(fd); goto fallback;
-    }
-  }
-  close(fd);
-  goto done;
+	if (!uwsgi_file_exists("/dev/urandom")) goto fallback;
+	int fd = open("/dev/urandom", O_RDONLY);
+	if (fd < 0) goto fallback;
+	for(i=0;i<11;i++) {
+		if (read(fd, &r[i], 4) != 4) {
+			close(fd); goto fallback;
+		}
+	}
+	close(fd);
+	goto done;
 fallback:
-  if (!srand_called) {
-    srand((unsigned int) getpid());
-    srand_called = 1;
-  }
-  for(i=0;i<11;i++) {
-    r[i] = rand();
-  }
+	for(i=0;i<11;i++) {
+		r[i] = rand();
+	}
 done:
-  snprintf(buf, 37, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x", r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10]);
+	snprintf(buf, 37, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x", r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10]);
 #endif
 }
 
@@ -4227,6 +4306,7 @@ void uwsgi_envdir(char *edir) {
 
 		free(content);
 	}
+	closedir(d);
 }
 
 void uwsgi_envdirs(struct uwsgi_string_list *envdirs) {
@@ -4245,4 +4325,18 @@ void uwsgi_exit(int status) {
 	uwsgi.last_exit_code = status;
 	// disable macro expansion
 	(exit) (status);
+}
+
+int uwsgi_base128(struct uwsgi_buffer *ub, uint64_t l, int first) {
+	if( l > 127 ) {
+		if (uwsgi_base128(ub, l/128, 0)) return -1;
+	}
+	l %= 128;
+	if(first) {
+		if (uwsgi_buffer_u8(ub, (uint8_t) l)) return -1;
+	}
+	else {
+		if (uwsgi_buffer_u8(ub, 0x80 | (uint8_t) l)) return -1;
+	}
+	return 0;
 }

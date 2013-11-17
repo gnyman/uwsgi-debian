@@ -233,7 +233,7 @@ void uwsgi_detach_daemons() {
 #endif
 			uwsgi_log("[uwsgi-daemons] stopping daemon (pid: %d): %s\n", (int) ud->pid, ud->command);
 			// try to gracefully stop daemon, kill it if it won't die
-			// if mercy is not set than wait up to 3 seconds
+			// if mercy is not set then wait up to 3 seconds
 			time_t timeout = uwsgi_now() + (uwsgi.reload_mercy ? uwsgi.reload_mercy : 3);
 			int waitpid_status;
 			while (!kill(ud->pid, 0)) {
@@ -241,7 +241,7 @@ void uwsgi_detach_daemons() {
 				sleep(1);
 				waitpid(-ud->pid, &waitpid_status, WNOHANG);
 				if (uwsgi_now() >= timeout) {
-					uwsgi_log("[uwsgi-daemons] daemon did not died in time, killing (pid: %d): %s\n", (int) ud->pid, ud->command);
+					uwsgi_log("[uwsgi-daemons] daemon did not die in time, killing (pid: %d): %s\n", (int) ud->pid, ud->command);
 					kill(-ud->pid, SIGKILL);
 					break;
 				}
@@ -263,6 +263,8 @@ void uwsgi_spawn_daemon(struct uwsgi_daemon *ud) {
 
 	if (uwsgi.current_time - ud->last_spawn <= 3) {
 		throttle = ud->respawns - (uwsgi.current_time - ud->last_spawn);
+		// if ud->respawns == 0 then we can end up with throttle < 0
+		if (throttle <= 0) throttle = 1;
 	}
 
 	pid_t pid = uwsgi_fork("uWSGI external daemon");
@@ -323,7 +325,7 @@ void uwsgi_spawn_daemon(struct uwsgi_daemon *ud) {
 
 		if (throttle) {
 			uwsgi_log("[uwsgi-daemons] throttling \"%s\" for %d seconds\n", ud->command, throttle);
-			sleep(throttle);
+			sleep((unsigned int) throttle);
 		}
 
 		uwsgi_log("[uwsgi-daemons] %sspawning \"%s\"\n", ud->respawns > 0 ? "re" : "", ud->command);
