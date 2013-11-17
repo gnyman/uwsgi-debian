@@ -974,6 +974,7 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 #endif
 
 #ifdef UWSGI_CAP
+#if defined(CAP_LAST_CAP) && defined(PR_CAPBSET_READ) && defined(PR_CAPBSET_DROP)
         if (uwsgi.emperor_cap && uwsgi.emperor_cap_count > 0) {
 		int i;
 		for(i=0;i<=CAP_LAST_CAP;i++) {
@@ -1009,6 +1010,7 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 #endif
 		uwsgi_log("capabilities applied for vassal %s (pid: %d)\n", n_ui->name, (int) getpid());
         }
+#endif
 #endif
 #endif
 
@@ -1100,6 +1102,7 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 		struct uwsgi_string_list *uct;
 		uwsgi_foreach(uct, uwsgi.vassals_templates_before) counter += 2;
 		uwsgi_foreach(uct, uwsgi.vassals_includes_before) counter += 2;
+		uwsgi_foreach(uct, uwsgi.vassals_set) counter += 2;
 		uwsgi_foreach(uct, uwsgi.vassals_templates) counter += 2;
 		uwsgi_foreach(uct, uwsgi.vassals_includes) counter += 2;
 
@@ -1118,6 +1121,12 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 
                 uwsgi_foreach (uct,  uwsgi.vassals_includes_before) {
                         vassal_argv[counter] = "--include";
+                        vassal_argv[counter + 1] = uct->value;
+                        counter += 2;
+                }
+
+		uwsgi_foreach (uct,  uwsgi.vassals_set) {
+                        vassal_argv[counter] = "--set";
                         vassal_argv[counter + 1] = uct->value;
                         counter += 2;
                 }

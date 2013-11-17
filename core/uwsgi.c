@@ -38,10 +38,20 @@ UWSGI_DECLARE_EMBEDDED_PLUGINS;
 static struct uwsgi_option uwsgi_base_options[] = {
 	{"socket", required_argument, 's', "bind to the specified UNIX/TCP socket using default protocol", uwsgi_opt_add_socket, NULL, 0},
 	{"uwsgi-socket", required_argument, 's', "bind to the specified UNIX/TCP socket using uwsgi protocol", uwsgi_opt_add_socket, "uwsgi", 0},
+#ifdef UWSGI_SSL
+	{"suwsgi-socket", required_argument, 's', "bind to the specified UNIX/TCP socket using uwsgi protocol over SSL", uwsgi_opt_add_ssl_socket, "suwsgi", 0},
+	{"ssl-socket", required_argument, 's', "bind to the specified UNIX/TCP socket using uwsgi protocol over SSL", uwsgi_opt_add_ssl_socket, "suwsgi", 0},
+#endif
 
 	{"http-socket", required_argument, 0, "bind to the specified UNIX/TCP socket using HTTP protocol", uwsgi_opt_add_socket, "http", 0},
 	{"http-socket-modifier1", required_argument, 0, "force the specified modifier1 when using HTTP protocol", uwsgi_opt_set_64bit, &uwsgi.http_modifier1, 0},
 	{"http-socket-modifier2", required_argument, 0, "force the specified modifier2 when using HTTP protocol", uwsgi_opt_set_64bit, &uwsgi.http_modifier2, 0},
+
+#ifdef UWSGI_SSL
+	{"https-socket", required_argument, 0, "bind to the specified UNIX/TCP socket using HTTPS protocol", uwsgi_opt_add_ssl_socket, "https", 0},
+	{"https-socket-modifier1", required_argument, 0, "force the specified modifier1 when using HTTPS protocol", uwsgi_opt_set_64bit, &uwsgi.https_modifier1, 0},
+	{"https-socket-modifier2", required_argument, 0, "force the specified modifier2 when using HTTPS protocol", uwsgi_opt_set_64bit, &uwsgi.https_modifier2, 0},
+#endif
 
 	{"fastcgi-socket", required_argument, 0, "bind to the specified UNIX/TCP socket using FastCGI protocol", uwsgi_opt_add_socket, "fastcgi", 0},
 	{"fastcgi-nph-socket", required_argument, 0, "bind to the specified UNIX/TCP socket using FastCGI protocol (nph mode)", uwsgi_opt_add_socket, "fastcgi-nph", 0},
@@ -56,6 +66,8 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"raw-socket", required_argument, 0, "bind to the specified UNIX/TCP socket using RAW protocol", uwsgi_opt_add_socket_no_defer, "raw", 0},
 	{"raw-modifier1", required_argument, 0, "force the specified modifier1 when using RAW protocol", uwsgi_opt_set_64bit, &uwsgi.raw_modifier1, 0},
 	{"raw-modifier2", required_argument, 0, "force the specified modifier2 when using RAW protocol", uwsgi_opt_set_64bit, &uwsgi.raw_modifier2, 0},
+
+	{"puwsgi-socket", required_argument, 0, "bind to the specified UNIX/TCP socket using persistent uwsgi protocol (puwsgi)", uwsgi_opt_add_socket, "puwsgi", 0},
 
 	{"protocol", required_argument, 0, "force the specified protocol for default sockets", uwsgi_opt_set_str, &uwsgi.protocol, 0},
 	{"socket-protocol", required_argument, 0, "force the specified protocol for default sockets", uwsgi_opt_set_str, &uwsgi.protocol, 0},
@@ -220,13 +232,16 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"vassals-start-hook", required_argument, 0, "run the specified command before each vassal starts", uwsgi_opt_set_str, &uwsgi.vassals_start_hook, 0},
 	{"vassals-stop-hook", required_argument, 0, "run the specified command after vassal's death", uwsgi_opt_set_str, &uwsgi.vassals_stop_hook, 0},
 	{"vassal-sos-backlog", required_argument, 0, "ask emperor for sos if backlog queue has more items than the value specified", uwsgi_opt_set_int, &uwsgi.vassal_sos_backlog, 0},
-	{"heartbeat", required_argument, 0, "announce healtness to the emperor", uwsgi_opt_set_int, &uwsgi.heartbeat, 0},
-	{"auto-snapshot", optional_argument, 0, "automatically make workers snaphost after reload", uwsgi_opt_set_int, &uwsgi.auto_snapshot, UWSGI_OPT_LAZY},
+	{"vassals-set", required_argument, 0, "automatically set the specified option (via --set) for every vassal", uwsgi_opt_add_string_list, &uwsgi.vassals_set, 0},
+	{"vassal-set", required_argument, 0, "automatically set the specified option (via --set) for every vassal", uwsgi_opt_add_string_list, &uwsgi.vassals_set, 0},
+
+	{"heartbeat", required_argument, 0, "announce healthiness to the emperor", uwsgi_opt_set_int, &uwsgi.heartbeat, 0},
+
 	{"reload-mercy", required_argument, 0, "set the maximum time (in seconds) we wait for workers and other processes to die during reload/shutdown", uwsgi_opt_set_int, &uwsgi.reload_mercy, 0},
 	{"worker-reload-mercy", required_argument, 0, "set the maximum time (in seconds) a worker can take to reload/shutdown (default is 60)", uwsgi_opt_set_int, &uwsgi.worker_reload_mercy, 0},
 	{"exit-on-reload", no_argument, 0, "force exit even if a reload is requested", uwsgi_opt_true, &uwsgi.exit_on_reload, 0},
 	{"die-on-term", no_argument, 0, "exit instead of brutal reload on SIGTERM", uwsgi_opt_true, &uwsgi.die_on_term, 0},
-	{"force-gateway", no_argument, 0, "force teh spawn of the first registered gateway without a master", uwsgi_opt_true, &uwsgi.force_gateway, 0},
+	{"force-gateway", no_argument, 0, "force the spawn of the first registered gateway without a master", uwsgi_opt_true, &uwsgi.force_gateway, 0},
 	{"help", no_argument, 'h', "show this help", uwsgi_help, NULL, UWSGI_OPT_IMMEDIATE},
 	{"usage", no_argument, 'h', "show this help", uwsgi_help, NULL, UWSGI_OPT_IMMEDIATE},
 
@@ -292,6 +307,12 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"signal", required_argument, 0, "send a uwsgi signal to a server", uwsgi_opt_signal, NULL, UWSGI_OPT_IMMEDIATE},
 	{"signal-bufsize", required_argument, 0, "set buffer size for signal queue", uwsgi_opt_set_int, &uwsgi.signal_bufsize, 0},
 	{"signals-bufsize", required_argument, 0, "set buffer size for signal queue", uwsgi_opt_set_int, &uwsgi.signal_bufsize, 0},
+
+	{"signal-timer", required_argument, 0, "add a timer (syntax: <signal> <seconds>)", uwsgi_opt_add_string_list, &uwsgi.signal_timers, UWSGI_OPT_MASTER},
+	{"timer", required_argument, 0, "add a timer (syntax: <signal> <seconds>)", uwsgi_opt_add_string_list, &uwsgi.signal_timers, UWSGI_OPT_MASTER},
+
+	{"signal-rbtimer", required_argument, 0, "add a redblack timer (syntax: <signal> <seconds>)", uwsgi_opt_add_string_list, &uwsgi.rb_signal_timers, UWSGI_OPT_MASTER},
+	{"rbtimer", required_argument, 0, "add a redblack timer (syntax: <signal> <seconds>)", uwsgi_opt_add_string_list, &uwsgi.rb_signal_timers, UWSGI_OPT_MASTER},
 
 	{"rpc-max", required_argument, 0, "maximum number of rpc slots (default: 64)", uwsgi_opt_set_64bit, &uwsgi.rpc_max, 0},
 
@@ -504,13 +525,22 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"reload-on-exception-repr", required_argument, 0, "reload a worker when a specific exception type+value (language-specific) is raised", uwsgi_opt_add_string_list, &uwsgi.reload_on_exception_repr, 0},
 	{"exception-handler", required_argument, 0, "add an exception handler", uwsgi_opt_add_string_list, &uwsgi.exception_handlers_instance, UWSGI_OPT_MASTER},
 
+	{"enable-metrics", no_argument, 0, "enable metrics subsystem", uwsgi_opt_true, &uwsgi.has_metrics, UWSGI_OPT_MASTER},
+	{"metric", required_argument, 0, "add a custom metric", uwsgi_opt_add_string_list, &uwsgi.additional_metrics, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
+	{"metric-threshold", required_argument, 0, "add a metric threshold/alarm", uwsgi_opt_add_string_list, &uwsgi.metrics_threshold, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
+	{"metric-alarm", required_argument, 0, "add a metric threshold/alarm", uwsgi_opt_add_string_list, &uwsgi.metrics_threshold, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
+	{"metrics-dir", required_argument, 0, "export metrics as text files to the specified directory", uwsgi_opt_set_str, &uwsgi.metrics_dir, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
+	{"metrics-dir-restore", no_argument, 0, "restore last value taken from the metrics dir", uwsgi_opt_true, &uwsgi.metrics_dir_restore, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
+	{"metric-dir", required_argument, 0, "export metrics as text files to the specified directory", uwsgi_opt_set_str, &uwsgi.metrics_dir, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
+	{"metric-dir-restore", no_argument, 0, "restore last value taken from the metrics dir", uwsgi_opt_true, &uwsgi.metrics_dir_restore, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
+
 	{"udp", required_argument, 0, "run the udp server on the specified address", uwsgi_opt_set_str, &uwsgi.udp_socket, UWSGI_OPT_MASTER},
 	{"stats", required_argument, 0, "enable the stats server on the specified address", uwsgi_opt_set_str, &uwsgi.stats, UWSGI_OPT_MASTER},
 	{"stats-server", required_argument, 0, "enable the stats server on the specified address", uwsgi_opt_set_str, &uwsgi.stats, UWSGI_OPT_MASTER},
 	{"stats-http", no_argument, 0, "prefix stats server json output with http headers", uwsgi_opt_true, &uwsgi.stats_http, UWSGI_OPT_MASTER},
 	{"stats-minified", no_argument, 0, "minify statistics json output", uwsgi_opt_true, &uwsgi.stats_minified, UWSGI_OPT_MASTER},
 	{"stats-min", no_argument, 0, "minify statistics json output", uwsgi_opt_true, &uwsgi.stats_minified, UWSGI_OPT_MASTER},
-	{"stats-push", required_argument, 0, "push the stats json to the specified destination", uwsgi_opt_add_string_list, &uwsgi.requested_stats_pushers, UWSGI_OPT_MASTER},
+	{"stats-push", required_argument, 0, "push the stats json to the specified destination", uwsgi_opt_add_string_list, &uwsgi.requested_stats_pushers, UWSGI_OPT_MASTER|UWSGI_OPT_METRICS},
 	{"stats-pusher-default-freq", required_argument, 0, "set the default frequency of stats pushers", uwsgi_opt_set_int, &uwsgi.stats_pusher_default_freq, UWSGI_OPT_MASTER},
 	{"stats-pushers-default-freq", required_argument, 0, "set the default frequency of stats pushers", uwsgi_opt_set_int, &uwsgi.stats_pusher_default_freq, UWSGI_OPT_MASTER},
 	{"multicast", required_argument, 0, "subscribe to specified multicast group", uwsgi_opt_set_str, &uwsgi.multicast_group, UWSGI_OPT_MASTER},
@@ -628,7 +658,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"log-master-req-stream", no_argument, 0, "create the master requests logpipe as SOCK_STREAM", uwsgi_opt_true, &uwsgi.log_master_req_stream, 0},
 	{"log-reopen", no_argument, 0, "reopen log after reload", uwsgi_opt_true, &uwsgi.log_reopen, 0},
 	{"log-truncate", no_argument, 0, "truncate log on startup", uwsgi_opt_true, &uwsgi.log_truncate, 0},
-	{"log-maxsize", required_argument, 0, "set maximum logfile size", uwsgi_opt_set_int, &uwsgi.log_maxsize, UWSGI_OPT_LOG_MASTER},
+	{"log-maxsize", required_argument, 0, "set maximum logfile size", uwsgi_opt_set_64bit, &uwsgi.log_maxsize, UWSGI_OPT_LOG_MASTER},
 	{"log-backupname", required_argument, 0, "set logfile name after rotation", uwsgi_opt_set_str, &uwsgi.log_backupname, 0},
 
 	{"logdate", optional_argument, 0, "prefix logs with date or a strftime string", uwsgi_opt_log_date, NULL, 0},
@@ -830,6 +860,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"namespace-net", required_argument, 0, "add network namespace", uwsgi_opt_set_str, &uwsgi.ns_net, 0},
 	{"ns-net", required_argument, 0, "add network namespace", uwsgi_opt_set_str, &uwsgi.ns_net, 0},
 #endif
+	{"enable-proxy-protocol", no_argument, 0, "enable PROXY1 protocol support (only for http parsers)", uwsgi_opt_true, &uwsgi.enable_proxy_protocol, 0},
 	{"reuse-port", no_argument, 0, "enable REUSE_PORT flag on socket (BSD only)", uwsgi_opt_true, &uwsgi.reuse_port, 0},
 	{"tcp-fast-open", required_argument, 0, "enable TCP_FASTOPEN flag on TCP sockets with the specified qlen value", uwsgi_opt_set_int, &uwsgi.tcp_fast_open, 0},
 	{"tcp-fastopen", required_argument, 0, "enable TCP_FASTOPEN flag on TCP sockets with the specified qlen value", uwsgi_opt_set_int, &uwsgi.tcp_fast_open, 0},
@@ -855,7 +886,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"worker-exec", required_argument, 0, "run the specified command as worker", uwsgi_opt_set_str, &uwsgi.worker_exec, 0},
 	{"worker-exec2", required_argument, 0, "run the specified command as worker (after post_fork hook)", uwsgi_opt_set_str, &uwsgi.worker_exec2, 0},
 	{"attach-daemon", required_argument, 0, "attach a command/daemon to the master process (the command has to not go in background)", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
-	{"attach-control-daemon", required_argument, 0, "attach a command/daemon to the master process (the command has to not go in background), when teh daemon dies, the master dies too", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
+	{"attach-control-daemon", required_argument, 0, "attach a command/daemon to the master process (the command has to not go in background), when the daemon dies, the master dies too", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
 	{"smart-attach-daemon", required_argument, 0, "attach a command/daemon to the master process managed by a pidfile (the command has to daemonize)", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
 	{"smart-attach-daemon2", required_argument, 0, "attach a command/daemon to the master process managed by a pidfile (the command has to NOT daemonize)", uwsgi_opt_add_daemon, NULL, UWSGI_OPT_MASTER},
 #ifdef UWSGI_SSL
@@ -1038,10 +1069,10 @@ void warn_pipe() {
 	struct wsgi_request *wsgi_req = current_wsgi_req();
 
 	if (uwsgi.threads < 2 && wsgi_req->uri_len > 0) {
-		uwsgi_log("SIGPIPE: writing to a closed pipe/socket/fd (probably the client disconnected) on request %.*s (ip %.*s) !!!\n", wsgi_req->uri_len, wsgi_req->uri, wsgi_req->remote_addr_len, wsgi_req->remote_addr);
+		uwsgi_log_verbose("SIGPIPE: writing to a closed pipe/socket/fd (probably the client disconnected) on request %.*s (ip %.*s) !!!\n", wsgi_req->uri_len, wsgi_req->uri, wsgi_req->remote_addr_len, wsgi_req->remote_addr);
 	}
 	else {
-		uwsgi_log("SIGPIPE: writing to a closed pipe/socket/fd (probably the client disconnected) !!!\n");
+		uwsgi_log_verbose("SIGPIPE: writing to a closed pipe/socket/fd (probably the client disconnected) !!!\n");
 	}
 }
 
@@ -1189,16 +1220,15 @@ void grace_them_all(int signum) {
 
 	if (uwsgi.lazy) {
 		for (i = 1; i <= uwsgi.numproc; i++) {
-			uwsgi_curse(i, SIGHUP);
+			if (uwsgi.workers[i].pid > 0) {
+				uwsgi_curse(i, SIGHUP);
+			}
 		}
 		return;
 	}
 	
 
 	uwsgi.status.gracefully_reloading = 1;
-
-	int waitpid_status;
-
 
 	uwsgi_destroy_processes();
 
@@ -1213,36 +1243,10 @@ void grace_them_all(int signum) {
 	}
 
 	for (i = 1; i <= uwsgi.numproc; i++) {
-		if (uwsgi.auto_snapshot) {
-			if (uwsgi.workers[i].snapshot > 0) {
-				kill(uwsgi.workers[i].snapshot, SIGKILL);
-				if (waitpid(uwsgi.workers[i].snapshot, &waitpid_status, 0) < 0) {
-					uwsgi_error("waitpid()");
-				}
-			}
-			if (uwsgi.workers[i].pid > 0) {
-				if (uwsgi.auto_snapshot > 0 && i > uwsgi.auto_snapshot) {
-					uwsgi.workers[i].snapshot = 0;
-					uwsgi.workers[i].destroy = 1;
-					uwsgi_curse(i, SIGHUP);
-				}
-				else {
-					uwsgi.workers[i].snapshot = uwsgi.workers[i].pid;
-					kill(uwsgi.workers[i].pid, SIGURG);
-				}
-			}
-		}
-		else if (uwsgi.workers[i].pid > 0) {
+		if (uwsgi.workers[i].pid > 0) {
 			uwsgi_curse(i, SIGHUP);
 		}
 	}
-
-	if (uwsgi.auto_snapshot) {
-		uwsgi.respawn_snapshots = uwsgi.numproc - uwsgi.auto_snapshot;
-		if (!uwsgi.respawn_snapshots)
-			uwsgi.respawn_snapshots = 1;
-	}
-
 }
 
 void uwsgi_nuclear_blast() {
@@ -1299,23 +1303,6 @@ void harakiri() {
 		uwsgi_log("*** if you want your workers to be automatically respawned consider enabling the uWSGI master process ***\n");
 	}
 	exit(0);
-}
-
-void snapshot_me(int signum) {
-	// wakeup !!!
-	if (uwsgi.snapshot) {
-		uwsgi.snapshot = 0;
-		uwsgi_set_processname(uwsgi.workers[uwsgi.mywid].name);
-		return;
-	}
-
-	uwsgi.workers[uwsgi.mywid].manage_next_request = 0;
-	if (uwsgi.threads > 1) {
-		wait_for_threads();
-	}
-	uwsgi.snapshot = 1;
-	uwsgi_set_processname(uwsgi.workers[uwsgi.mywid].snapshot_name);
-	uwsgi_log("[snapshot] process %d taken\n", (int) getpid());
 }
 
 void stats(int signum) {
@@ -1401,8 +1388,8 @@ void what_i_am_doing() {
 
 int unconfigured_hook(struct wsgi_request *wsgi_req) {
 	if (wsgi_req->uh->modifier1 == 0 && !uwsgi.no_default_app) {
-		if (uwsgi_apps_cnt > 0 && wsgi_req->app_id > -1 && wsgi_req->app_id < uwsgi.max_apps) {
-			struct uwsgi_app *ua = &uwsgi_apps[wsgi_req->app_id];
+		if (uwsgi_apps_cnt > 0 && uwsgi.default_app > -1) {
+			struct uwsgi_app *ua = &uwsgi_apps[uwsgi.default_app];
 			if (uwsgi.p[ua->modifier1]->request != unconfigured_hook) {
 				wsgi_req->uh->modifier1 = ua->modifier1;
 				return uwsgi.p[ua->modifier1]->request(wsgi_req);
@@ -1441,7 +1428,7 @@ void uwsgi_exec_atexit(void) {
 
 		uwsgi_foreach(usl, uwsgi.call_as_user_atexit) {
                 	if (uwsgi_call_symbol(usl->value)) {
-                        	uwsgi_log("unaable to call function \"%s\"\n", usl->value);
+                        	uwsgi_log("unable to call function \"%s\"\n", usl->value);
                 	}
         	}
 	}
@@ -1854,6 +1841,10 @@ static struct uwsgi_clock uwsgi_unix_clock = {
 	.microseconds = uwsgi_unix_microseconds,
 };
 
+void uwsgi_init_random() {
+        srand((unsigned int) (uwsgi.start_tv.tv_usec * uwsgi.start_tv.tv_sec));
+}
+
 #ifdef UWSGI_AS_SHARED_LIBRARY
 int uwsgi_init(int argc, char *argv[], char *envp[]) {
 
@@ -1883,7 +1874,6 @@ int main(int argc, char *argv[], char *envp[]) {
 	signal(SIGHUP, SIG_IGN);
 	signal(SIGTERM, SIG_IGN);
 	signal(SIGPIPE, SIG_IGN);
-
 
 	//initialize masterpid with a default value
 	masterpid = getpid();
@@ -1927,6 +1917,12 @@ int main(int argc, char *argv[], char *envp[]) {
 	// set default values
 	uwsgi_init_default();
 
+	// detect cpu cores
+#if defined(_SC_NPROCESSORS_ONLN)
+	uwsgi.cpus = sysconf(_SC_NPROCESSORS_ONLN);
+#elif defined(_SC_NPROCESSORS_CONF)
+	uwsgi.cpus = sysconf(_SC_NPROCESSORS_CONF);
+#endif
 	// set default logit hook
 	uwsgi.logit = uwsgi_logit_simple;
 
@@ -1946,6 +1942,9 @@ int main(int argc, char *argv[], char *envp[]) {
 
 	// get startup time
 	gettimeofday(&uwsgi.start_tv, NULL);
+
+	// initialize random engine
+	uwsgi_init_random();
 
 	setlinebuf(stdout);
 
@@ -2004,6 +2003,9 @@ int main(int argc, char *argv[], char *envp[]) {
 	uwsgi_register_base_hooks();
 	uwsgi_log_encoders_register_embedded();
 
+	// register base metrics (so plugins can override them)
+	uwsgi_metrics_collectors_setup();
+
 	//initialize embedded plugins
 	UWSGI_LOAD_EMBEDDED_PLUGINS
 		// now a bit of magic, if the executable basename contains a 'uwsgi_' string,
@@ -2020,7 +2022,10 @@ int main(int argc, char *argv[], char *envp[]) {
 	// set a couple of 'static' magic vars
 	uwsgi.magic_table['v'] = uwsgi.cwd;
 	uwsgi.magic_table['h'] = uwsgi.hostname;
+	uwsgi.magic_table['t'] = uwsgi_64bit2str(uwsgi_now());
+	uwsgi.magic_table['T'] = uwsgi_64bit2str(uwsgi_micros());
 	uwsgi.magic_table['V'] = UWSGI_VERSION;
+	uwsgi.magic_table['k'] = uwsgi_num2str(uwsgi.cpus);
 	uwsgi.magic_table['['] = "\033";
 
 	// you can embed a ini file in the uWSGi binary with default options
@@ -2042,12 +2047,7 @@ int main(int argc, char *argv[], char *envp[]) {
 	uwsgi_apply_config_pass('@', uwsgi_simple_file_read);
 
 	// last pass: REFERENCEs
-	uwsgi_apply_config_pass('%', uwsgi_get_exported_opt);
-
-#ifdef UWSGI_MATHEVAL
-	// optional pass: MATH
-	uwsgi_apply_config_pass('=', uwsgi_matheval_str);
-#endif
+	uwsgi_apply_config_pass('%', uwsgi_manage_placeholder);
 
 	// ok, the options dictionary is available, lets manage it
 	uwsgi_configure();
@@ -2138,7 +2138,6 @@ int main(int argc, char *argv[], char *envp[]) {
 	uwsgi_register_imperial_monitor("glob", uwsgi_imperial_monitor_glob_init, uwsgi_imperial_monitor_glob);
 
 	// setup stats pushers
-	uwsgi_register_stats_pusher("file", uwsgi_stats_pusher_file);
 	uwsgi_stats_pusher_setup();
 
 	// register embedded alarms
@@ -2227,12 +2226,6 @@ int main(int argc, char *argv[], char *envp[]) {
 
 #ifdef __BIG_ENDIAN__
 	uwsgi_log_initial("*** big endian arch detected ***\n");
-#endif
-
-#if defined(_SC_NPROCESSORS_ONLN)
-	uwsgi.cpus = sysconf(_SC_NPROCESSORS_ONLN);
-#elif defined(_SC_NPROCESSORS_CONF)
-	uwsgi.cpus = sysconf(_SC_NPROCESSORS_CONF);
 #endif
 
 	uwsgi_log_initial("detected number of CPU cores: %d\n", uwsgi.cpus);
@@ -2605,6 +2598,9 @@ int uwsgi_start(void *v_argv) {
 	// initialize the exception handlers
 	uwsgi_exception_setup_handlers();
 
+	// initialize socket protocols (do it after caching !!!)
+	uwsgi_protocols_register();
+
 	/* plugin initialization */
 	for (i = 0; i < uwsgi.gp_cnt; i++) {
 		if (uwsgi.gp[i]->init) {
@@ -2842,6 +2838,9 @@ unsafe:
 
 	// set a default request structure (for loading apps...)
 	uwsgi.wsgi_req = &uwsgi.workers[0].cores[0].req;
+
+	// ok, let's initialize the metrics subsystem
+	uwsgi_setup_metrics();
 
 	// cores are allocated, lets allocate logformat (if required)
 	if (uwsgi.logformat) {
@@ -3189,11 +3188,6 @@ void uwsgi_worker_run() {
 	uwsgi_unix_signal(SIGINT, end_me);
 	uwsgi_unix_signal(SIGTERM, end_me);
 
-	if (uwsgi.auto_snapshot) {
-		uwsgi_unix_signal(SIGURG, snapshot_me);
-	}
-
-
 	uwsgi_unix_signal(SIGUSR1, stats);
 	signal(SIGUSR2, (void *) &what_i_am_doing);
 	if (!uwsgi.ignore_sigpipe) {
@@ -3257,15 +3251,6 @@ void uwsgi_ignition() {
 
 	int i;
 
-	// snapshot workers do not enter the loop until a specific signal (SIGURG) is raised...
-	if (uwsgi.snapshot) {
-wait_for_call_of_duty:
-		uwsgi_sig_pause();
-		if (uwsgi.snapshot)
-			goto wait_for_call_of_duty;
-		uwsgi_log("[snapshot] process %d is the new worker %d\n", (int) getpid(), uwsgi.mywid);
-	}
-
 	for (i = 0; i < 256; i++) {
 		if (uwsgi.p[i]->hijack_worker) {
 			uwsgi.p[i]->hijack_worker();
@@ -3308,9 +3293,6 @@ wait_for_call_of_duty:
 		}
 	}
 
-	if (uwsgi.snapshot) {
-		uwsgi_ignition();
-	}
 	// end of the process...
 	end_me(0);
 }
@@ -3508,7 +3490,7 @@ void uwsgi_init_all_apps() {
 
 	uwsgi_foreach(usl, uwsgi.call_pre_app) {
                 if (uwsgi_call_symbol(usl->value)) {
-                        uwsgi_log("unaable to call function \"%s\"\n", usl->value);
+                        uwsgi_log("unable to call function \"%s\"\n", usl->value);
 			exit(1);
                 }
         }
@@ -3576,7 +3558,7 @@ void uwsgi_init_all_apps() {
 
 	uwsgi_foreach(usl, uwsgi.call_post_app) {
                 if (uwsgi_call_symbol(usl->value)) {
-                        uwsgi_log("unaable to call function \"%s\"\n", usl->value);
+                        uwsgi_log("unable to call function \"%s\"\n", usl->value);
                 }
         }
 
@@ -3871,6 +3853,51 @@ void uwsgi_opt_add_socket(char *opt, char *value, void *protocol) {
 	uwsgi_sock->name_len = strlen(uwsgi_sock->name);
 	uwsgi_sock->proto_name = protocol;
 }
+
+#ifdef UWSGI_SSL
+void uwsgi_opt_add_ssl_socket(char *opt, char *value, void *protocol) {
+	char *client_ca = NULL;
+
+        // build socket, certificate and key file
+        char *sock = uwsgi_str(value);
+        char *crt = strchr(sock, ',');
+        if (!crt) {
+                uwsgi_log("invalid https-socket syntax must be socket,crt,key\n");
+                exit(1);
+        }
+        *crt = '\0'; crt++;
+        char *key = strchr(crt, ',');
+        if (!key) {
+                uwsgi_log("invalid https-socket syntax must be socket,crt,key\n");
+                exit(1);
+        }
+        *key = '\0'; key++;
+
+        char *ciphers = strchr(key, ',');
+        if (ciphers) {
+                *ciphers = '\0'; ciphers++;
+                client_ca = strchr(ciphers, ',');
+                if (client_ca) {
+                        *client_ca = '\0'; client_ca++;
+                }
+        }
+
+	struct uwsgi_socket *uwsgi_sock = uwsgi_new_socket(generate_socket_name(sock));
+	uwsgi_sock->name_len = strlen(uwsgi_sock->name);
+        uwsgi_sock->proto_name = protocol;
+
+        // ok we have the socket, initialize ssl if required
+        if (!uwsgi.ssl_initialized) {
+                uwsgi_ssl_init();
+        }
+
+        // initialize ssl context
+        uwsgi_sock->ssl_ctx = uwsgi_ssl_new_server_context(uwsgi_sock->name, crt, key, ciphers, client_ca);
+        if (!uwsgi_sock->ssl_ctx) {
+                exit(1);
+        }
+}
+#endif
 
 void uwsgi_opt_add_socket_no_defer(char *opt, char *value, void *protocol) {
         struct uwsgi_socket *uwsgi_sock = uwsgi_new_socket(generate_socket_name(value));
@@ -4187,6 +4214,7 @@ int uwsgi_zerg_attach(char *value) {
 			}
 			pos++;
 		}
+		free(zerg);
 	}
 
 	close(zerg_fd);

@@ -315,7 +315,7 @@ VALUE rack_call_rpc_handler(VALUE args) {
 }
 
 
-uint16_t uwsgi_ruby_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[], char *buffer) {
+uint64_t uwsgi_ruby_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[], char **buffer) {
 
         uint8_t i;
 	VALUE rb_args = rb_ary_new2(2);
@@ -343,8 +343,9 @@ uint16_t uwsgi_ruby_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[],
 	if (TYPE(ret) == T_STRING) {
         	rv = RSTRING_PTR(ret);
                 rl = RSTRING_LEN(ret);
-                if (rl <= 0xffff) {
-                	memcpy(buffer, rv, rl);
+                if (rl > 0) {
+			*buffer = uwsgi_malloc(rl);
+                	memcpy(*buffer, rv, rl);
                         return rl;
                 }
         }
@@ -1106,7 +1107,6 @@ static void uwsgi_rack_hijack(void) {
                                 uwsgi_error("dup2()");
                         }
                 }
-                int ret = -1;
 		int error = 0;
                 if (ur.rbshell[0] != 0) {
 			rb_eval_string(ur.rbshell);
@@ -1122,9 +1122,6 @@ static void uwsgi_rack_hijack(void) {
                         exit(UWSGI_DE_HIJACKED_CODE);
                 }
 
-                if (ret == 0) {
-                        exit(UWSGI_QUIET_CODE);
-                }
                 exit(0);
         }
 

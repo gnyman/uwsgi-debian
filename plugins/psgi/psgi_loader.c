@@ -349,6 +349,7 @@ int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, Pe
 
 		perl_eval_pv("use IO::Handle;", 0);
 		perl_eval_pv("use IO::File;", 0);
+		perl_eval_pv("use IO::Socket;", 0);
 		perl_eval_pv("use Scalar::Util;", 0);
 		if (!uperl.no_die_catch) {
 			perl_eval_pv("use Devel::StackTrace;", 0);
@@ -462,7 +463,7 @@ void uwsgi_psgi_app() {
 		init_psgi_app(NULL, uperl.psgi, strlen(uperl.psgi), uperl.main);
         }
 	// create a perl environment (if needed)
-	else if (uperl.exec) {
+	else if (uperl.exec || uperl.shell) {
 		PERL_SET_CONTEXT(uperl.main[0]);
                 perl_parse(uperl.main[0], xs_init, 2, uperl.embedding, NULL);
 	}
