@@ -311,6 +311,8 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 				     $${PLUGIN_NAME}; \
 	done
 
+DEB_INSTALL_DOCS_uwsgi-core += tests
+
 # move installed examples into subdirs by type
 ex_types = conffile psgi rack router wsapi wsgi
 ex_conffile = mega.xml multi.* sites.xml uwsgi.xml vassals werkzeug_strict.yml werkzeug.*
