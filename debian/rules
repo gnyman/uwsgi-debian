@@ -79,12 +79,12 @@ UWSGI_PLUGINS_SRC_DIR = plugins
 UWSGI_PLUGIN_PYTHON_PKG_KINDS = python python3
 JAVA_KINDS = openjdk-6 openjdk-7
 
-JAVA_PLUGIN_PKGS = $(foreach stem,jvm jwsgi,$(patsubst %,$(stem)-%,$(JAVA_KINDS)))
+UWSGI_PLUGINS_JAVA = $(foreach stem,jvm jwsgi,$(patsubst %,$(stem)-%,$(JAVA_KINDS)))
 
 PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGIN_PYTHON_PKG_KINDS) \
 	greenlet-python \
-	$(JAVA_PLUGIN_PKGS) \
+	$(UWSGI_PLUGINS_JAVA) \
 	lua5.1 lua5.2 \
 	$(patsubst %,pyerl-%,$(UWSGI_PLUGIN_PYTHON_PKG_KINDS)) \
 	rack-ruby1.9.1 rbthreads fiber
@@ -368,7 +368,7 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): debia
 	touch $@
 
 # Build Java plugins
-$(patsubst %,debian/stamp-plugin-%,$(JAVA_PLUGIN_PKGS)): debian/stamp-plugin-%
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_JAVA)): debian/stamp-plugin-%
 	$(eval OPENJDK_VERSION = $(lastword $(subst -, ,$@)))
 	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(DEB_HOST_ARCH))
 	$(eval PLUGIN_SRC_SUBDIR = $(firstword $(subst _, ,$(plugin_name))))
