@@ -102,7 +102,7 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(patsubst %,pyerl-%,$(UWSGI_PYTHON_KINDS)) \
 	$(UWSGI_PLUGINS_RUBY) rbthreads fiber
 
-ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
+UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGINS))
 
 # List of packaged Apache2 modules' names
@@ -211,7 +211,7 @@ clean::
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
-			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) \
+			$(UWSGI_PLUGINS_REGULAR_BUILD) \
 				$(UWSGI_PLUGINS_LUA) $(UWSGI_PLUGINS_RUBY), \
 			.$${TEMPLATE_TYPE} \
 		); do \
@@ -373,7 +373,7 @@ uwsgi-core-local:
 		--build $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 
 # Ordinary building of uWSGI plugins
-$(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): debian/stamp-plugin-%
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)): debian/stamp-plugin-%
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
@@ -470,7 +470,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_RUBY)): debian/stamp-plugin-%
 	touch $@
 
 # Install uwsgi-plugin-% package for ordinarily built uWSGI plugin
-$(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: install/uwsgi-plugin-%
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: install/uwsgi-plugin-%
 	for TEMPLATE_TYPE in install links manpages postinst prerm; do \
 		sed \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
