@@ -91,8 +91,6 @@ ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 # List of packaged Apache2 modules' names
 UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
 
-libapache2mod_to_orig = $(subst -,_,$(subst ruwsgi,Ruwsgi,$(1)))
-
 # List of templates to instantiate for each libapache2-mod-X package
 # There is special-case template, not listed here: uwsgi.load
 LIBAPACHE2_MOD_PKG_TEMPLATES = install postinst prerm
@@ -114,6 +112,7 @@ files_instantiated_in_debian_dir = $(addprefix \
 
 pkg_name = $(cdbs_curpkg)
 
+module_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 module_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
 
 # CDBS-specific variables
@@ -626,22 +625,20 @@ $(patsubst %,build/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
 # Build specific Apache2 module
 $(patsubst %,debian/stamp-libapache2-mod-%,$(UWSGI_MODULES_apache)): \
  debian/stamp-libapache2-mod-%:
-	$(eval MODULE_NAME = $(call libapache2mod_to_orig, $(subst stamp-libapache2-mod-,,$(notdir $@))))
-	$(APACHE2_BUILDER) apache2/mod_$(MODULE_NAME).c
+	$(APACHE2_BUILDER) apache2/mod_$(module_name).c
 	touch $@
 
 # Install libapache2-mod-% package
 $(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
  install/libapache2-mod-%:
-	$(eval MODULE_NAME = $(call libapache2mod_to_orig, $(subst libapache2-mod-,,$(notdir $@))))
-	sed -e 's/@@module_name@@/$(MODULE_NAME)/g' \
+	sed -e 's/@@module_name@@/$(module_name)/g' \
 		-e 's/@@module_apachename@@/$(module_apachename)/g' \
 		< $(CURDIR)/debian/uwsgi.load.in \
-		> $(CURDIR)/debian/$(MODULE_NAME).load
+		> $(CURDIR)/debian/$(module_name).load
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
 		sed \
 			-e 's/@@pkg_name@@/$(pkg_name)/g' \
-			-e 's/@@module_name@@/$(MODULE_NAME)/g' \
+			-e 's/@@module_name@@/$(module_name)/g' \
 			< $(CURDIR)/debian/libapache2-mod.$${TEMPLATE_TYPE}.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE} ; \
 	done
