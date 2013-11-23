@@ -68,11 +68,11 @@ pkg_name_to_plugin_name = $(strip \
 ))
 
 # List of plugins' packages names (without common prefix 'uwsgi-plugin-')
-UWSGI_PLUGIN_PKGS_NAMES = $(call list_pkgname_suffixes,uwsgi-plugin-)
+UWSGI_PLUGINS = $(call list_pkgname_suffixes,uwsgi-plugin-)
 
 # List of plugins' names
 UWSGI_PLUGINS_NAMES = $(call \
-	pkg_name_to_plugin_name, $(UWSGI_PLUGIN_PKGS_NAMES))
+	pkg_name_to_plugin_name, $(UWSGI_PLUGINS))
 
 UWSGI_PLUGINS_SRC_DIR = plugins
 
@@ -90,7 +90,7 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	rack-ruby1.9.1 rbthreads fiber
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
-	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
+	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGINS))
 
 # List of packaged Apache2 modules' names
 LIBAPACHE2_MODS_NAMES = uwsgi ruwsgi proxy-uwsgi
@@ -124,7 +124,7 @@ DEB_COMPRESS_EXCLUDE_uwsgi-core = .ini .lua .pl .png .psgi .py .ru .ws .xml \
 DEB_COMPRESS_EXCLUDE_uwsgi-extra = .class .java .rb .c
 
 DEB_DH_STRIP_ARGS_uwsgi-core := --dbg-package=uwsgi-dbg
-$(foreach PLUGIN_PKG_NAME, $(UWSGI_PLUGIN_PKGS_NAMES), $(eval \
+$(foreach PLUGIN_PKG_NAME, $(UWSGI_PLUGINS), $(eval \
 	DEB_DH_STRIP_ARGS_uwsgi-plugin-$(PLUGIN_PKG_NAME) := --dbg-package=uwsgi-dbg\
 ))
 
@@ -192,7 +192,7 @@ clean::
 	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 	# instantiated uwsgi-plugin-X templates
 	$(RM) $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(JAVA_KINDS)), $(UWSGI_PLUGIN_PKGS_NAMES)), \
+		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(JAVA_KINDS)), $(UWSGI_PLUGINS)), \
 		.install \
 	)
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
@@ -345,7 +345,7 @@ install/uwsgi-core::
 # -----------------------
 
 # Build uwsgi-plugin-% package
-$(patsubst %,build/uwsgi-plugin-%,$(UWSGI_PLUGIN_PKGS_NAMES)) \
+$(patsubst %,build/uwsgi-plugin-%,$(UWSGI_PLUGINS)) \
 	:: build/uwsgi-plugin-% \
 	:  debian/buildconf/uwsgi-plugin.ini uwsgi-core-local \
 	   debian/stamp-plugin-%
