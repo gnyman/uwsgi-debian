@@ -84,12 +84,16 @@ UWSGI_KINDS_lua = lua5.1 lua5.2
 UWSGI_DEFAULTKIND_lua = lua5.1
 UWSGI_PLUGINS_lua = $(UWSGI_KINDS_lua)
 
+UWSGI_KINDS_ruby = ruby1.9.1
+UWSGI_DEFAULTKIND_ruby = ruby1.9.1
+UWSGI_PLUGINS_ruby = $(foreach stem,rack,$(patsubst %,$(stem)-%,$(UWSGI_KINDS_ruby)))
+
 PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGINS_python) \
 	greenlet-python \
 	$(UWSGI_PLUGINS_java) \
 	$(UWSGI_PLUGINS_lua) \
-	rack-ruby1.9.1 rbthreads fiber
+	$(UWSGI_PLUGINS_ruby) rbthreads fiber
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
@@ -182,7 +186,7 @@ clean::
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
 			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) \
-				$(UWSGI_PLUGINS_lua) rack-ruby1.9.1, \
+				$(UWSGI_PLUGINS_lua) $(UWSGI_PLUGINS_ruby), \
 			.$${TEMPLATE_TYPE} \
 		); do \
 			if [ -f debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
@@ -373,7 +377,7 @@ debian/stamp-plugin-greenlet-python: \
 # Build rbthreads plugin
 debian/stamp-plugin-rbthreads: \
  debian/stamp-plugin-%:
-	UWSGICONFIG_RUBYPATH=/usr/bin/ruby1.9.1 \
+	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_DEFAULTKIND_ruby) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
@@ -383,7 +387,7 @@ debian/stamp-plugin-rbthreads: \
 # Build fiber plugin
 debian/stamp-plugin-fiber: \
  debian/stamp-plugin-%:
-	UWSGICONFIG_RUBYPATH=/usr/bin/ruby1.9.1 \
+	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_DEFAULTKIND_ruby) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
@@ -401,7 +405,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_lua)): \
 	touch $@
 
 # Build rack_ruby191_plugin.so
-debian/stamp-plugin-rack-ruby1.9.1: \
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_ruby)): \
  debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(call target_name_tail, $@) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
@@ -532,10 +536,10 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_lua)):: \
 		$(CURDIR)/uwsgi_$(plugin_name) \
 		> $(CURDIR)/debian/uwsgi_$(plugin_name).1
 
-install/uwsgi-plugin-rack-ruby1.9.1:: \
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_ruby)):: \
  install/uwsgi-plugin-%:
 	$(eval PLUGIN_PRIORITY = $(if \
-		$(findstring uwsgi-plugin-rack-ruby1.9.1, $@),75,35) \
+		$(findstring uwsgi-plugin-rack-$(UWSGI_DEFAULTKIND_ruby), $@),75,35) \
 	)
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
