@@ -84,11 +84,15 @@ UWSGI_PLUGINS_PYTHON = $(UWSGI_PYTHON_KINDS)
 UWSGI_JAVA_KINDS = openjdk-6 openjdk-7
 UWSGI_PLUGINS_JAVA = $(foreach stem,jvm jwsgi,$(patsubst %,$(stem)-%,$(UWSGI_JAVA_KINDS)))
 
+UWSGI_LUA_KINDS = lua5.1 lua5.2
+UWSGI_LUA_DEFAULT_KIND = lua5.1
+UWSGI_PLUGINS_LUA = $(UWSGI_LUA_KINDS)
+
 PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGINS_PYTHON) \
 	greenlet-python \
 	$(UWSGI_PLUGINS_JAVA) \
-	lua5.1 lua5.2 \
+	$(UWSGI_PLUGINS_LUA) \
 	$(patsubst %,pyerl-%,$(UWSGI_PYTHON_KINDS)) \
 	rack-ruby1.9.1 rbthreads fiber
 
@@ -202,7 +206,7 @@ clean::
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
 			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) \
-				lua5.1 lua5.2 rack-ruby1.9.1, \
+				$(UWSGI_PLUGINS_LUA) rack-ruby1.9.1, \
 			.$${TEMPLATE_TYPE} \
 		); do \
 			if [ -f $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
@@ -441,8 +445,8 @@ debian/stamp-plugin-fiber: debian/stamp-plugin-%
 		         $(plugin_name)
 	touch $@
 
-# Build lua51_plugin.so/lua52_plugin.so
-debian/stamp-plugin-lua5.1 debian/stamp-plugin-lua5.2: debian/stamp-plugin-%
+# Build lua plugins
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_LUA)): debian/stamp-plugin-%
 	UWSGICONFIG_LUA_IMPLEMENTATION=$(call target_name_tail, $@) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/lua \
@@ -565,8 +569,8 @@ install/uwsgi-plugin-fiber:: install/uwsgi-plugin-%
 			< $(CURDIR)/debian/uwsgi-plugin.install.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).install
 
-install/uwsgi-plugin-lua5.1 install/uwsgi-plugin-lua5.2:: install/uwsgi-plugin-%
-	$(eval PLUGIN_PRIORITY = $(if $(findstring uwsgi-plugin-lua5.1, $@),75,35))
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_LUA)):: install/uwsgi-plugin-%
+	$(eval PLUGIN_PRIORITY = $(if $(findstring uwsgi-plugin-$(UWSGI_LUA_DEFAULT_KIND), $@),75,35))
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
 			-e 's/@@lua_kind@@/$(subst uwsgi-plugin-,,$(notdir $@))/g' \
