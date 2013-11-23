@@ -373,7 +373,7 @@ uwsgi-core-local:
 		--build $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 
 # Ordinary building of uWSGI plugins
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)): debian/stamp-plugin-%
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)): debian/stamp-plugin-%:
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
@@ -381,7 +381,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)): debian/stamp
 	touch $@
 
 # Build Java plugins
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_JAVA)): debian/stamp-plugin-%
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_JAVA)): debian/stamp-plugin-%:
 	$(eval OPENJDK_VERSION = $(lastword $(subst -, ,$@)))
 	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(DEB_HOST_ARCH))
 	$(eval PLUGIN_SRC_SUBDIR = $(firstword $(subst _, ,$(plugin_name))))
@@ -434,7 +434,7 @@ debian/stamp-plugin-greenlet-python:
 	touch $@
 
 # Build rbthreads plugin
-debian/stamp-plugin-rbthreads: debian/stamp-plugin-%
+debian/stamp-plugin-rbthreads: debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_RUBY_DEFAULT_KIND) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
@@ -443,7 +443,7 @@ debian/stamp-plugin-rbthreads: debian/stamp-plugin-%
 	touch $@
 
 # Build fiber plugin
-debian/stamp-plugin-fiber: debian/stamp-plugin-%
+debian/stamp-plugin-fiber: debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_RUBY_DEFAULT_KIND) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
@@ -452,7 +452,7 @@ debian/stamp-plugin-fiber: debian/stamp-plugin-%
 	touch $@
 
 # Build lua plugins
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_LUA)): debian/stamp-plugin-%
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_LUA)): debian/stamp-plugin-%:
 	UWSGICONFIG_LUA_IMPLEMENTATION=$(call target_name_tail, $@) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/lua \
@@ -461,7 +461,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_LUA)): debian/stamp-plugin-%
 	touch $@
 
 # Build rack_ruby191_plugin.so
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_RUBY)): debian/stamp-plugin-%
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_RUBY)): debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(call target_name_tail, $@) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/rack \
@@ -470,7 +470,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_RUBY)): debian/stamp-plugin-%
 	touch $@
 
 # Install uwsgi-plugin-% package for ordinarily built uWSGI plugin
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: install/uwsgi-plugin-%
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: install/uwsgi-plugin-%:
 	for TEMPLATE_TYPE in install links manpages postinst prerm; do \
 		sed \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
@@ -485,7 +485,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: install/uw
 		$(CURDIR)/uwsgi_$(plugin_name) \
 		> $(CURDIR)/debian/uwsgi_$(plugin_name).1; \
 
-$(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_JAVA_KINDS)):: install/uwsgi-plugin-%
+$(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_JAVA_KINDS)):: install/uwsgi-plugin-%:
 	for TEMPLATE_TYPE in install links manpages; do \
 		sed \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
@@ -563,19 +563,19 @@ install/uwsgi-plugin-greenlet-python::
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
 	done
 
-install/uwsgi-plugin-rbthreads:: install/uwsgi-plugin-%
+install/uwsgi-plugin-rbthreads:: install/uwsgi-plugin-%:
 	sed \
 		-e 's/@@plugin_name@@/$(plugin_name)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin.install.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).install
 
-install/uwsgi-plugin-fiber:: install/uwsgi-plugin-%
+install/uwsgi-plugin-fiber:: install/uwsgi-plugin-%:
 	sed \
 		-e 's/@@plugin_name@@/$(plugin_name)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin.install.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).install
 
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_LUA)):: install/uwsgi-plugin-%
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_LUA)):: install/uwsgi-plugin-%:
 	$(eval PLUGIN_PRIORITY = $(if $(findstring uwsgi-plugin-$(UWSGI_LUA_DEFAULT_KIND), $@),75,35))
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
@@ -599,7 +599,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_LUA)):: install/uwsgi-plugin
 		$(CURDIR)/uwsgi_$(plugin_name) \
 		> $(CURDIR)/debian/uwsgi_$(plugin_name).1
 
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_RUBY)):: install/uwsgi-plugin-%
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_RUBY)):: install/uwsgi-plugin-%:
 	$(eval PLUGIN_PRIORITY = $(if \
 		$(findstring uwsgi-plugin-rack-$(UWSGI_RUBY_DEFAULT_KIND), $@),75,35) \
 	)
