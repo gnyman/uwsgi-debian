@@ -94,7 +94,7 @@ UWSGI_RUBY_DEFAULT_KIND = ruby1.9.1
 # TODO: include fiber and rbthreads plugins
 UWSGI_PLUGINS_RUBY = $(foreach stem,rack,$(patsubst %,$(stem)-%,$(UWSGI_RUBY_KINDS)))
 
-PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
+UWSGI_PLUGINS_CUSTOM_BUILD = \
 	$(UWSGI_PLUGINS_PYTHON) \
 	greenlet-python \
 	$(UWSGI_PLUGINS_JAVA) \
@@ -103,7 +103,7 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGINS_RUBY) rbthreads fiber
 
 UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
-	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGINS))
+	$(UWSGI_PLUGINS_CUSTOM_BUILD), $(UWSGI_PLUGINS))
 
 # List of packaged Apache2 modules' names
 LIBAPACHE2_MODS_NAMES = uwsgi ruwsgi proxy-uwsgi
