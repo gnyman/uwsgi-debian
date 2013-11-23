@@ -74,14 +74,15 @@ UWSGI_PLUGIN_PKGS_NAMES = $(call list_pkgname_suffixes,uwsgi-plugin-)
 UWSGI_PLUGINS_SRC_DIR = plugins
 
 UWSGI_PLUGIN_PYTHON_PKG_KINDS = python python3
-JAVA_KINDS = openjdk-7
 
-JAVA_PLUGIN_PKGS = $(foreach stem,jvm jwsgi,$(patsubst %,$(stem)-%,$(JAVA_KINDS)))
+UWSGI_KINDS_java = openjdk-7
+UWSGI_DEFAULTKIND_java = openjdk-7
+UWSGI_PLUGINS_java = $(foreach stem,jvm jwsgi,$(patsubst %,$(stem)-%,$(UWSGI_KINDS_java)))
 
 PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGIN_PYTHON_PKG_KINDS) \
 	greenlet-python \
-	$(JAVA_PLUGIN_PKGS) \
+	$(UWSGI_PLUGINS_java) \
 	lua5.1 lua5.2 \
 	rack-ruby1.9.1 rbthreads fiber
 
@@ -170,7 +171,7 @@ clean::
 	rm -f debian/buildconf/uwsgi-plugin.ini
 	# instantiated uwsgi-plugin-X templates
 	rm -f $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(JAVA_KINDS)), $(UWSGI_PLUGIN_PKGS_NAMES)), \
+		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(UWSGI_KINDS_java)), $(UWSGI_PLUGIN_PKGS_NAMES)), \
 		.install )
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
@@ -324,7 +325,7 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
 	touch $@
 
 # Build Java plugins
-$(patsubst %,debian/stamp-plugin-%,$(JAVA_PLUGIN_PKGS)): \
+$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_java)): \
  debian/stamp-plugin-%:
 	$(eval OPENJDK_VERSION = $(lastword $(subst -, ,$@)))
 	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(JAVA_ARCH))
@@ -422,7 +423,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
 		$(CURDIR)/uwsgi_$(plugin_name) \
 		> $(CURDIR)/debian/uwsgi_$(plugin_name).1; \
 
-$(patsubst %,install/uwsgi-plugin-jvm-%,$(JAVA_KINDS)):: \
+$(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_KINDS_java)):: \
  install/uwsgi-plugin-%:
 	for TEMPLATE_TYPE in install links manpages; do \
 		sed \
