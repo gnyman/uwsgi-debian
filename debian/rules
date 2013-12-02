@@ -222,21 +222,10 @@ $(foreach module, $(UWSGI_MODULES_apache),\
 
 clean::
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) --clean
-	# uWSGI executable binaries
-	rm -f uwsgi-core uwsgi-core-local
-	find -type l -name 'uwsgi_*' -delete
-	rm -f uwsgi_python*
-	# converted Python modules
-	rm -rf 2to3
 	find -type f -name '*.pyc' -delete
 	find -type d -name __pycache__ -delete
 	find -type f \( -name '*.class' -or -name '*.jar' \) -delete
 	rm -f *_plugin.so
-	# compiled Apache2 modules
-	rm -rf apache2/.libs
-	rm -f apache2/*.la apache2/*.lo apache2/*.slo
-	# instantiated build configurations
-	rm -f debian/buildconf/uwsgi-plugin.ini
 	# instantiated uwsgi-plugin-X templates
 	rm -f $(call files_instantiated_in_debian_dir, \
 		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(UWSGI_KINDS_java)), $(UWSGI_PLUGIN_PKGS_NAMES)), \
@@ -253,24 +242,6 @@ clean::
 			fi; \
 		done; \
 	done
-	for TEMPLATE_TYPE in dirs links manpages postinst prerm; do \
-		rm -f $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-, $(UWSGI_KINDS_python), .$${TEMPLATE_TYPE}); \
-	done
-	for TEMPLATE_TYPE in postinst prerm; do \
-		rm -f $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-greenlet-, \
-			$(UWSGI_KINDS_python), .$${TEMPLATE_TYPE}); \
-	done
-	for TEMPLATE_TYPE in links manpages; do \
-		rm -f debian/uwsgi-plugin-jvm-openjdk-7.$${TEMPLATE_TYPE}; \
-	done
-	# instantiated libapache2-mod-X templates
-	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
-		rm -f $(call files_instantiated_in_debian_dir, \
-			libapache2-mod-, $(UWSGI_MODULES_apache), .$${TEMPLATE_TYPE}); \
-	done
-	rm -f debian/*.load
 	rm -f debian/*.1
 	rm -f debian/stamp-*
 	rm -f uwsgibuild.*
@@ -338,6 +309,9 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 				     $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 				     $${PLUGIN_NAME}; \
 	done
+clean::
+	rm -f uwsgi-core
+	find -type l -name 'uwsgi_*' -delete
 
 DEB_INSTALL_DOCS_uwsgi-core += tests
 
@@ -378,10 +352,14 @@ debian/buildconf/uwsgi-plugin.ini:
 	sed -e 's|@@curdir@@|$(CURDIR)|g' \
 		< $(CURDIR)/debian/buildconf/uwsgi-plugin.ini.in \
 		> $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
+clean::
+	rm -f debian/buildconf/uwsgi-plugin.ini
 
 uwsgi-core-local:
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--build $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
+clean::
+	rm -f uwsgi-core-local
 
 $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
  debian/stamp-plugin-%:
@@ -503,6 +481,10 @@ $(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_KINDS_java)):: \
 		--no-info \
 		$(CURDIR)/uwsgi_$(plugin_name) \
 		> $(CURDIR)/debian/uwsgi_$(plugin_name).1
+clean::
+	for TEMPLATE_TYPE in links manpages; do \
+		rm -f debian/uwsgi-plugin-jvm-openjdk-7.$${TEMPLATE_TYPE}; \
+	done
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
  install/uwsgi-plugin-%:
@@ -537,6 +519,12 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 			$(CURDIR)/uwsgi_python$${PYTHON_VERSION} \
 			> $(CURDIR)/debian/uwsgi_python$${PYTHON_VERSION}.1; \
 	done
+clean::
+	for TEMPLATE_TYPE in dirs links manpages postinst prerm; do \
+		rm -f $(call files_instantiated_in_debian_dir, \
+			uwsgi-plugin-, $(UWSGI_KINDS_python), .$${TEMPLATE_TYPE} \
+		); \
+	done
 
 install/uwsgi-plugin-greenlet-python:: \
  install/uwsgi-plugin-%:
@@ -556,6 +544,13 @@ install/uwsgi-plugin-greenlet-python:: \
 		sed -e "s/@@plugin_name@@/greenlet_python$${PYTHON_VERSION}/g" \
 			< $(CURDIR)/debian/uwsgi-plugin.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
+	done
+clean::
+	for TEMPLATE_TYPE in postinst prerm; do \
+		rm -f $(call files_instantiated_in_debian_dir, \
+			uwsgi-plugin-greenlet-, \
+			$(UWSGI_KINDS_python), .$${TEMPLATE_TYPE} \
+		); \
 	done
 
 install/uwsgi-plugin-rbthreads:: \
@@ -673,6 +668,9 @@ $(patsubst %,debian/stamp-libapache2-mod-%,$(UWSGI_MODULES_apache)): \
  debian/stamp-libapache2-mod-%:
 	$(APACHE2_BUILDER) apache2/mod_$(module_name).c
 	touch $@
+clean::
+	rm -rf apache2/.libs
+	rm -f apache2/*.la apache2/*.lo apache2/*.slo
 
 $(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
  install/libapache2-mod-%:
@@ -687,6 +685,13 @@ $(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
 			< $(CURDIR)/debian/libapache2-mod.$${TEMPLATE_TYPE}.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE} ; \
 	done
+clean::
+	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
+		rm -f $(call files_instantiated_in_debian_dir, \
+			libapache2-mod-, $(UWSGI_MODULES_apache), .$${TEMPLATE_TYPE} \
+		); \
+	done
+	rm -f debian/*.load
 
 # Python module packages
 # ----------------------
@@ -698,3 +703,5 @@ build/python3-uwsgidecorators:: \
 	mkdir -p 2to3
 	2to3 --output-dir=2to3 --write --nobackups --no-diffs \
 		uwsgidecorators.py
+clean::
+	rm -rf 2to3
