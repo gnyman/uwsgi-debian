@@ -71,10 +71,6 @@ pkg_name_to_plugin_name = $(strip \
 # List of plugins' packages names (without common prefix 'uwsgi-plugin-')
 UWSGI_PLUGIN_PKGS_NAMES = $(call list_pkgname_suffixes,uwsgi-plugin-)
 
-# List of plugins' names
-UWSGI_PLUGINS_NAMES = $(call \
-	pkg_name_to_plugin_name, $(UWSGI_PLUGIN_PKGS_NAMES))
-
 UWSGI_PLUGINS_SRC_DIR = plugins
 
 UWSGI_PLUGIN_PYTHON_PKG_KINDS = python python3
@@ -152,45 +148,25 @@ CDBS_SUGGESTS_libapache2-mod-ruwsgi = uwsgi
 # =====
 
 clean::
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) --clean
 	# uWSGI executable binaries
-	$(RM) $(CURDIR)/uwsgi-core $(CURDIR)/uwsgi-core-local
-	for PLUGIN_NAME in $(UWSGI_PLUGINS_NAMES); do \
-		$(RM) $(CURDIR)/uwsgi_$${PLUGIN_NAME}; \
-	done
-	for PYTHON_VERSION in $(PYTHON_VERS) $(PYTHON3_VERS); do \
-		$(RM) $(CURDIR)/uwsgi_python$${PYTHON_VERSION}; \
-	done
+	rm -f uwsgi-core uwsgi-core-local
+	find -type l -name 'uwsgi_*' -delete
+	rm -f uwsgi_python*
 	# converted Python modules
 	rm -rf 2to3
-	# intermediate compiled files
-	find $(CURDIR) \
-		\! -path '$(CURDIR)/debian/*' \( -name '*.o' -o -name '*.pyc' \) -type f \
-		-delete
-	find $(CURDIR) \
-		\! -path '$(CURDIR)/debian/*' -name __pycache__ -type d \
-		-delete
-	# plugins
-	for PLUGIN_NAME in $(UWSGI_PLUGINS_NAMES); do \
-		$(RM) $(CURDIR)/$${PLUGIN_NAME}_plugin.so; \
-	done
-	for PYVER in $(PYTHON_VERS) $(PYTHON3_VERS); do \
-		$(RM) \
-			$(CURDIR)/greenlet_python$${PYVER}_plugin.so \
-			$(CURDIR)/python$${PYVER}_plugin.so; \
-	done
+	find -type f -name '*.pyc' -delete
+	find -type d -name __pycache__ -delete
+	rm -f *_plugin.so
 	# compiled Apache2 modules
-	$(RM) -r $(CURDIR)/apache2/.libs
-	$(RM) -r $(addprefix $(CURDIR)/apache2/mod_, \
-		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
-			$(addprefix $(call libapache2mod_to_orig, $(module_name)), .la .lo .slo) \
-	))
+	rm -rf apache2/.libs
+	rm -f apache2/*.la apache2/*.lo apache2/*.slo
 	# instantiated build configurations
-	$(RM) $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
+	rm -f debian/buildconf/uwsgi-plugin.ini
 	# instantiated uwsgi-plugin-X templates
-	$(RM) $(call files_instantiated_in_debian_dir, \
+	rm -f $(call files_instantiated_in_debian_dir, \
 		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(JAVA_KINDS)), $(UWSGI_PLUGIN_PKGS_NAMES)), \
-		.install \
-	)
+		.install )
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
@@ -198,46 +174,32 @@ clean::
 				lua5.1 lua5.2 rack-ruby1.9.1, \
 			.$${TEMPLATE_TYPE} \
 		); do \
-			if [ -f $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
-				$(RM) $${INSTANTIATED_TEMPLATE}; \
+			if [ -f debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
+				rm -f $${INSTANTIATED_TEMPLATE}; \
 			fi; \
 		done; \
 	done
 	for TEMPLATE_TYPE in dirs links manpages postinst prerm; do \
-		$(RM) $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-, $(UWSGI_PLUGIN_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE} \
-		); \
+		rm -f $(call files_instantiated_in_debian_dir, \
+			uwsgi-plugin-, $(UWSGI_PLUGIN_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE}); \
 	done
 	for TEMPLATE_TYPE in postinst prerm; do \
-		$(RM) $(call files_instantiated_in_debian_dir, \
+		rm -f $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-greenlet-, \
-			$(UWSGI_PLUGIN_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE} \
-		); \
+			$(UWSGI_PLUGIN_PYTHON_PKG_KINDS), .$${TEMPLATE_TYPE}); \
 	done
 	for TEMPLATE_TYPE in links manpages; do \
-		$(RM) $(CURDIR)/debian/uwsgi-plugin-jvm-openjdk-7.$${TEMPLATE_TYPE}; \
+		rm -f debian/uwsgi-plugin-jvm-openjdk-7.$${TEMPLATE_TYPE}; \
 	done
 	# instantiated libapache2-mod-X templates
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
-		$(RM) $(call files_instantiated_in_debian_dir, \
-			libapache2-mod-, $(LIBAPACHE2_MODS_NAMES), .$${TEMPLATE_TYPE} \
-		); \
+		rm -f $(call files_instantiated_in_debian_dir, \
+			libapache2-mod-, $(LIBAPACHE2_MODS_NAMES), .$${TEMPLATE_TYPE}); \
 	done
-	$(RM) $(addprefix $(CURDIR)/debian/, \
-		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
-			$(addsuffix .load,  $(call libapache2mod_to_orig, $(module_name))) \
-	))
-	# generated manpages
-	$(RM) $(CURDIR)/debian/uwsgi-core.1
-	$(RM) $(call files_instantiated_in_debian_dir, \
-		uwsgi_, $(UWSGI_PLUGINS_NAMES), .1 \
-	)
-	$(RM) $(call files_instantiated_in_debian_dir, \
-		uwsgi_python, $(PYTHON_VERS) $(PYTHON3_VERS), .1 \
-	)
-	# stampfiles
-	$(RM) $(CURDIR)/debian/stamp-*
-	$(RM) $(CURDIR)/uwsgibuild.*
+	rm -f debian/*.load
+	rm -f debian/*.1
+	rm -f debian/stamp-*
+	rm -f uwsgibuild.*
 
 # uwsgi-core package
 # ------------------
