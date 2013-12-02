@@ -89,7 +89,7 @@ ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
 
 # List of packaged Apache2 modules' names
-LIBAPACHE2_MODS_NAMES = uwsgi ruwsgi proxy-uwsgi
+UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
 
 libapache2mod_to_orig = $(subst -,_,$(subst ruwsgi,Ruwsgi,$(1)))
 
@@ -195,7 +195,7 @@ clean::
 	# instantiated libapache2-mod-X templates
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
 		rm -f $(call files_instantiated_in_debian_dir, \
-			libapache2-mod-, $(LIBAPACHE2_MODS_NAMES), .$${TEMPLATE_TYPE}); \
+			libapache2-mod-, $(UWSGI_MODULES_apache), .$${TEMPLATE_TYPE}); \
 	done
 	rm -f debian/*.load
 	rm -f debian/*.1
@@ -594,16 +594,16 @@ binary-post-install/uwsgi-plugin-greenlet-python::
 # -------------------------
 
 # Build libapache2-mod-% package
-$(patsubst %,build/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):: build/% : debian/stamp-%
+$(patsubst %,build/libapache2-mod-%,$(UWSGI_MODULES_apache)):: build/% : debian/stamp-%
 
 # Build specific Apache2 module
-$(patsubst %,debian/stamp-libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):
+$(patsubst %,debian/stamp-libapache2-mod-%,$(UWSGI_MODULES_apache)):
 	$(eval MODULE_NAME = $(call libapache2mod_to_orig, $(subst stamp-libapache2-mod-,,$(notdir $@))))
 	$(APACHE2_BUILDER) apache2/mod_$(MODULE_NAME).c
 	touch $@
 
 # Install libapache2-mod-% package
-$(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES))::
+$(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache))::
 	$(eval MODULE_NAME = $(call libapache2mod_to_orig, $(subst libapache2-mod-,,$(notdir $@))))
 	# Remove the R from Ruwsgi_module
 	$(eval APACHE_MODULE_NAME = $(subst R,,$(MODULE_NAME)))
