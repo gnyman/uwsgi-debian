@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for uwsgi-plugin-@@lua_kind@@
+# prerm script for uwsgi-plugin-@@pkg_stem@@
 #
 # see: dh_installdeb(1)
 
@@ -20,7 +20,7 @@ case "$1" in
     remove)
       update-alternatives --quiet \
         --remove \
-          uwsgi-plugin-lua \
+          uwsgi-plugin-@@plugin_stem@@ \
           /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so
 
       update-alternatives --quiet \
@@ -28,15 +28,15 @@ case "$1" in
           uwsgi \
           /usr/bin/uwsgi_@@plugin_name@@
 
-      LUA_PLUGIN_ALTERNATIVES_COUNT="$(\
-        update-alternatives --list uwsgi-plugin-lua 2>/dev/null \
+      PLUGIN_ALTERNATIVES_COUNT="$(\
+        update-alternatives --list uwsgi-plugin-@@plugin_stem@@ 2>/dev/null \
         | wc -l \
       )"
-      if [ "$LUA_PLUGIN_ALTERNATIVES_COUNT" -eq 0 ]; then
+      if [ "$PLUGIN_ALTERNATIVES_COUNT" -eq 0 ]; then
         update-alternatives --quiet \
           --remove \
             uwsgi \
-            /usr/bin/uwsgi_lua
+            /usr/bin/uwsgi_@@plugin_stem@@
       fi
     ;;
 

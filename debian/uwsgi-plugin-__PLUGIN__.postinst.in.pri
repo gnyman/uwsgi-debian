@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for uwsgi-plugin-rack-@@ruby_kind@@
+# postinst script for uwsgi-plugin-@@pkg_stem@@
 #
 # see: dh_installdeb(1)
 
@@ -21,17 +21,17 @@ case "$1" in
     configure)
       update-alternatives --quiet \
         --install \
-          /usr/lib/uwsgi/plugins/rack_plugin.so \
-          uwsgi-plugin-rack \
+          /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
+          uwsgi-plugin-@@plugin_stem@@ \
           /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so \
           @@plugin_alternatives_priority@@ \
         --slave \
-          /usr/bin/uwsgi_rack \
-          uwsgi_rack \
+          /usr/bin/uwsgi_@@plugin_stem@@ \
+          uwsgi_@@plugin_stem@@ \
           /usr/bin/uwsgi-core \
         --slave \
-          /usr/share/man/man1/uwsgi_rack.1.gz \
-          uwsgi_rack.1.gz \
+          /usr/share/man/man1/uwsgi_@@plugin_stem@@.1.gz \
+          uwsgi_@@plugin_stem@@.1.gz \
           /usr/share/man/man1/uwsgi_@@plugin_name@@.1.gz
 
       update-alternatives --quiet \
@@ -45,22 +45,22 @@ case "$1" in
           uwsgi.1.gz \
           /usr/share/man/man1/uwsgi_@@plugin_name@@.1.gz
 
-      UWSGI_RACK_BINARY_IS_UWSGI_ALTERNATIVE="$(\
+      BINARY_IS_UWSGI_ALTERNATIVE="$(\
         update-alternatives --list uwsgi 2>/dev/null \
-        | grep '/uwsgi_rack$' \
+        | grep '/uwsgi_@@plugin_stem@@$' \
         | wc -l \
       )"
-      if [ "$UWSGI_RACK_BINARY_IS_UWSGI_ALTERNATIVE" -eq 0 ]; then
+      if [ "$BINARY_IS_UWSGI_ALTERNATIVE" -eq 0 ]; then
         update-alternatives --quiet \
           --install \
             /usr/bin/uwsgi \
             uwsgi \
-            /usr/bin/uwsgi_rack \
+            /usr/bin/uwsgi_@@plugin_stem@@ \
             35 \
           --slave \
             /usr/share/man/man1/uwsgi.1.gz \
             uwsgi.1.gz \
-            /usr/share/man/man1/uwsgi_rack.1.gz
+            /usr/share/man/man1/uwsgi_@@plugin_stem@@.1.gz
       fi
     ;;
 
