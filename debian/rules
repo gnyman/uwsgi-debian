@@ -107,6 +107,12 @@ UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 
 UWSGI_APACHEMODULES = uwsgi ruwsgi proxy-uwsgi
 
+# type of packaging scripts to use
+# * pri: binary and library
+# * sec: only binary
+# * aux: only library
+UWSGI_PKGSCRIPTS_DEFAULT = sec
+
 libapache2mod_to_orig = $(subst -,_,$(subst ruwsgi,Ruwsgi,$(1)))
 
 # Discards directory-part of target and returns substring after last '-'
@@ -124,6 +130,9 @@ files_instantiated_in_debian_dir = $(addprefix \
 # per-package variables, relying on $* being plugin part of package name
 plugin_name = $(call pkg_name_to_plugin_name,$*)
 module_name = $(call libapache2mod_to_orig,$*)
+
+# per-infile variables, relying on $(infile) and optional $(plugin_stem)
+plugin_infile = $(firstword $(wildcard $(infile).$(UWSGI_PKGSCRIPTS_$(or $(plugin_stem),DEFAULT))) $(infile))
 
 # CDBS-specific variables
 # =======================
@@ -184,9 +193,7 @@ clean::
 				$(UWSGI_PLUGINS_LUA) $(UWSGI_PLUGINS_RUBY), \
 			.$${TEMPLATE_TYPE} \
 		); do \
-			if [ -f debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in ]; then \
-				rm -f $${INSTANTIATED_TEMPLATE}; \
-			fi; \
+			rm -f $${INSTANTIATED_TEMPLATE}; \
 		done; \
 	done
 	# generated manpages
@@ -410,13 +417,13 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_RUBY)): debian/stamp-plugin-%
 # resolve packaging scripts and man pages
 # ---------------------------------------
 
+infiles_plugin := $(wildcard debian/*__PLUGIN__*.in)
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: install/uwsgi-plugin-%:
-	for TEMPLATE_TYPE in install links manpages postinst prerm; do \
-		sed \
-			-e 's/@@plugin_name@@/$(plugin_name)/g' \
-				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
-				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
-	done
+	$(foreach infile,$(infiles_plugin),sed \
+		-e 's/@@pkg_stem@@/$*/g' \
+		-e 's/@@plugin_name@@/$(plugin_name)/g' \
+		< $(plugin_infile) \
+		> $(subst __PLUGIN__,$*,$(basename $(infile))); )
 	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
 	help2man \
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
@@ -429,7 +436,7 @@ $(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_JAVA_KINDS)):: install/uwsgi-plu
 	for TEMPLATE_TYPE in install links manpages; do \
 		sed \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
-				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
+				< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
 	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
@@ -459,7 +466,7 @@ $(patsubst %,install/uwsgi-plugin-pyerl-%,$(UWSGI_PYTHON_KINDS))::
 	done
 	for PYTHON_VERSION in $(PYVERS); do \
 		sed -e "s/@@plugin_name@@/pyerl_python$${PYTHON_VERSION}/g" \
-			< $(CURDIR)/debian/uwsgi-plugin.install.in \
+			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
 	done
 clean::
@@ -485,7 +492,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_PYTHON))::
 	for PYTHON_VERSION in $(PYVERS); do \
 		for TEMPLATE_TYPE in install links manpages; do \
 			sed -e "s/@@plugin_name@@/python$${PYTHON_VERSION}/g" \
-				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
+				< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.$${TEMPLATE_TYPE}.in \
 				>> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 		done; \
 		ln -sf \
@@ -525,7 +532,7 @@ install/uwsgi-plugin-greenlet-python::
 	done
 	for PYTHON_VERSION in $(PYTHON_VERS); do \
 		sed -e "s/@@plugin_name@@/greenlet_python$${PYTHON_VERSION}/g" \
-			< $(CURDIR)/debian/uwsgi-plugin.install.in \
+			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
 	done
 clean::
@@ -539,13 +546,13 @@ clean::
 install/uwsgi-plugin-rbthreads:: install/uwsgi-plugin-%:
 	sed \
 		-e 's/@@plugin_name@@/$(plugin_name)/g' \
-			< $(CURDIR)/debian/uwsgi-plugin.install.in \
+			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).install
 
 install/uwsgi-plugin-fiber:: install/uwsgi-plugin-%:
 	sed \
 		-e 's/@@plugin_name@@/$(plugin_name)/g' \
-			< $(CURDIR)/debian/uwsgi-plugin.install.in \
+			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).install
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_LUA)):: install/uwsgi-plugin-%:
@@ -561,7 +568,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_LUA)):: install/uwsgi-plugin
 	for TEMPLATE_TYPE in install links manpages; do \
 		sed \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
-				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
+				< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
 	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
@@ -587,7 +594,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_RUBY)):: install/uwsgi-plugi
 	for TEMPLATE_TYPE in install links manpages; do \
 		sed \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
-				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
+				< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
 	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
