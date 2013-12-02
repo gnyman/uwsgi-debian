@@ -223,6 +223,11 @@ clean::
 	rm -f debian/stamp-*
 	rm -f uwsgibuild.*
 
+# add per-package hook to expand packaging files before build
+DEB_PHONY_RULES += $(patsubst %,expand-files/%,$(DEB_ALL_PACKAGES))
+pre-build:: $(patsubst %,expand-files/%,$(DEB_ALL_PACKAGES))
+$(patsubst %,expand-files/%,$(DEB_ALL_PACKAGES)) :: expand-files/% : | update-config
+
 # uwsgi-core package
 # ------------------
 
@@ -437,7 +442,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_RUBY)): debian/stamp-plugin-%
 # ---------------------------------------
 
 infiles_plugin := $(wildcard debian/*__PLUGIN__*.in)
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: install/uwsgi-plugin-%:
+$(patsubst %,expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: expand-files/uwsgi-plugin-%:
 	$(foreach infile,$(infiles_plugin),sed \
 		-e 's/@@pkg_stem@@/$*/g' \
 		-e 's/@@plugin_name@@/$(plugin_name)/g' \
@@ -446,6 +451,8 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: install/
 		-e 's/@@plugin_kind@@/$(plugin_kind)/g' \
 		< $(plugin_infile) \
 		> $(subst __PLUGIN__,$*,$(basename $(infile))); )
+
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: install/uwsgi-plugin-%:
 	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
 	help2man \
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
@@ -614,7 +621,7 @@ clean::
 
 # resolve control files and apache2-specific module hint files
 infiles_module := $(wildcard debian/*__MODULE__*.in)
-$(patsubst %,install/libapache2-mod-%,$(UWSGI_APACHEMODULES)):: install/libapache2-mod-%
+$(patsubst %,expand-files/libapache2-mod-%,$(UWSGI_APACHEMODULES)):: expand-files/libapache2-mod-%:
 	# Remove the R from Ruwsgi_module
 	$(eval APACHE_MODULE_NAME = $(subst R,,$(module_name)))
 	$(foreach infile,$(infiles_module),sed \
