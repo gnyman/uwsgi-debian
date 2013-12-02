@@ -272,6 +272,17 @@ clean::
 	rm -f debian/stamp-*
 	rm -f uwsgibuild.*
 
+# add per-package hook to expand packaging files before build
+pre-build:: \
+ $(patsubst %,debian/expand-files/%,$(DEB_ALL_PACKAGES))
+$(patsubst %,debian/expand-files/%,$(DEB_ALL_PACKAGES)): \
+ debian/expand-files/%: \
+ | debian/expand-files update-config
+debian/expand-files:
+	mkdir debian/expand-files
+clean::
+	rm -rf debian/expand-files
+
 # uwsgi-core package
 # ------------------
 
@@ -471,8 +482,8 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_ruby)): \
 # resolve packaging scripts and man pages
 # ---------------------------------------
 
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: \
- install/uwsgi-plugin-%:
+$(patsubst %,debian/expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)): \
+ debian/expand-files/uwsgi-plugin-%:
 	set -e; \
 	$(foreach infile,$(UWSGI_PLUGIN_INFILES),\
 		$(if $(shell test -s "$(plugin_infile)" && echo "not empty"),\
@@ -484,7 +495,12 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: \
 				-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 				-e 's/@@plugin_alternatives_priority@@/$(plugin_alternatives_priority)/g' \
 				< $(plugin_infile) \
-				> $(subst __PLUGIN__,$*,$(basename $(infile)));))\
+				> $(subst __PLUGIN__,$*,$(basename $(infile)));))
+	touch $@
+
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: \
+ install/uwsgi-plugin-%:
+	set -e; \
 	$(if $(plugin_has_binary),\
 		ln -sf uwsgi-core-local uwsgi_$(plugin_name);\
 		help2man \
@@ -617,8 +633,8 @@ clean::
 	rm -rf apache2/.libs
 	rm -f apache2/*.la apache2/*.lo apache2/*.slo
 
-$(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
- install/libapache2-mod-%:
+$(patsubst %,debian/expand-files/libapache2-mod-%,$(UWSGI_MODULES_apache)): \
+ debian/expand-files/libapache2-mod-%:
 	echo 'LoadModule $(module_apachename)_module /usr/lib/apache2/modules/mod_$(module_name).so' \
 		> debian/$(module_name).load
 	set -e; \
