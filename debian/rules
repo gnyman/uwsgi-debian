@@ -105,8 +105,7 @@ UWSGI_PLUGINS_CUSTOM_BUILD = \
 UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 	$(UWSGI_PLUGINS_CUSTOM_BUILD), $(UWSGI_PLUGINS))
 
-# List of packaged Apache2 modules' names
-LIBAPACHE2_MODS_NAMES = uwsgi ruwsgi proxy-uwsgi
+UWSGI_APACHEMODULES = uwsgi ruwsgi proxy-uwsgi
 
 libapache2mod_to_orig = $(subst -,_,$(subst ruwsgi,Ruwsgi,$(1)))
 
@@ -645,8 +644,8 @@ binary-post-install/uwsgi-plugin-greenlet-python::
 # libapache2-mod-% packages
 # -------------------------
 
-$(patsubst %,build/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):: build/% : debian/stamp-%
-$(patsubst %,debian/stamp-libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)): debian/stamp-libapache2-mod-%:
+$(patsubst %,build/libapache2-mod-%,$(UWSGI_APACHEMODULES)):: build/% : debian/stamp-%
+$(patsubst %,debian/stamp-libapache2-mod-%,$(UWSGI_APACHEMODULES)): debian/stamp-libapache2-mod-%:
 	$(APXS2) -c \
 		`$(APR_CONFIG) --link-ld` `$(APU_CONFIG) --link-ld` \
 		$(CURDIR)/apache2/mod_$(module_name).c
@@ -654,11 +653,11 @@ $(patsubst %,debian/stamp-libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)): debian/sta
 clean::
 	rm -rf apache2/.libs
 	rm -f $(addprefix $(CURDIR)/apache2/mod_, \
-		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
+		$(foreach module_name, $(UWSGI_APACHEMODULES), \
 			$(addprefix $(call libapache2mod_to_orig, $(module_name)), .la .lo .slo) \
 	))
 
-$(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):: install/libapache2-mod-%
+$(patsubst %,install/libapache2-mod-%,$(UWSGI_APACHEMODULES)):: install/libapache2-mod-%
 	# Remove the R from Ruwsgi_module
 	$(eval APACHE_MODULE_NAME = $(subst R,,$(module_name)))
 	sed -e 's/@@module_name@@/$(module_name)/g' \
@@ -673,11 +672,11 @@ $(patsubst %,install/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):: install/libapa
 clean::
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
 		rm -f $(call files_instantiated_in_debian_dir, \
-			libapache2-mod-, $(LIBAPACHE2_MODS_NAMES), .$${TEMPLATE_TYPE} \
+			libapache2-mod-, $(UWSGI_APACHEMODULES), .$${TEMPLATE_TYPE} \
 		); \
 	done
 	rm -f $(addprefix debian/, \
-		$(foreach module_name, $(LIBAPACHE2_MODS_NAMES), \
+		$(foreach module_name, $(UWSGI_APACHEMODULES), \
 			$(addsuffix .load,  $(call libapache2mod_to_orig, $(module_name))) \
 	))
 
