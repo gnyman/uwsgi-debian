@@ -103,7 +103,6 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
 
-# List of packaged Apache2 modules' names
 UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
 
 # List of templates to instantiate for each libapache2-mod-X package
@@ -370,7 +369,7 @@ install/uwsgi-core::
 # uwsgi-plugin-% packages
 # -----------------------
 
-# Build uwsgi-plugin-% package
+# setup hook and config for building plugins
 $(patsubst %,build/uwsgi-plugin-%,$(UWSGI_PLUGIN_PKGS_NAMES)):: \
  build/uwsgi-plugin-%: \
  debian/buildconf/uwsgi-plugin.ini uwsgi-core-local debian/stamp-plugin-%
@@ -384,7 +383,6 @@ uwsgi-core-local:
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--build $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
 
-# Ordinary building of uWSGI plugins
 $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
  debian/stamp-plugin-%:
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
@@ -393,7 +391,6 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
 		         $(plugin_name)
 	touch $@
 
-# Build Java plugins
 #  * eval'ing JAVA_HOME needed to resolve JVM_SERVER_DIR
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_java)): \
  debian/stamp-plugin-%:
@@ -406,7 +403,6 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_java)): \
 		         $(plugin_name)
 	touch $@
 
-# Build python2x_plugin.so/python3x_plugin.so
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_python)): \
  debian/stamp-plugin-%:
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
@@ -422,7 +418,6 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_python)): \
 			> $(CURDIR)/debian/uwsgi-plugin-$(PYTHON_KIND).dirs
 	touch $@
 
-# Build greenlet plugin
 debian/stamp-plugin-greenlet-python: \
  debian/stamp-plugin-%:
 	$(foreach python_version,$(cdbs_python_supported_versions), \
@@ -433,7 +428,6 @@ debian/stamp-plugin-greenlet-python: \
 	)
 	touch $@
 
-# Build rbthreads plugin
 debian/stamp-plugin-rbthreads: \
  debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=$(plugin_interpreter) \
@@ -443,7 +437,6 @@ debian/stamp-plugin-rbthreads: \
 		         $(plugin_name)
 	touch $@
 
-# Build fiber plugin
 debian/stamp-plugin-fiber: \
  debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=$(plugin_interpreter) \
@@ -453,7 +446,6 @@ debian/stamp-plugin-fiber: \
 		         $(plugin_name)
 	touch $@
 
-# Build lua plugins
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_lua)): \
  debian/stamp-plugin-%:
 	UWSGICONFIG_LUA_IMPLEMENTATION=$(call target_name_tail, $@) \
@@ -463,7 +455,6 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_lua)): \
 		         $(plugin_name)
 	touch $@
 
-# Build rack_ruby191_plugin.so
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_ruby)): \
  debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=$(plugin_interpreter) \
@@ -473,7 +464,9 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_ruby)): \
 		         $(plugin_name)
 	touch $@
 
-# Install uwsgi-plugin-% package for ordinarily built uWSGI plugin
+# resolve packaging scripts and man pages
+# ---------------------------------------
+
 $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
  install/uwsgi-plugin-%:
 	for TEMPLATE_TYPE in install links manpages postinst prerm; do \
@@ -511,7 +504,6 @@ $(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_KINDS_java)):: \
 		$(CURDIR)/uwsgi_$(plugin_name) \
 		> $(CURDIR)/debian/uwsgi_$(plugin_name).1; \
 
-# Install uwsgi-plugin-python/uwsgi-plugin-python3 packages
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
  install/uwsgi-plugin-%:
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
@@ -636,7 +628,9 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_ruby)):: \
 		$(CURDIR)/uwsgi_$(plugin_name) \
 		> $(CURDIR)/debian/uwsgi_$(plugin_name).1
 
-# Binary-post-install uwsgi-plugin-python/uwsgi-plugin-python3 packages
+# resolve Python rtupdate scripts
+# -------------------------------
+
 $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
  binary-post-install/uwsgi-plugin-%:
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
@@ -672,18 +666,14 @@ binary-post-install/uwsgi-plugin-greenlet-python:: \
 # libapache2-mod-% packages
 # -------------------------
 
-# Build libapache2-mod-% package
 $(patsubst %,build/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
  build/%: \
  debian/stamp-%
-
-# Build specific Apache2 module
 $(patsubst %,debian/stamp-libapache2-mod-%,$(UWSGI_MODULES_apache)): \
  debian/stamp-libapache2-mod-%:
 	$(APACHE2_BUILDER) apache2/mod_$(module_name).c
 	touch $@
 
-# Install libapache2-mod-% package
 $(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
  install/libapache2-mod-%:
 	sed -e 's/@@module_name@@/$(module_name)/g' \
@@ -697,6 +687,9 @@ $(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
 			< $(CURDIR)/debian/libapache2-mod.$${TEMPLATE_TYPE}.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE} ; \
 	done
+
+# Python module packages
+# ----------------------
 
 # convert Python 2.x module to Python 3
 build/python3-uwsgidecorators:: \
