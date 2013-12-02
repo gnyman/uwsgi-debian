@@ -82,6 +82,7 @@ UWSGI_PYTHON_KINDS = python python3
 UWSGI_PLUGINS_PYTHON = $(UWSGI_PYTHON_KINDS)
 
 UWSGI_JAVA_KINDS = openjdk-6 openjdk-7
+UWSGI_JAVA_DEFAULT_KIND = openjdk-7
 UWSGI_PLUGINS_JAVA = $(foreach stem,jvm jwsgi,$(patsubst %,$(stem)-%,$(UWSGI_JAVA_KINDS)))
 
 UWSGI_LUA_KINDS = lua5.1 lua5.2
@@ -107,6 +108,7 @@ UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 
 UWSGI_PLUGINS_REGULAR_INSTALL = \
 	$(UWSGI_PLUGINS_REGULAR_BUILD) \
+	$(patsubst %,jvm-%,$(UWSGI_JAVA_KINDS)) \
 	$(UWSGI_PLUGINS_LUA) \
 	$(UWSGI_PLUGINS_RUBY)
 
@@ -117,6 +119,7 @@ UWSGI_APACHEMODULES = uwsgi ruwsgi proxy-uwsgi
 # * sec: only binary
 # * aux: only library
 UWSGI_PKGSCRIPTS_DEFAULT = sec
+UWSGI_PKGSCRIPTS_jvm = pri
 UWSGI_PKGSCRIPTS_lua = pri
 UWSGI_PKGSCRIPTS_rack = pri
 
@@ -136,11 +139,15 @@ files_instantiated_in_debian_dir = $(addprefix \
 
 # per-package variables, relying on $* being plugin part of package name
 plugin_name = $(call pkg_name_to_plugin_name,$*)
+plugin_kind_jvm = $(patsubst jvm-%,%,$(filter jvm-%,$*))
 plugin_kind_lua = $(filter lua%,$*)
 plugin_kind_rack = $(patsubst rack-%,%,$(filter rack-%,$*))
-plugin_stem = $(or $(plugin_kind_lua:%=lua),$(plugin_kind_rack:%=rack))
+plugin_stem = $(or $(plugin_kind_jvm:%=jvm),$(plugin_kind_lua:%=lua),$(plugin_kind_rack:%=rack))
 plugin_kind = $(plugin_kind_$(plugin_stem))
-plugin_lang = $(or $(plugin_kind_lua:%=LUA),$(plugin_kind_rack:%=RUBY))
+plugin_lang = $(or \
+	$(if $(filter jvm,$(plugin_kind)),JAVA),\
+	$(plugin_kind_lua:%=LUA),$(plugin_kind_rack:%=RUBY),\
+	)
 plugin_priority = $(if $(filter $(plugin_kind),$(UWSGI_$(plugin_lang)_DEFAULT_KIND)),75,35)
 module_name = $(call libapache2mod_to_orig,$*)
 
@@ -446,26 +453,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: install/
 		--no-info \
 		$(CURDIR)/uwsgi_$(plugin_name) \
 		> $(CURDIR)/debian/uwsgi_$(plugin_name).1; \
-
-$(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_JAVA_KINDS)):: install/uwsgi-plugin-%:
-	for TEMPLATE_TYPE in install links manpages; do \
-		sed \
-			-e 's/@@plugin_name@@/$(plugin_name)/g' \
-				< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.$${TEMPLATE_TYPE}.in \
-				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
-	done
-	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
-	help2man \
-		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
-		--section 1 \
-		--no-info \
-		$(CURDIR)/uwsgi_$(plugin_name) \
-		> $(CURDIR)/debian/uwsgi_$(plugin_name).1; \
-clean::
-	for TEMPLATE_TYPE in links manpages; do \
-		rm -f debian/uwsgi-plugin-jvm-openjdk-6.$${TEMPLATE_TYPE}; \
-		rm -f debian/uwsgi-plugin-jvm-openjdk-7.$${TEMPLATE_TYPE}; \
-	done
 
 $(patsubst %,install/uwsgi-plugin-pyerl-%,$(UWSGI_PYTHON_KINDS))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
