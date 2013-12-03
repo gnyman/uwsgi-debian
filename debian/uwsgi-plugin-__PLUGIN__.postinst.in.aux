@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for uwsgi-plugin-jwsgi-openjdk-7
+# postinst script for @@pkg_name@@
 #
 # see: dh_installdeb(1)
 
@@ -21,10 +21,10 @@ case "$1" in
     configure)
       update-alternatives --quiet \
         --install \
-          /usr/lib/uwsgi/plugins/jwsgi_plugin.so \
-          uwsgi-plugin-jwsgi \
-          /usr/lib/uwsgi/plugins/jwsgi_openjdk7_plugin.so \
-          75
+          /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
+          @@plugin_alternatives_name@@ \
+          /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so \
+          @@plugin_alternatives_priority@@
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

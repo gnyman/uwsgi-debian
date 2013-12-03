@@ -106,7 +106,7 @@ ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 
 UWSGI_PLUGINS_REGULAR_INSTALL = \
 	$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) \
-	$(patsubst %,jvm-%,$(UWSGI_KINDS_java)) \
+	$(UWSGI_PLUGINS_java) \
 	$(UWSGI_PLUGINS_lua) \
 	$(UWSGI_PLUGINS_ruby)
 
@@ -121,6 +121,7 @@ UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
 # * openjdk: non-java code linked against OpenJDK
 UWSGI_PKGSCRIPTS_DEFAULT = sec
 UWSGI_PKGSCRIPTS_jvm = openjdk pri
+UWSGI_PKGSCRIPTS_jwsgi = openjdk aux
 UWSGI_PKGSCRIPTS_lua = pri
 UWSGI_PKGSCRIPTS_rack = pri
 
@@ -256,7 +257,7 @@ clean::
 	rm -f *_plugin.so
 	# instantiated uwsgi-plugin-X templates
 	rm -f $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(UWSGI_KINDS_java)), $(UWSGI_PLUGIN_PKGS_NAMES)), \
+		uwsgi-plugin-, $(UWSGI_PLUGIN_PKGS_NAMES), \
 		.install )
 	for TEMPLATE_TYPE in links manpages postinst prerm lintian-overrides; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
