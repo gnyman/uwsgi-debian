@@ -98,7 +98,6 @@ UWSGI_PLUGINS_RUBY = $(foreach stem,rack,$(patsubst %,$(stem)-%,$(UWSGI_RUBY_KIN
 UWSGI_PLUGINS_CUSTOM_BUILD = \
 	$(UWSGI_PLUGINS_PYTHON) \
 	greenlet-python \
-	$(UWSGI_PLUGINS_JAVA) \
 	$(patsubst %,pyerl-%,$(UWSGI_PYTHON_KINDS)) \
 	rbthreads fiber
 
@@ -106,8 +105,7 @@ UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 	$(UWSGI_PLUGINS_CUSTOM_BUILD), $(UWSGI_PLUGINS))
 
 UWSGI_PLUGINS_REGULAR_INSTALL = \
-	$(UWSGI_PLUGINS_REGULAR_BUILD) \
-	$(UWSGI_PLUGINS_JAVA)
+	$(UWSGI_PLUGINS_REGULAR_BUILD)
 
 UWSGI_APACHEMODULES = uwsgi ruwsgi proxy-uwsgi
 
@@ -148,6 +146,9 @@ plugin_lang = $(or \
 	$(if $(filter jvm jwsgi,$(plugin_kind)),JAVA),\
 	$(plugin_kind_lua:%=LUA),$(plugin_kind_rack:%=RUBY),\
 	)
+plugin_lang_stem = $(if $(filter JAVA,$(plugin_lang)),$(firstword $(subst -, ,$(plugin_kind))))
+plugin_lang_kind = $(if $(filter JAVA,$(plugin_lang)),$(lastword $(subst -, ,$(plugin_kind))))
+plugin_lang_home = $(if $(filter JAVA,$(plugin_lang)),/usr/lib/jvm/java-$(plugin_lang_kind)-$(plugin_lang_stem)-$(DEB_HOST_ARCH))
 plugin_interpreter = $(if $(filter RUBY,$(plugin_lang)),/usr/bin/$(plugin_kind))
 plugin_priority = $(if $(filter $(plugin_kind),$(UWSGI_$(plugin_lang)_DEFAULT_KIND)),75,35)
 module_name = $(call libapache2mod_to_orig,$*)
@@ -356,22 +357,12 @@ clean::
 	rm -f uwsgi-core-local
 
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)): debian/stamp-plugin-%:
+	$(if $(filter JAVA,$(plugin_lang)),UWSGICONFIG_JVM_INCPATH='$(plugin_lang_home)/include/') \
+	$(if $(filter JAVA,$(plugin_lang)),UWSGICONFIG_JVM_LIBPATH='$(JVM_SERVER_DIR)') \
 	$(if $(filter LUA,$(plugin_lang)),UWSGICONFIG_LUA_IMPLEMENTATION=$(plugin_kind)) \
 	$(if $(filter RUBY,$(plugin_lang)),UWSGICONFIG_RUBYPATH=$(plugin_interpreter)) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_basename) \
-		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-		         $(plugin_name)
-	touch $@
-
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_JAVA)): debian/stamp-plugin-%:
-	$(eval OPENJDK_VERSION = $(lastword $(subst -, ,$@)))
-	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(DEB_HOST_ARCH))
-	$(eval PLUGIN_SRC_SUBDIR = $(firstword $(subst _, ,$(plugin_name))))
-	UWSGICONFIG_JVM_INCPATH='$(JAVA_HOME)/include/' \
-	UWSGICONFIG_JVM_LIBPATH='$(JVM_SERVER_DIR)' \
-	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_SRC_SUBDIR) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
