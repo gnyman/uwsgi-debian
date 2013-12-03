@@ -99,9 +99,6 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
 
-UWSGI_PLUGINS_REGULAR_INSTALL = \
-	$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)
-
 UWSGI_MODULE_INFILES := $(wildcard debian/*__MODULE__*.in)
 
 UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
@@ -254,7 +251,7 @@ clean::
 	for TEMPLATE_TYPE in links manpages postinst prerm lintian-overrides; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
-			$(UWSGI_PLUGINS_REGULAR_INSTALL), \
+			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS), \
 			.$${TEMPLATE_TYPE} \
 		); do \
 			rm -f $${INSTANTIATED_TEMPLATE}; \
@@ -451,7 +448,7 @@ debian/stamp-plugin-fiber: \
 # resolve packaging scripts and man pages
 # ---------------------------------------
 
-$(patsubst %,debian/expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)): \
+$(patsubst %,debian/expand-files/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
  debian/expand-files/uwsgi-plugin-%:
 	set -e; \
 	$(foreach infile,$(UWSGI_PLUGIN_INFILES),\
@@ -467,7 +464,7 @@ $(patsubst %,debian/expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)
 				> $(subst __PLUGIN__,$*,$(basename $(infile)));))
 	touch $@
 
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: \
+$(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
  install/uwsgi-plugin-%:
 	set -e; \
 	$(if $(plugin_has_binary),\
