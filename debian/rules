@@ -152,7 +152,11 @@ plugin_priority = $(if $(filter $(plugin_kind),$(UWSGI_$(plugin_lang)_DEFAULT_KI
 module_name = $(call libapache2mod_to_orig,$*)
 
 # per-infile variables, relying on $(infile) and optional $(plugin_stem)
-plugin_infile = $(firstword $(wildcard $(infile).$(UWSGI_PKGSCRIPTS_$(or $(plugin_stem),DEFAULT))) $(infile))
+# plugin_infile picks first existing infile variant:
+# * basename + UWSGI_PKGSCRIPTS_$(plugin_stem) suffix
+# * basename + UWSGI_PKGSCRIPTS_DEFAULT suffix
+# * basename
+plugin_infile = $(firstword $(wildcard $(patsubst %,$(infile).%,$(UWSGI_PKGSCRIPTS_$(or $(plugin_stem),DEFAULT))) $(infile)))
 
 # CDBS-specific variables
 # =======================
