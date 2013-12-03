@@ -104,9 +104,6 @@ UWSGI_PLUGINS_CUSTOM_BUILD = \
 UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 	$(UWSGI_PLUGINS_CUSTOM_BUILD), $(UWSGI_PLUGINS))
 
-UWSGI_PLUGINS_REGULAR_INSTALL = \
-	$(UWSGI_PLUGINS_REGULAR_BUILD)
-
 UWSGI_APACHEMODULES = uwsgi ruwsgi proxy-uwsgi
 
 # type of packaging scripts to use
@@ -215,7 +212,7 @@ clean::
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
 		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, \
-			$(UWSGI_PLUGINS_REGULAR_INSTALL), \
+			$(UWSGI_PLUGINS_REGULAR_BUILD), \
 			.$${TEMPLATE_TYPE} \
 		); do \
 			rm -f $${INSTANTIATED_TEMPLATE}; \
@@ -424,7 +421,7 @@ debian/stamp-plugin-fiber: debian/stamp-plugin-%:
 # ---------------------------------------
 
 infiles_plugin := $(wildcard debian/*__PLUGIN__*.in)
-$(patsubst %,expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: expand-files/uwsgi-plugin-%:
+$(patsubst %,expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: expand-files/uwsgi-plugin-%:
 	$(foreach infile,$(infiles_plugin),$(if $(shell test -s "$(plugin_infile)" && echo "not empty"),sed \
 		-e 's/@@pkg_stem@@/$*/g' \
 		-e 's/@@plugin_name@@/$(plugin_name)/g' \
@@ -434,7 +431,7 @@ $(patsubst %,expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: exp
 		< $(plugin_infile) \
 		> $(subst __PLUGIN__,$*,$(basename $(infile))); ))
 
-$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: install/uwsgi-plugin-%:
+$(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: install/uwsgi-plugin-%:
 	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
 	help2man \
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
