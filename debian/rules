@@ -99,18 +99,15 @@ UWSGI_PLUGINS_CUSTOM_BUILD = \
 	$(UWSGI_PLUGINS_PYTHON) \
 	greenlet-python \
 	$(UWSGI_PLUGINS_JAVA) \
-	$(UWSGI_PLUGINS_LUA) \
 	$(patsubst %,pyerl-%,$(UWSGI_PYTHON_KINDS)) \
-	$(UWSGI_PLUGINS_RUBY) rbthreads fiber
+	rbthreads fiber
 
 UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 	$(UWSGI_PLUGINS_CUSTOM_BUILD), $(UWSGI_PLUGINS))
 
 UWSGI_PLUGINS_REGULAR_INSTALL = \
 	$(UWSGI_PLUGINS_REGULAR_BUILD) \
-	$(UWSGI_PLUGINS_JAVA) \
-	$(UWSGI_PLUGINS_LUA) \
-	$(UWSGI_PLUGINS_RUBY)
+	$(UWSGI_PLUGINS_JAVA)
 
 UWSGI_APACHEMODULES = uwsgi ruwsgi proxy-uwsgi
 
@@ -145,12 +142,13 @@ plugin_kind_jwsgi = $(patsubst jwsgi-%,%,$(filter jwsgi-%,$*))
 plugin_kind_lua = $(filter lua%,$*)
 plugin_kind_rack = $(patsubst rack-%,%,$(filter rack-%,$*))
 plugin_stem = $(or $(plugin_kind_jvm:%=jvm),$(plugin_kind_jwsgi:%=jwsgi),$(plugin_kind_lua:%=lua),$(plugin_kind_rack:%=rack))
+plugin_basename = $(or $(plugin_stem),$(plugin_name))
 plugin_kind = $(plugin_kind_$(plugin_stem))
 plugin_lang = $(or \
 	$(if $(filter jvm jwsgi,$(plugin_kind)),JAVA),\
 	$(plugin_kind_lua:%=LUA),$(plugin_kind_rack:%=RUBY),\
 	)
-=======
+plugin_interpreter = $(if $(filter RUBY,$(plugin_lang)),/usr/bin/$(plugin_kind))
 plugin_priority = $(if $(filter $(plugin_kind),$(UWSGI_$(plugin_lang)_DEFAULT_KIND)),75,35)
 module_name = $(call libapache2mod_to_orig,$*)
 
@@ -358,8 +356,10 @@ clean::
 	rm -f uwsgi-core-local
 
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)): debian/stamp-plugin-%:
+	$(if $(filter LUA,$(plugin_lang)),UWSGICONFIG_LUA_IMPLEMENTATION=$(plugin_kind)) \
+	$(if $(filter RUBY,$(plugin_lang)),UWSGICONFIG_RUBYPATH=$(plugin_interpreter)) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_basename) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
@@ -425,22 +425,6 @@ debian/stamp-plugin-fiber: debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_RUBY_DEFAULT_KIND) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
-		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-		         $(plugin_name)
-	touch $@
-
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_LUA)): debian/stamp-plugin-%:
-	UWSGICONFIG_LUA_IMPLEMENTATION=$(call target_name_tail, $@) \
-	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/lua \
-		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-		         $(plugin_name)
-	touch $@
-
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_RUBY)): debian/stamp-plugin-%:
-	UWSGICONFIG_RUBYPATH=/usr/bin/$(call target_name_tail, $@) \
-	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/rack \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
