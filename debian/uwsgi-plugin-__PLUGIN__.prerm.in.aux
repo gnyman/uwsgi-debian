@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for uwsgi-plugin-jwsgi-openjdk-7
+# prerm script for uwsgi-plugin-@@plugin_name@@
 #
 # see: dh_installdeb(1)
 
@@ -20,8 +20,8 @@ case "$1" in
     remove)
       update-alternatives --quiet \
         --remove \
-          uwsgi-plugin-jwsgi \
-          /usr/lib/uwsgi/plugins/jwsgi_openjdk7_plugin.so
+          uwsgi-plugin-@@plugin_stem@@ \
+          /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so
     ;;
 
     upgrade|deconfigure|failed-upgrade)

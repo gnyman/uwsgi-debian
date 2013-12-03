@@ -108,7 +108,7 @@ UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 
 UWSGI_PLUGINS_REGULAR_INSTALL = \
 	$(UWSGI_PLUGINS_REGULAR_BUILD) \
-	$(patsubst %,jvm-%,$(UWSGI_JAVA_KINDS)) \
+	$(UWSGI_PLUGINS_JAVA) \
 	$(UWSGI_PLUGINS_LUA) \
 	$(UWSGI_PLUGINS_RUBY)
 
@@ -120,6 +120,7 @@ UWSGI_APACHEMODULES = uwsgi ruwsgi proxy-uwsgi
 # * aux: only library
 UWSGI_PKGSCRIPTS_DEFAULT = sec
 UWSGI_PKGSCRIPTS_jvm = pri
+UWSGI_PKGSCRIPTS_jwsgi = aux
 UWSGI_PKGSCRIPTS_lua = pri
 UWSGI_PKGSCRIPTS_rack = pri
 
@@ -140,14 +141,16 @@ files_instantiated_in_debian_dir = $(addprefix \
 # per-package variables, relying on $* being plugin part of package name
 plugin_name = $(call pkg_name_to_plugin_name,$*)
 plugin_kind_jvm = $(patsubst jvm-%,%,$(filter jvm-%,$*))
+plugin_kind_jwsgi = $(patsubst jwsgi-%,%,$(filter jwsgi-%,$*))
 plugin_kind_lua = $(filter lua%,$*)
 plugin_kind_rack = $(patsubst rack-%,%,$(filter rack-%,$*))
-plugin_stem = $(or $(plugin_kind_jvm:%=jvm),$(plugin_kind_lua:%=lua),$(plugin_kind_rack:%=rack))
+plugin_stem = $(or $(plugin_kind_jvm:%=jvm),$(plugin_kind_jwsgi:%=jwsgi),$(plugin_kind_lua:%=lua),$(plugin_kind_rack:%=rack))
 plugin_kind = $(plugin_kind_$(plugin_stem))
 plugin_lang = $(or \
-	$(if $(filter jvm,$(plugin_kind)),JAVA),\
+	$(if $(filter jvm jwsgi,$(plugin_kind)),JAVA),\
 	$(plugin_kind_lua:%=LUA),$(plugin_kind_rack:%=RUBY),\
 	)
+=======
 plugin_priority = $(if $(filter $(plugin_kind),$(UWSGI_$(plugin_lang)_DEFAULT_KIND)),75,35)
 module_name = $(call libapache2mod_to_orig,$*)
 
@@ -207,7 +210,7 @@ clean::
 	rm -f *_plugin.so
 	# instantiated uwsgi-plugin-X templates
 	rm -f $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(filter-out $(patsubst %,jwsgi-%,$(UWSGI_JAVA_KINDS)), $(UWSGI_PLUGINS)), \
+		uwsgi-plugin-, $(UWSGI_PLUGINS), \
 		.install \
 	)
 	for TEMPLATE_TYPE in links manpages postinst prerm; do \
@@ -447,14 +450,14 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_RUBY)): debian/stamp-plugin-%
 
 infiles_plugin := $(wildcard debian/*__PLUGIN__*.in)
 $(patsubst %,expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: expand-files/uwsgi-plugin-%:
-	$(foreach infile,$(infiles_plugin),sed \
+	$(foreach infile,$(infiles_plugin),$(if $(shell test -s "$(plugin_infile)" && echo "not empty"),sed \
 		-e 's/@@pkg_stem@@/$*/g' \
 		-e 's/@@plugin_name@@/$(plugin_name)/g' \
 		-e 's/@@plugin_alternatives_priority@@/$(plugin_priority)/g' \
 		-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 		-e 's/@@plugin_kind@@/$(plugin_kind)/g' \
 		< $(plugin_infile) \
-		> $(subst __PLUGIN__,$*,$(basename $(infile))); )
+		> $(subst __PLUGIN__,$*,$(basename $(infile))); ))
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: install/uwsgi-plugin-%:
 	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
