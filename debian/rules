@@ -87,28 +87,23 @@ UWSGI_SRCPLUGINS_java = jvm jwsgi
 
 UWSGI_KINDS_lua = lua5.1 lua5.2
 UWSGI_DEFAULTKIND_lua = lua5.1
-UWSGI_PLUGINS_lua = $(UWSGI_KINDS_lua)
 
 UWSGI_KINDS_ruby = ruby1.9.1
 UWSGI_DEFAULTKIND_ruby = ruby1.9.1
-UWSGI_PLUGINS_ruby = $(foreach stem,rack,$(patsubst %,$(stem)-%,$(UWSGI_KINDS_ruby)))
 UWSGI_SRCPLUGINS_ruby = rack
 
 PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGINS_python) \
 	greenlet-python \
 	$(UWSGI_PLUGINS_java) \
-	$(UWSGI_PLUGINS_lua) \
-	$(UWSGI_PLUGINS_ruby) rbthreads fiber
+	rbthreads fiber
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
 
 UWSGI_PLUGINS_REGULAR_INSTALL = \
 	$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS) \
-	$(UWSGI_PLUGINS_java) \
-	$(UWSGI_PLUGINS_lua) \
-	$(UWSGI_PLUGINS_ruby)
+	$(UWSGI_PLUGINS_java)
 
 UWSGI_MODULE_INFILES := $(wildcard debian/*__MODULE__*.in)
 
@@ -400,6 +395,8 @@ clean::
 
 $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
  debian/stamp-plugin-%:
+	$(if $(filter lua,$(plugin_lang)),UWSGICONFIG_LUA_IMPLEMENTATION=$(plugin_kind)) \
+	$(if $(filter ruby,$(plugin_lang)),UWSGICONFIG_RUBYPATH=$(plugin_interpreter)) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
@@ -453,24 +450,6 @@ debian/stamp-plugin-rbthreads: \
 	touch $@
 
 debian/stamp-plugin-fiber: \
- debian/stamp-plugin-%:
-	UWSGICONFIG_RUBYPATH=$(plugin_interpreter) \
-	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
-		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-		         $(plugin_name)
-	touch $@
-
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_lua)): \
- debian/stamp-plugin-%:
-	UWSGICONFIG_LUA_IMPLEMENTATION=$(call target_name_tail, $@) \
-	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
-		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-		         $(plugin_name)
-	touch $@
-
-$(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_ruby)): \
  debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=$(plugin_interpreter) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
