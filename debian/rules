@@ -1,6 +1,7 @@
 #!/usr/bin/make -f
 
 include /usr/share/cdbs/1/rules/upstream-tarball.mk
+include /usr/share/cdbs/1/rules/utils.mk
 include /usr/share/cdbs/1/class/python-module.mk
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/javahelper/java-vars.mk
@@ -266,7 +267,7 @@ pre-build:: \
  $(patsubst %,debian/expand-files/%,$(DEB_ALL_PACKAGES))
 $(patsubst %,debian/expand-files/%,$(DEB_ALL_PACKAGES)): \
  debian/expand-files/%: \
- | debian/expand-files update-config
+ | debian/expand-files update-config debian/stamp-copyright-check
 debian/expand-files:
 	mkdir debian/expand-files
 clean::
