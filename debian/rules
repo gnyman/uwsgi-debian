@@ -71,10 +71,6 @@ pkg_name_to_plugin_name = $(strip \
 # List of plugins' packages names (without common prefix 'uwsgi-plugin-')
 UWSGI_PLUGINS = $(call list_pkgname_suffixes,uwsgi-plugin-)
 
-# List of plugins' names
-UWSGI_PLUGINS_NAMES = $(call \
-	pkg_name_to_plugin_name, $(UWSGI_PLUGINS))
-
 UWSGI_PLUGINS_SRC_DIR = plugins
 
 # TODO: Package separately each actual kind (e.g. python2.7 and python3.3)
@@ -218,11 +214,7 @@ clean::
 			rm -f $${INSTANTIATED_TEMPLATE}; \
 		done; \
 	done
-	# generated manpages
-	rm -f $(call files_instantiated_in_debian_dir, \
-		uwsgi_, $(UWSGI_PLUGINS_NAMES), .1 \
-	)
-	# stampfiles
+	rm -f debian/*.1
 	rm -f debian/stamp-*
 	rm -f uwsgibuild.*
 
@@ -298,9 +290,7 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 	done
 clean::
 	rm -f uwsgi-core
-	for PLUGIN_NAME in $(UWSGI_PLUGINS_NAMES); do \
-		rm -f uwsgi_$${PLUGIN_NAME}; \
-	done
+	find -type l -name 'uwsgi_*' -delete
 
 DEB_INSTALL_DOCS_uwsgi-core += tests
 
@@ -328,8 +318,6 @@ install/uwsgi-core::
 		--no-info \
 		$(CURDIR)/uwsgi-core \
 		> $(CURDIR)/debian/uwsgi-core.1
-clean::
-	rm -f debian/uwsgi-core.1
 
 # uwsgi-plugin-% packages
 # -----------------------
@@ -438,7 +426,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: install/uw
 		--section 1 \
 		--no-info \
 		$(CURDIR)/uwsgi_$(plugin_name) \
-		> $(CURDIR)/debian/uwsgi_$(plugin_name).1; \
+		> $(CURDIR)/debian/uwsgi_$(plugin_name).1
 
 $(patsubst %,install/uwsgi-plugin-pyerl-%,$(UWSGI_PYTHON_KINDS))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
@@ -494,16 +482,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_PYTHON))::
 			> $(CURDIR)/debian/uwsgi_python$${PYTHON_VERSION}.1; \
 	done
 clean::
-	for PYTHON_VERSION in $(PYTHON_VERS) $(PYTHON3_VERS); do \
-		rm -f \
-			uwsgi_python$${PYTHON_VERSION} \
-			greenlet_python$${PYTHON_VERSION}_plugin.so \
-			pyerl_python$${PYTHON_VERSION}_plugin.so \
-			python$${PYTHON_VERSION}_plugin.so; \
-	done
-	rm -f $(call files_instantiated_in_debian_dir, \
-		uwsgi_python, $(PYTHON_VERS) $(PYTHON3_VERS), .1 \
-	)
 	for TEMPLATE_TYPE in dirs links manpages postinst prerm; do \
 		rm -f $(call files_instantiated_in_debian_dir, \
 			uwsgi-plugin-, $(UWSGI_PYTHON_KINDS), .$${TEMPLATE_TYPE} \
