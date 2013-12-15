@@ -117,8 +117,6 @@ UWSGI_PKGSCRIPTS_jwsgi = aux
 UWSGI_PKGSCRIPTS_lua = pri
 UWSGI_PKGSCRIPTS_rack = pri
 
-libapache2mod_to_orig = $(subst -,_,$(subst ruwsgi,Ruwsgi,$(1)))
-
 # Discards directory-part of target and returns substring after last '-'
 # character
 target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
@@ -149,7 +147,8 @@ plugin_lang_kind = $(if $(filter JAVA,$(plugin_lang)),$(lastword $(subst -, ,$(p
 plugin_lang_home = $(if $(filter JAVA,$(plugin_lang)),/usr/lib/jvm/java-$(plugin_lang_kind)-$(plugin_lang_stem)-$(DEB_HOST_ARCH))
 plugin_interpreter = $(if $(filter RUBY,$(plugin_lang)),/usr/bin/$(plugin_kind))
 plugin_priority = $(if $(filter $(plugin_kind),$(UWSGI_$(plugin_lang)_DEFAULT_KIND)),75,35)
-module_name = $(call libapache2mod_to_orig,$*)
+apachemodule_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
+apachemodule_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
 
 # per-infile variables, relying on $(infile) and optional $(plugin_stem)
 # plugin_infile picks first existing infile variant:
@@ -590,24 +589,19 @@ $(patsubst %,build/libapache2-mod-%,$(UWSGI_APACHEMODULES)):: build/% : debian/s
 $(patsubst %,debian/stamp-libapache2-mod-%,$(UWSGI_APACHEMODULES)): debian/stamp-libapache2-mod-%:
 	$(APXS2) -c \
 		`$(APR_CONFIG) --link-ld` `$(APU_CONFIG) --link-ld` \
-		$(CURDIR)/apache2/mod_$(module_name).c
+		$(CURDIR)/apache2/mod_$(apachemodule_name).c
 	touch $@
 clean::
 	rm -rf apache2/.libs
-	rm -f $(addprefix $(CURDIR)/apache2/mod_, \
-		$(foreach module_name, $(UWSGI_APACHEMODULES), \
-			$(addprefix $(call libapache2mod_to_orig, $(module_name)), .la .lo .slo) \
-	))
+	rm -f apache2/*.la apache2/*.lo apache2/*.slo
 
 # resolve control files and apache2-specific module hint files
 infiles_module := $(wildcard debian/*__MODULE__*.in)
 $(patsubst %,expand-files/libapache2-mod-%,$(UWSGI_APACHEMODULES)):: expand-files/libapache2-mod-%:
-	# Remove the R from Ruwsgi_module
-	$(eval APACHE_MODULE_NAME = $(subst R,,$(module_name)))
 	$(foreach infile,$(infiles_module),sed \
 		-e 's/@@pkg_stem@@/$*/g' \
-		-e 's/@@module_name@@/$(module_name)/g' \
-		-e 's/@@apache_module_name@@/$(APACHE_MODULE_NAME)/g' \
+		-e 's/@@module_name@@/$(apachemodule_name)/g' \
+		-e 's/@@apache_module_name@@/$(apachemodule_apachename)/g' \
 		< $(infile) \
 		> $(subst __MODULE__,$*,$(basename $(infile))); )
 clean::
