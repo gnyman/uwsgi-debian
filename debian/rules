@@ -178,15 +178,11 @@ CDBS_DEPENDS_uwsgi-plugin-php +=, $(if $(PHP_SONAME_ALWAYS_CHANGE),\
 	libphp5-embed (= $(PHP_VERSION)),\
 	libphp5-embed (>= $(PHP_VERSION)~))
 
-CDBS_DEPENDS_libapache2-mod-proxy-uwsgi = $(APACHE2_API:%=apache2-api-%)
-CDBS_DEPENDS_libapache2-mod-uwsgi = $(APACHE2_API:%=apache2-api-%)
-CDBS_DEPENDS_libapache2-mod-ruwsgi = $(APACHE2_API:%=apache2-api-%)
-CDBS_RECOMMENDS_libapache2-mod-proxy-uwsgi = uwsgi-core
-CDBS_RECOMMENDS_libapache2-mod-uwsgi = uwsgi-core
-CDBS_RECOMMENDS_libapache2-mod-ruwsgi = uwsgi-core
-CDBS_SUGGESTS_libapache2-mod-proxy-uwsgi = uwsgi
-CDBS_SUGGESTS_libapache2-mod-uwsgi = uwsgi
-CDBS_SUGGESTS_libapache2-mod-ruwsgi = uwsgi
+$(foreach module, $(UWSGI_APACHEMODULES),\
+	$(eval CDBS_DEPENDS_libapache2-mod-$(module) = $(APACHE2_API:%=apache2-api-%))\
+	$(eval CDBS_RECOMMENDS_libapache2-mod-$(module) = uwsgi-core)\
+	$(eval CDBS_SUGGESTS_libapache2-mod-$(module) = uwsgi)\
+)
 
 # Rules
 # =====
