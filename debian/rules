@@ -114,14 +114,6 @@ UWSGI_PKGSCRIPTS_rack = pri
 # character
 target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
 
-# From something like:
-#   $(call <...>, uwsgi-, $(UWSGI_PYTHON_KINDS), .dirs)
-# makes list:
-#   $(CURDIR)/debian/uwsgi-python.dirs $(CURDIR)/debian/uwsgi-python3.dirs
-files_instantiated_in_debian_dir = $(addprefix \
-	$(CURDIR)/debian/$(strip $(1)), $(addsuffix $(strip $(3)), $(strip $(2))) \
-)
-
 # per-package variables, relying on $* being plugin part of package name
 plugin_name = $(call pkg_name_to_plugin_name,$*)
 plugin_kind_jvm = $(patsubst jvm-%,%,$(filter jvm-%,$*))
@@ -193,20 +185,7 @@ clean::
 		\! -path './debian/*' -name __pycache__ -type d \
 		-delete
 	rm -f *_plugin.so
-	# instantiated uwsgi-plugin-X templates
-	rm -f $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(UWSGI_PLUGINS), \
-		.install \
-	)
-	for TEMPLATE_TYPE in links manpages postinst prerm; do \
-		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-, \
-			$(UWSGI_PLUGINS_REGULAR_BUILD), \
-			.$${TEMPLATE_TYPE} \
-		); do \
-			rm -f $${INSTANTIATED_TEMPLATE}; \
-		done; \
-	done
+	rm -f $(foreach suffix,install dirs links manpages postinst prerm,$(addsuffix .$(suffix),debian/uwsgi-plugin-*))
 	rm -f debian/*.1
 	rm -f debian/stamp-*
 	rm -f uwsgibuild.*
@@ -438,13 +417,6 @@ $(patsubst %,install/uwsgi-plugin-pyerl-%,$(UWSGI_PYTHON_KINDS))::
 			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
 	done
-clean::
-	for TEMPLATE_TYPE in dirs links manpages postinst prerm; do \
-		rm -f $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-pyerl-, \
-			$(UWSGI_PYTHON_KINDS), .$${TEMPLATE_TYPE} \
-		); \
-	done
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_PYTHON))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
@@ -474,12 +446,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_PYTHON))::
 			$(CURDIR)/uwsgi_python$${PYTHON_VERSION} \
 			> $(CURDIR)/debian/uwsgi_python$${PYTHON_VERSION}.1; \
 	done
-clean::
-	for TEMPLATE_TYPE in dirs links manpages postinst prerm; do \
-		rm -f $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-, $(UWSGI_PYTHON_KINDS), .$${TEMPLATE_TYPE} \
-		); \
-	done
 
 install/uwsgi-plugin-greenlet-python::
 	for TEMPLATE_TYPE in postinst prerm; do \
@@ -493,13 +459,6 @@ install/uwsgi-plugin-greenlet-python::
 		sed -e "s/@@plugin_name@@/greenlet_python$${PYTHON_VERSION}/g" \
 			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install; \
-	done
-clean::
-	for TEMPLATE_TYPE in postinst prerm; do \
-		rm -f $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-greenlet-, \
-			$(UWSGI_PYTHON_KINDS), .$${TEMPLATE_TYPE} \
-		); \
 	done
 
 install/uwsgi-plugin-rbthreads:: install/uwsgi-plugin-%:
