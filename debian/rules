@@ -177,13 +177,9 @@ $(foreach module, $(UWSGI_APACHEMODULES),\
 # =====
 
 clean::
-	# intermediate compiled files
-	find . \
-		\! -path './debian/*' \( -name '*.o' -o -name '*.pyc' \) -type f \
-		-delete
-	find . \
-		\! -path './debian/*' -name __pycache__ -type d \
-		-delete
+	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) --clean
+	find -type f -name '*.pyc' -delete
+	find -type d -name __pycache__ -delete
 	rm -f *_plugin.so
 	rm -f $(foreach suffix,install dirs links manpages postinst prerm,$(addsuffix .$(suffix),debian/uwsgi-plugin-*))
 	rm -f debian/*.1
