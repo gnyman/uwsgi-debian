@@ -115,14 +115,6 @@ UWSGI_PKGSCRIPTS_rack = pri
 # character
 target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
 
-# From something like:
-#   $(call <...>, uwsgi-, $(UWSGI_KINDS_python), .dirs)
-# makes list:
-#   $(CURDIR)/debian/uwsgi-python.dirs $(CURDIR)/debian/uwsgi-python3.dirs
-files_instantiated_in_debian_dir = $(addprefix \
-	$(CURDIR)/debian/$(strip $(1)), $(addsuffix $(strip $(3)), $(strip $(2))) \
-)
-
 # Stem-based variables
 # ====================
 
@@ -241,19 +233,11 @@ clean::
 	find -type d -name __pycache__ -delete
 	find -type f \( -name '*.class' -or -name '*.jar' \) -delete
 	rm -f *_plugin.so
-	# instantiated uwsgi-plugin-X templates
-	rm -f $(call files_instantiated_in_debian_dir, \
-		uwsgi-plugin-, $(UWSGI_PLUGIN_PKGS_NAMES), \
-		.install )
-	for TEMPLATE_TYPE in links manpages postinst prerm lintian-overrides; do \
-		for INSTANTIATED_TEMPLATE in $(call files_instantiated_in_debian_dir, \
-			uwsgi-plugin-, \
-			$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS), \
-			.$${TEMPLATE_TYPE} \
-		); do \
-			rm -f $${INSTANTIATED_TEMPLATE}; \
-		done; \
-	done
+	find debian \
+		-regextype posix-egrep -regex \
+		'.*/uwsgi-plugin-.*\.(install|dirs|links|manpages|postinst|prerm|lintian-overrides)' \
+		-not -name '*greenlet*' \
+		-delete
 	rm -f debian/*.1
 	rm -f debian/stamp-*
 	rm -f uwsgibuild.*
@@ -505,10 +489,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 			--no-info \
 			$(CURDIR)/uwsgi_python$(PYTHON_VERSION) \
 			> $(CURDIR)/debian/uwsgi_python$(PYTHON_VERSION).1;)
-clean::
-	rm -f $(foreach python,$(UWSGI_KINDS_python),\
-		$(patsubst %,debian/uwsgi-plugin-$(python).%,\
-			dirs links manpages postinst prerm))
 
 install/uwsgi-plugin-greenlet-python:: \
  install/uwsgi-plugin-%:
