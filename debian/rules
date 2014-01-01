@@ -56,9 +56,6 @@ PYTHON3_DEFAULT=$(subst .,,$(cdbs_python3_current_version))
 # * leading slash emitted
 python_installdir = usr/lib/$(or $(cdbs_curpythonstem:%=python%),$(cdbs_curpythonpribinary))/dist-packages
 
-# Search in debian/control for packages with name $(1)% and extract % in list.
-list_pkgname_suffixes = $(patsubst $(1)%,%,$(filter $(1)%,$(DEB_PACKAGES)))
-
 # Transform plugin's package name to plugin's name:
 # * delete dots
 # * replace '-' with '_'
@@ -69,7 +66,7 @@ pkg_name_to_plugin_name = $(strip \
 ))
 
 # List of plugins' packages names (without common prefix 'uwsgi-plugin-')
-UWSGI_PLUGINS = $(call list_pkgname_suffixes,uwsgi-plugin-)
+UWSGI_PLUGINS = $(patsubst uwsgi-plugin-%,%,$(filter uwsgi-plugin-%,$(DEB_PACKAGES)))
 
 UWSGI_PLUGINS_SRC_DIR = plugins
 
