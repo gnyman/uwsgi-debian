@@ -136,11 +136,13 @@ apachemodule_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 apachemodule_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
 
 # per-infile variables, relying on $(infile) and optional $(plugin_stem)
+plugin_pkgtype = $(UWSGI_PKGSCRIPTS_$(or $(plugin_basename),DEFAULT))
+plugin_has_binary = $(filter pri sec,$(plugin_pkgtype))
 # plugin_infile picks first existing infile variant:
 # * basename + UWSGI_PKGSCRIPTS_$(plugin_stem) suffix
 # * basename + UWSGI_PKGSCRIPTS_DEFAULT suffix
 # * basename
-plugin_infile = $(firstword $(wildcard $(patsubst %,$(infile).%,$(UWSGI_PKGSCRIPTS_$(or $(plugin_stem),DEFAULT))) $(infile)))
+plugin_infile = $(firstword $(wildcard $(patsubst %,$(infile).%,$(plugin_pkgtype)) $(infile)))
 
 # CDBS-specific variables
 # =======================
@@ -388,13 +390,13 @@ $(patsubst %,expand-files/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: expan
 		> $(subst __PLUGIN__,$*,$(basename $(infile))); ))
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_BUILD)):: install/uwsgi-plugin-%:
-	ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name)
-	help2man \
-		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
+	$(if $(plugin_has_binary),ln -sf $(CURDIR)/uwsgi-core-local $(CURDIR)/uwsgi_$(plugin_name))
+	$(if $(plugin_has_binary),help2man \
+		--name 'fast (pure C)$(comma) self-healing$(comma) developer-friendly WSGI server' \
 		--section 1 \
 		--no-info \
-		$(CURDIR)/uwsgi_$(plugin_name) \
-		> $(CURDIR)/debian/uwsgi_$(plugin_name).1
+		./uwsgi_$(plugin_name) \
+		> debian/uwsgi_$(plugin_name).1)
 
 $(patsubst %,install/uwsgi-plugin-pyerl-%,$(UWSGI_PYTHON_KINDS))::
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
