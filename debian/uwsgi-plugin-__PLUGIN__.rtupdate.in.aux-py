@@ -6,7 +6,7 @@ if [ "x$1" = "xrtupdate" ]; then
   # Transform new default Python runtime name from 'pythonX.Y' to 'pythonXY'.
   NEW_RTNAME_DOTLESS="$(echo "$3" | tr -d .)"
 
-  # Versions of Python interpreter which was available at packaging moment
+  # Flavors of Python interpreter which was available at packaging moment
   # (and for which appropriate @@plugin_alternatives_stem@@_*_plugin.so was built).
   KNOWN_FLAVORS_DOTLESS="@@plugin_flavors_dotless@@"
 
@@ -15,8 +15,8 @@ if [ "x$1" = "xrtupdate" ]; then
 
   for maybe_new_defaultflavor_dotless in $KNOWN_FLAVORS_DOTLESS; do
 
-    # Check if pythonX.Y runtime (where pythonX.Y is a new default Python
-    # version) was available at packaging moment.
+    # Check if * runtime (where * is a new default Python
+    # flavor) was available at packaging moment.
     #
     # If it wasn't available, there is no point in changing default alternative
     # (as appropriate @@plugin_alternatives_stem@@_*_plugin.so wasn't built and packaged).
@@ -34,7 +34,7 @@ if [ "x$1" = "xrtupdate" ]; then
             $ALT_PLUGIN_ALTERNATIVE_PRIORITY
       done
 
-      # Set higher priority for @@plugin_alternatives_stem@@_pythonXY_plugin.so (where pythonX.Y is
+      # Set higher priority for @@plugin_alternatives_stem@@_*_plugin.so (where * is
       # a new default Python version).
       update-alternatives --quiet \
         --install \

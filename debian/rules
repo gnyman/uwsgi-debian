@@ -83,7 +83,6 @@ UWSGI_SRCPLUGINS_ruby = rack
 
 PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 	$(UWSGI_PLUGINS_python) \
-	greenlet-python \
 	rbthreads fiber
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
@@ -97,12 +96,15 @@ UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
 # * pri: binary and library
 # * sec: only binary
 # * aux: only library
+# * *-py: same as above but for (potentially) multiple python flavors
 # * openjdk: non-java code linked against OpenJDK
+# * python: python hooks
 UWSGI_PKGSCRIPTS_DEFAULT = sec
 UWSGI_PKGSCRIPTS_jvm = openjdk pri
 UWSGI_PKGSCRIPTS_jwsgi = openjdk aux
 UWSGI_PKGSCRIPTS_lua = pri
 UWSGI_PKGSCRIPTS_rack = pri
+UWSGI_PKGSCRIPTS_greenlet = python aux-py aux
 
 # Stem-based variables
 # ====================
@@ -230,8 +232,7 @@ clean::
 	rm -f *_plugin.so
 	find debian \
 		-regextype posix-egrep -regex \
-		'.*/uwsgi-plugin-.*\.(install|dirs|links|manpages|postinst|prerm|lintian-overrides)' \
-		-not -name '*greenlet*' \
+		'.*/uwsgi-plugin-.*\.(install|dirs|links|manpages|postinst|prerm|lintian-overrides|rtupdate)' \
 		-delete
 	rm -f debian/*.1
 	rm -f debian/stamp-*
@@ -372,10 +373,16 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
 	$(if $(filter java,$(plugin_lang)),UWSGICONFIG_JVM_LIBPATH='$(JVM_SERVER_DIR)') \
 	$(if $(filter lua,$(plugin_lang)),UWSGICONFIG_LUA_IMPLEMENTATION=$(plugin_kind)) \
 	$(if $(filter ruby,$(plugin_lang)),UWSGICONFIG_RUBYPATH=$(plugin_interpreter)) \
-	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
-		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-		         $(plugin_name)
+	$(if $(filter python,$(plugin_lang)),\
+		$(foreach flavor,$(plugin_flavors),\
+			$(call cdbs_python_binary,$(flavor)) $(UWSGI_BUILDER) \
+				--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
+				$(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+				$(plugin_stem:=_)$(subst .,,$(flavor));),\
+		$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
+			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
+			$(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+			$(plugin_name))
 	touch $@
 
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_python)): \
@@ -389,16 +396,6 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_python)): \
 	sed -e 's/@@python_kind@@/$(plugin_lang_kind)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.dirs.in \
 			> $(CURDIR)/debian/uwsgi-plugin-$(plugin_lang_kind).dirs
-	touch $@
-
-debian/stamp-plugin-greenlet-python: \
- debian/stamp-plugin-%:
-	$(foreach flavor,$(plugin_flavors), \
-		$(call cdbs_python_binary,$(flavor)) $(UWSGI_BUILDER) \
-			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
-			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-			         $(plugin_stem)_$(subst .,,$(flavor)); \
-	)
 	touch $@
 
 debian/stamp-plugin-rbthreads: \
@@ -434,8 +431,20 @@ $(patsubst %,debian/expand-files/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_
 				-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 				-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 				-e 's/@@plugin_alternatives_priority@@/$(plugin_alternatives_priority)/g' \
+				-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
+				-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
+				-e 's/@@plugin_defaultflavor_dotless@@/$(subst .,,$(plugin_defaultflavor))/g' \
 				< $(plugin_infile) \
-				> $(subst __PLUGIN__,$*,$(basename $(infile)));))
+				> $(subst __PLUGIN__,$*,$(basename $(infile)));))\
+	$(if $(filter python,$(plugin_lang)),\
+		$(foreach flavor,$(plugin_flavors),\
+			sed \
+				-e "s/@@plugin_name@@/$(plugin_stem:=_)$(subst .,,$(flavor))/g" \
+				< debian/uwsgi-plugin-__PLUGIN__.install.in \
+				>> debian/$(cdbs_curpkg).install;)\
+		chmod 755 debian/$(cdbs_curpkg).rtupdate;\
+		echo "debian/$(cdbs_curpkg).rtupdate usr/share/$(plugin_lang_kind)/runtime.d" \
+			>> debian/$(cdbs_curpkg).install )
 	touch $@
 
 $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
@@ -480,29 +489,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 			$(CURDIR)/uwsgi_$(subst .,,$(flavor)) \
 			> $(CURDIR)/debian/uwsgi_$(subst .,,$(flavor)).1;)
 
-install/uwsgi-plugin-greenlet-python:: \
- install/uwsgi-plugin-%:
-	set -e; \
-	$(foreach TEMPLATE_TYPE,postinst prerm,\
-		sed \
-			-e 's/@@pkg_name@@/$(pkg_name)/g' \
-			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
-			-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
-			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
-			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
-			-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
-			-e 's/@@plugin_defaultflavor_dotless@@/$(subst .,,$(plugin_defaultflavor))/g' \
-			< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.$(TEMPLATE_TYPE).in \
-			> $(CURDIR)/debian/$(cdbs_curpkg).$(TEMPLATE_TYPE);)\
-	$(foreach flavor,$(plugin_flavors),\
-		sed \
-			-e "s/@@plugin_name@@/greenlet_$(subst .,,$(flavor))/g" \
-			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
-			>> $(CURDIR)/debian/$(cdbs_curpkg).install;)
-clean::
-	rm -f $(patsubst %,debian/uwsgi-plugin-greenlet-python.%,\
-		install postinst prerm)
-
 install/uwsgi-plugin-rbthreads:: \
  install/uwsgi-plugin-%:
 	sed \
@@ -532,21 +518,6 @@ $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 		-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
 		-e 's/@@python_kind@@/$(plugin_lang_kind)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.rtupdate.in \
-			> $(PYTHON_RTUPDATE_SCRIPT)
-	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
-
-binary-post-install/uwsgi-plugin-greenlet-python:: \
- binary-post-install/uwsgi-plugin-%:
-	$(eval PYTHON_RTUPDATE_SCRIPT = \
-		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/python/runtime.d/uwsgi-plugin-greenlet-python.rtupdate \
-	)
-	sed \
-		-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
-		-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
-		-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
-		-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
-		-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
-			< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)
 	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
 
