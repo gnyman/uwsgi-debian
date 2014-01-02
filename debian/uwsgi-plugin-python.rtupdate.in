@@ -8,34 +8,34 @@ if [ "x$1" = "xrtupdate" ]; then
 
   # Versions of Python interpreter which was available at packaging moment
   # (and for which appropriate pythonXY_plugin.so was built).
-  KNOWN_PYVERS_DOTLESS="@@available_python_versions_dotless@@"
+  KNOWN_FLAVORS_DOTLESS="@@plugin_flavors_dotless@@"
 
   DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY=75
   ALT_PLUGIN_ALTERNATIVE_PRIORITY=35
 
-  for MAYBE_NEW_DEFAULT_PYVER_DOTLESS in $KNOWN_PYVERS_DOTLESS; do
+  for maybe_new_defaultflavor_dotless in $KNOWN_FLAVORS_DOTLESS; do
 
     # Check if pythonX.Y runtime (where pythonX.Y is a new default Python
     # version) was available at packaging moment.
     #
     # If it wasn't available, there is no point in changing default alternative
     # (as appropriate pythonXY_plugin.so wasn't built and packaged).
-    if [ "x$NEW_RTNAME_DOTLESS" = "xpython$MAYBE_NEW_DEFAULT_PYVER_DOTLESS" ]
+    if [ "x$NEW_RTNAME_DOTLESS" = "x$maybe_new_defaultflavor_dotless" ]
     then
 
       # Reset prorities of all packaged alternatives of @@plugin_alternatives_stem@@_plugin.so
       # to lower value.
-      for PYVER_DOTLESS in $KNOWN_PYVERS_DOTLESS; do
+      for flavor_dotless in $KNOWN_FLAVORS_DOTLESS; do
         update-alternatives --quiet \
           --install \
             /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_plugin.so \
             @@plugin_alternatives_name@@ \
-            /usr/lib/uwsgi/plugins/python${PYVER_DOTLESS}_plugin.so \
+            /usr/lib/uwsgi/plugins/${flavor_dotless}_plugin.so \
             $ALT_PLUGIN_ALTERNATIVE_PRIORITY \
           --slave \
             /usr/share/man/man1/uwsgi_@@plugin_alternatives_stem@@.1.gz \
             uwsgi_@@plugin_alternatives_stem@@.1.gz \
-            /usr/share/man/man1/uwsgi_python${PYVER_DOTLESS}.1.gz
+            /usr/share/man/man1/uwsgi_${flavor_dotless}.1.gz
       done
 
       # Set higher priority for pythonXY_plugin.so (where pythonX.Y is a
@@ -51,7 +51,7 @@ if [ "x$1" = "xrtupdate" ]; then
           uwsgi_@@plugin_alternatives_stem@@.1.gz \
           /usr/share/man/man1/uwsgi_${NEW_RTNAME_DOTLESS}.1.gz
 
-      break # for MAYBE_NEW_DEFAULT_PYVER_DOTLESS ...
+      break # for maybe_new_defaultflavor_dotless ...
     fi
   done
 fi

@@ -7,30 +7,30 @@ if [ "x$1" = "xrtupdate" ]; then
   NEW_RTNAME_DOTLESS="$(echo "$3" | tr -d .)"
 
   # Versions of Python interpreter which was available at packaging moment
-  # (and for which appropriate @@plugin_alternatives_stem@@_pythonXY_plugin.so was built).
-  KNOWN_PYVERS_DOTLESS="@@available_python_versions_dotless@@"
+  # (and for which appropriate @@plugin_alternatives_stem@@_*_plugin.so was built).
+  KNOWN_FLAVORS_DOTLESS="@@plugin_flavors_dotless@@"
 
   DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY=75
   ALT_PLUGIN_ALTERNATIVE_PRIORITY=35
 
-  for MAYBE_NEW_DEFAULT_PYVER_DOTLESS in $KNOWN_PYVERS_DOTLESS; do
+  for maybe_new_defaultflavor_dotless in $KNOWN_FLAVORS_DOTLESS; do
 
     # Check if pythonX.Y runtime (where pythonX.Y is a new default Python
     # version) was available at packaging moment.
     #
     # If it wasn't available, there is no point in changing default alternative
-    # (as appropriate @@plugin_alternatives_stem@@_pythonXY_plugin.so wasn't built and packaged).
-    if [ "x$NEW_RTNAME_DOTLESS" = "xpython$MAYBE_NEW_DEFAULT_PYVER_DOTLESS" ]
+    # (as appropriate @@plugin_alternatives_stem@@_*_plugin.so wasn't built and packaged).
+    if [ "x$NEW_RTNAME_DOTLESS" = "x$maybe_new_defaultflavor_dotless" ]
     then
 
       # Reset prorities of all packaged alternatives of
       # @@plugin_alternatives_stem@@_@@plugin_lang_kind@@_plugin.so to lower value.
-      for PYVER_DOTLESS in $KNOWN_PYVERS_DOTLESS; do
+      for flavor_dotless in $KNOWN_FLAVORS_DOTLESS; do
         update-alternatives --quiet \
           --install \
             /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_@@plugin_lang_kind@@_plugin.so \
             @@plugin_alternatives_name@@ \
-            /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_python${PYVER_DOTLESS}_plugin.so \
+            /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_${flavor_dotless}_plugin.so \
             $ALT_PLUGIN_ALTERNATIVE_PRIORITY
       done
 
@@ -43,7 +43,7 @@ if [ "x$1" = "xrtupdate" ]; then
           /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_${NEW_RTNAME_DOTLESS}_plugin.so \
           $DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY
 
-      break # for MAYBE_NEW_DEFAULT_PYVER_DOTLESS ...
+      break # for maybe_new_defaultflavor_dotless ...
     fi
   done
 fi

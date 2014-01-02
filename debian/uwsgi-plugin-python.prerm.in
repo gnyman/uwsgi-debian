@@ -18,16 +18,16 @@ set -e
 
 case "$1" in
     remove)
-      for PYVER_DOTLESS in @@available_python_versions_dotless@@; do
+      for flavor_dotless in @@plugin_flavors_dotless@@; do
         update-alternatives --quiet \
           --remove \
             uwsgi \
-            /usr/bin/uwsgi_python${PYVER_DOTLESS}
+            /usr/bin/uwsgi_${flavor_dotless}
 
         update-alternatives --quiet \
           --remove \
             @@plugin_alternatives_name@@ \
-            /usr/lib/uwsgi/plugins/python${PYVER_DOTLESS}_plugin.so
+            /usr/lib/uwsgi/plugins/${flavor_dotless}_plugin.so
       done
 
       PLUGIN_ALTERNATIVES_COUNT="$(\

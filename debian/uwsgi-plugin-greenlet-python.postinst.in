@@ -19,9 +19,9 @@ set -e
 
 case "$1" in
     configure)
-      PYVER_DEFAULT_DOTLESS=@@default_python_version_dotless@@
-      for PYVER_DOTLESS in @@available_python_versions_dotless@@; do
-        if [ "x$PYVER_DOTLESS" = "x$PYVER_DEFAULT_DOTLESS" ]; then
+      DEFAULTFLAVOR_DOTLESS=@@plugin_defaultflavor_dotless@@
+      for flavor_dotless in @@plugin_flavors_dotless@@; do
+        if [ "x$flavor_dotless" = "x$DEFAULTFLAVOR_DOTLESS" ]; then
           ALTERNATIVE_PRIORITY=75
         else
           ALTERNATIVE_PRIORITY=35
@@ -30,7 +30,7 @@ case "$1" in
           --install \
             /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_@@plugin_lang_kind@@_plugin.so \
             @@plugin_alternatives_name@@ \
-            /usr/lib/uwsgi/plugins/@@plugin_stem@@_python${PYVER_DOTLESS}_plugin.so \
+            /usr/lib/uwsgi/plugins/@@plugin_stem@@_${flavor_dotless}_plugin.so \
             $ALTERNATIVE_PRIORITY
       done
     ;;

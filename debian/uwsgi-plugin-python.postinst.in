@@ -19,9 +19,9 @@ set -e
 
 case "$1" in
     configure)
-      PYVER_DEFAULT_DOTLESS=@@default_python_version_dotless@@
-      for PYVER_DOTLESS in @@available_python_versions_dotless@@; do
-        if [ "x$PYVER_DOTLESS" = "x$PYVER_DEFAULT_DOTLESS" ]; then
+      DEFAULTFLAVOR_DOTLESS=@@plugin_defaultflavor_dotless@@
+      for flavor_dotless in @@plugin_flavors_dotless@@; do
+        if [ "x$flavor_dotless" = "x$DEFAULTFLAVOR_DOTLESS" ]; then
           ALTERNATIVE_PRIORITY=75
         else
           ALTERNATIVE_PRIORITY=35
@@ -31,7 +31,7 @@ case "$1" in
           --install \
             /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_plugin.so \
             @@plugin_alternatives_name@@ \
-            /usr/lib/uwsgi/plugins/python${PYVER_DOTLESS}_plugin.so \
+            /usr/lib/uwsgi/plugins/${flavor_dotless}_plugin.so \
             $ALTERNATIVE_PRIORITY \
           --slave \
             /usr/bin/uwsgi_@@plugin_alternatives_stem@@ \
@@ -40,19 +40,19 @@ case "$1" in
           --slave \
             /usr/share/man/man1/uwsgi_@@plugin_alternatives_stem@@.1.gz \
             uwsgi_@@plugin_alternatives_stem@@.1.gz \
-            /usr/share/man/man1/uwsgi_python${PYVER_DOTLESS}.1.gz
+            /usr/share/man/man1/uwsgi_${flavor_dotless}.1.gz
 
         update-alternatives --quiet \
           --install \
             /usr/bin/uwsgi \
             uwsgi \
-            /usr/bin/uwsgi_python${PYVER_DOTLESS} \
+            /usr/bin/uwsgi_${flavor_dotless} \
             35 \
           --slave \
             /usr/share/man/man1/uwsgi.1.gz \
             uwsgi.1.gz \
-            /usr/share/man/man1/uwsgi_python${PYVER_DOTLESS}.1.gz
-      done # for PYVER_DOTLESS ...
+            /usr/share/man/man1/uwsgi_${flavor_dotless}.1.gz
+      done # for flavor_dotless ...
 
       BINARY_IS_UWSGI_ALTERNATIVE="$(\
         update-alternatives --list uwsgi 2>/dev/null \

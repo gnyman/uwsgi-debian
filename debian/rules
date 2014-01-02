@@ -46,12 +46,6 @@ PHP_SONAME_ALWAYS_CHANGE := $(shell dpkg --compare-versions '$(PHP_VERSION)' '>=
 
 DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
-# Dotless versions of Python runtimes (like 'XY').
-PYTHON_VERS=$(subst .,,$(cdbs_python_supported_versions))
-PYTHON_DEFAULT=$(subst .,,$(cdbs_python_current_version))
-PYTHON3_VERS=$(subst .,,$(cdbs_python3_supported_versions))
-PYTHON3_DEFAULT=$(subst .,,$(cdbs_python3_current_version))
-
 # Python install path for dh_install, as expected by dh_pythonX helpers
 # * major and minor included for python 2.x, else only major
 # * leading slash emitted
@@ -154,6 +148,12 @@ plugin_lang_stem = $(strip \
 plugin_lang_kind = $(strip \
 	$(if $(filter java python,$(plugin_lang)),\
 		$(lastword $(subst -, ,$(plugin_kind)))))
+plugin_flavors = $(strip \
+	$(if $(filter python,$(plugin_lang)),\
+		$(patsubst %,python%,$(cdbs_$(plugin_lang_kind)_supported_versions))))
+plugin_defaultflavor = $(strip \
+	$(if $(filter python,$(plugin_lang)),\
+		python$(cdbs_$(plugin_lang_kind)_current_version)))
 # TODO: avoid exception for rbthreads or fiber
 plugin_interpreter = $(strip $(or \
 	$(if $(filter rbthreads fiber,$*),\
@@ -385,12 +385,11 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_python)): \
  debian/stamp-plugin-%:
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval PYVERS = $(cdbs_python$(PYTHON_KIND:python%=%)_supported_versions))
-	$(foreach python_version,$(PYVERS), \
-		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
+	$(foreach flavor,$(plugin_flavors), \
+		$(call cdbs_python_binary,$(flavor)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini\
-			         python$(subst .,,$(python_version)); \
+			         $(subst .,,$(flavor)); \
 	)
 	sed -e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.dirs.in \
@@ -399,11 +398,11 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_python)): \
 
 debian/stamp-plugin-greenlet-python: \
  debian/stamp-plugin-%:
-	$(foreach python_version,$(cdbs_python_supported_versions), \
-		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
+	$(foreach flavor,$(plugin_flavors), \
+		$(call cdbs_python_binary,$(flavor)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-			         $(plugin_stem)_python$(subst .,,$(python_version)); \
+			         $(plugin_stem)_$(subst .,,$(flavor)); \
 	)
 	touch $@
 
@@ -459,8 +458,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
  install/uwsgi-plugin-%:
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
-	$(eval PYDEFAULT = $($(subst python,PYTHON,$(PYTHON_KIND))_DEFAULT))
 	set -e; \
 	$(foreach TEMPLATE_TYPE,postinst prerm,\
 		sed \
@@ -468,26 +465,26 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
-			-e 's/@@available_python_versions_dotless@@/$(PYVERS)/g' \
-			-e 's/@@default_python_version_dotless@@/$(PYDEFAULT)/g' \
+			-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
+			-e 's/@@plugin_defaultflavor_dotless@@/$(subst .,,$(plugin_defaultflavor))/g' \
 			-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-python.$(TEMPLATE_TYPE).in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$(TEMPLATE_TYPE);)\
-	$(foreach PYTHON_VERSION,$(PYVERS),\
+	$(foreach flavor,$(plugin_flavors),\
 		$(foreach TEMPLATE_TYPE,install links manpages,\
 			sed \
-				-e "s/@@plugin_name@@/python$(PYTHON_VERSION)/g" \
+				-e "s/@@plugin_name@@/$(subst .,,$(flavor))/g" \
 				< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.$(TEMPLATE_TYPE).in \
 				>> $(CURDIR)/debian/$(cdbs_curpkg).$(TEMPLATE_TYPE);)\
 		ln -sf \
 			$(CURDIR)/uwsgi-core-local \
-			$(CURDIR)/uwsgi_python$(PYTHON_VERSION); \
+			$(CURDIR)/uwsgi_$(subst .,,$(flavor)); \
 		help2man \
-			--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
+			--name 'fast (pure C)$(comma) self-healing$(comma) developer-friendly WSGI server' \
 			--section 1 \
 			--no-info \
-			$(CURDIR)/uwsgi_python$(PYTHON_VERSION) \
-			> $(CURDIR)/debian/uwsgi_python$(PYTHON_VERSION).1;)
+			$(CURDIR)/uwsgi_$(subst .,,$(flavor)) \
+			> $(CURDIR)/debian/uwsgi_$(subst .,,$(flavor)).1;)
 
 install/uwsgi-plugin-greenlet-python:: \
  install/uwsgi-plugin-%:
@@ -499,13 +496,13 @@ install/uwsgi-plugin-greenlet-python:: \
 			-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
-			-e 's/@@available_python_versions_dotless@@/$(PYTHON_VERS)/g' \
-			-e 's/@@default_python_version_dotless@@/$(PYTHON_DEFAULT)/g' \
+			-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
+			-e 's/@@plugin_defaultflavor_dotless@@/$(subst .,,$(plugin_defaultflavor))/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.$(TEMPLATE_TYPE).in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).$(TEMPLATE_TYPE);)\
-	$(foreach PYTHON_VERSION,$(PYTHON_VERS),\
+	$(foreach flavor,$(plugin_flavors),\
 		sed \
-			-e "s/@@plugin_name@@/greenlet_python$(PYTHON_VERSION)/g" \
+			-e "s/@@plugin_name@@/greenlet_$(subst .,,$(flavor))/g" \
 			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
 			>> $(CURDIR)/debian/$(cdbs_curpkg).install;)
 clean::
@@ -532,7 +529,6 @@ install/uwsgi-plugin-fiber:: \
 $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
  binary-post-install/uwsgi-plugin-%:
 	$(eval PYTHON_KIND = $(call target_name_tail, $@))
-	$(eval PYVERS = $($(subst python,PYTHON,$(PYTHON_KIND))_VERS))
 	$(eval PYTHON_RTUPDATE_SCRIPT = \
 		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(PYTHON_KIND)/runtime.d/uwsgi-plugin-$(PYTHON_KIND).rtupdate \
 	)
@@ -540,7 +536,7 @@ $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 		-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 		-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 		-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
-		-e 's/@@available_python_versions_dotless@@/$(PYVERS)/g' \
+		-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
 		-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)
@@ -556,7 +552,7 @@ binary-post-install/uwsgi-plugin-greenlet-python:: \
 		-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
 		-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 		-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
-		-e 's/@@available_python_versions_dotless@@/$(PYTHON_VERS)/g' \
+		-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)
 	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
