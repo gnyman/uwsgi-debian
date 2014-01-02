@@ -104,10 +104,6 @@ UWSGI_PKGSCRIPTS_jwsgi = openjdk aux
 UWSGI_PKGSCRIPTS_lua = pri
 UWSGI_PKGSCRIPTS_rack = pri
 
-# Discards directory-part of target and returns substring after last '-'
-# character
-target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
-
 # Stem-based variables
 # ====================
 
@@ -384,16 +380,15 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
 
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_python)): \
  debian/stamp-plugin-%:
-	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(foreach flavor,$(plugin_flavors), \
 		$(call cdbs_python_binary,$(flavor)) $(UWSGI_BUILDER) \
 			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini\
 			         $(subst .,,$(flavor)); \
 	)
-	sed -e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
+	sed -e 's/@@python_kind@@/$(plugin_lang_kind)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.dirs.in \
-			> $(CURDIR)/debian/uwsgi-plugin-$(PYTHON_KIND).dirs
+			> $(CURDIR)/debian/uwsgi-plugin-$(plugin_lang_kind).dirs
 	touch $@
 
 debian/stamp-plugin-greenlet-python: \
@@ -457,7 +452,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
  install/uwsgi-plugin-%:
-	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	set -e; \
 	$(foreach TEMPLATE_TYPE,postinst prerm,\
 		sed \
@@ -467,7 +461,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 			-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
 			-e 's/@@plugin_defaultflavor_dotless@@/$(subst .,,$(plugin_defaultflavor))/g' \
-			-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
+			-e 's/@@python_kind@@/$(plugin_lang_kind)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-python.$(TEMPLATE_TYPE).in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$(TEMPLATE_TYPE);)\
 	$(foreach flavor,$(plugin_flavors),\
@@ -528,16 +522,15 @@ install/uwsgi-plugin-fiber:: \
 
 $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
  binary-post-install/uwsgi-plugin-%:
-	$(eval PYTHON_KIND = $(call target_name_tail, $@))
 	$(eval PYTHON_RTUPDATE_SCRIPT = \
-		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(PYTHON_KIND)/runtime.d/uwsgi-plugin-$(PYTHON_KIND).rtupdate \
+		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(plugin_lang_kind)/runtime.d/uwsgi-plugin-$(plugin_lang_kind).rtupdate \
 	)
 	sed \
 		-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 		-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 		-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 		-e 's/@@plugin_flavors_dotless@@/$(subst .,,$(plugin_flavors))/g' \
-		-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
+		-e 's/@@python_kind@@/$(plugin_lang_kind)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)
 	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
