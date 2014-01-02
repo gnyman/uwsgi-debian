@@ -107,7 +107,7 @@ UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 
 UWSGI_APACHEMODULES = uwsgi ruwsgi proxy-uwsgi
 
-# type of packaging scripts to use
+# types of packaging scripts to use (leftmost favored if more available)
 # * pri: binary and library
 # * sec: only binary
 # * aux: only library
@@ -143,13 +143,13 @@ apachemodule_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 apachemodule_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
 
 # per-infile variables, relying on $(infile) and optional $(plugin_stem)
-plugin_pkgtype = $(UWSGI_PKGSCRIPTS_$(or $(plugin_basename),DEFAULT))
-plugin_has_binary = $(filter pri sec,$(plugin_pkgtype))
+plugin_pkgtypes = $(UWSGI_PKGSCRIPTS_$(or $(plugin_basename),DEFAULT))
+plugin_has_binary = $(filter pri sec,$(plugin_pkgtypes))
 # plugin_infile picks first existing infile variant:
 # * basename + UWSGI_PKGSCRIPTS_$(plugin_stem) suffix
 # * basename + UWSGI_PKGSCRIPTS_DEFAULT suffix
 # * basename
-plugin_infile = $(firstword $(wildcard $(patsubst %,$(infile).%,$(plugin_pkgtype)) $(infile)))
+plugin_infile = $(firstword $(wildcard $(foreach suffix,$(plugin_pkgtypes),$(addsuffix .$(suffix),$(infile))) $(infile)))
 
 # CDBS-specific variables
 # =======================
