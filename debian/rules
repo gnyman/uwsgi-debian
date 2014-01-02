@@ -182,6 +182,7 @@ clean::
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) --clean
 	find -type f -name '*.pyc' -delete
 	find -type d -name __pycache__ -delete
+	find -type f \( -name '*.class' -or -name '*.jar' \) -delete
 	rm -f *_plugin.so
 	rm -f $(foreach suffix,install dirs links manpages postinst prerm,$(addsuffix .$(suffix),debian/uwsgi-plugin-*))
 	rm -f debian/*.1
