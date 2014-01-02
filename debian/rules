@@ -60,10 +60,9 @@ python_installdir = usr/lib/$(or $(cdbs_curpythonstem:%=python%),$(cdbs_curpytho
 # Transform plugin's package name to plugin's name:
 # * delete dots
 # * replace '-' with '_'
-# * replace 'openjdk_7' with 'openjdk7'
+# * strip trailing openjdk delimiter
 pkg_name_to_plugin_name = $(strip \
-	$(subst openjdk_7,openjdk7,$(subst -,_,$(subst .,,$(1))) \
-))
+	$(subst openjdk_,openjdk,$(subst -,_,$(subst .,,$(1)))))
 
 # List of plugins' packages names (without common prefix 'uwsgi-plugin-')
 UWSGI_PLUGIN_PKGS_NAMES = $(patsubst uwsgi-plugin-%,%,$(filter uwsgi-plugin-%,$(DEB_PACKAGES)))
