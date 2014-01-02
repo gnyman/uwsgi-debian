@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for uwsgi-plugin-pyerl-@@python_kind@@
+# prerm script for uwsgi-plugin-@@plugin_name@@
 #
 # see: dh_installdeb(1)
 
@@ -18,11 +18,11 @@ set -e
 
 case "$1" in
     remove)
-      for PYVER_DOTLESS in @@available_python_versions_dotless@@; do
+      for PYVER_DOTLESS in @@plugin_lang_versions_dotless@@; do
         update-alternatives --quiet \
           --remove \
-            uwsgi-plugin-pyerl-@@python_kind@@ \
-            /usr/lib/uwsgi/plugins/pyerl_python${PYVER_DOTLESS}_plugin.so
+            uwsgi-plugin-@@plugin_stem@@_@@plugin_lang_kind@@ \
+            /usr/lib/uwsgi/plugins/@@plugin_stem@@_python${PYVER_DOTLESS}_plugin.so
       done
     ;;
 

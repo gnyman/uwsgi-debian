@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for uwsgi-plugin-greenlet-python
+# postinst script for uwsgi-plugin-@@plugin_name@@
 #
 # see: dh_installdeb(1)
 
@@ -19,8 +19,8 @@ set -e
 
 case "$1" in
     configure)
-      PYVER_DEFAULT_DOTLESS=@@default_python_version_dotless@@
-      for PYVER_DOTLESS in @@available_python_versions_dotless@@; do
+      PYVER_DEFAULT_DOTLESS=@@plugin_lang_defaultversion_dotless@@
+      for PYVER_DOTLESS in @@plugin_lang_versions_dotless@@; do
         if [ "x$PYVER_DOTLESS" = "x$PYVER_DEFAULT_DOTLESS" ]; then
           ALTERNATIVE_PRIORITY=75
         else
@@ -28,9 +28,9 @@ case "$1" in
         fi
         update-alternatives --quiet \
           --install \
-            /usr/lib/uwsgi/plugins/greenlet_python_plugin.so \
-            uwsgi-plugin-greenlet-python \
-            /usr/lib/uwsgi/plugins/greenlet_python${PYVER_DOTLESS}_plugin.so \
+            /usr/lib/uwsgi/plugins/@@plugin_stem@@_@@plugin_lang_kind@@_plugin.so \
+            uwsgi-plugin-@@plugin_stem@@_@@plugin_lang_kind@@ \
+            /usr/lib/uwsgi/plugins/@@plugin_stem@@_python${PYVER_DOTLESS}_plugin.so \
             $ALTERNATIVE_PRIORITY
       done
     ;;
