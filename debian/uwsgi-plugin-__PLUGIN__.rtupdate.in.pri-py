@@ -7,7 +7,7 @@ if [ "x$1" = "xrtupdate" ]; then
   NEW_RTNAME_DOTLESS="$(echo "$3" | tr -d .)"
 
   # Versions of Python interpreter which was available at packaging moment
-  # (and for which appropriate pythonXY_plugin.so was built).
+  # (and for which appropriate @@plugin_stem@@*_plugin.so was built).
   KNOWN_FLAVORS_DOTLESS="@@plugin_flavors_dotless@@"
 
   DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY=75
@@ -19,7 +19,7 @@ if [ "x$1" = "xrtupdate" ]; then
     # version) was available at packaging moment.
     #
     # If it wasn't available, there is no point in changing default alternative
-    # (as appropriate pythonXY_plugin.so wasn't built and packaged).
+    # (as appropriate @@plugin_stem@@*_plugin.so wasn't built and packaged).
     if [ "x$NEW_RTNAME_DOTLESS" = "x$maybe_new_defaultflavor_dotless" ]
     then
 
