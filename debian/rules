@@ -98,6 +98,7 @@ UWSGI_PLUGINS_REGULAR_BUILD := $(filter-out \
 
 UWSGI_PLUGINS_REGULAR_INSTALL = \
 	$(UWSGI_PLUGINS_REGULAR_BUILD) \
+	$(UWSGI_PLUGINS_PYTHON) \
 	$(patsubst %,pyerl-%,$(UWSGI_PYTHON_KINDS)) \
 	greenlet-python
 
@@ -114,6 +115,8 @@ UWSGI_PKGSCRIPTS_jvm = pri
 UWSGI_PKGSCRIPTS_jwsgi = aux
 UWSGI_PKGSCRIPTS_lua = pri
 UWSGI_PKGSCRIPTS_rack = pri
+UWSGI_PKGSCRIPTS_python = python pri-py pri
+UWSGI_PKGSCRIPTS_python3 = python pri-py pri
 UWSGI_PKGSCRIPTS_pyerl = python aux-py aux
 UWSGI_PKGSCRIPTS_greenlet = python aux-py aux
 
@@ -126,13 +129,13 @@ plugin_kind_rack = $(patsubst rack-%,%,$(filter rack-%,$*))
 plugin_kind_python = $(filter python%,$*)
 plugin_kind_pyerl = $(patsubst pyerl-%,%,$(filter pyerl-%,$*))
 plugin_kind_greenlet = $(patsubst greenlet-%,%,$(filter greenlet-%,$*))
-plugin_stem = $(or $(plugin_kind_jvm:%=jvm),$(plugin_kind_jwsgi:%=jwsgi),$(plugin_kind_lua:%=lua),$(plugin_kind_rack:%=rack),$(plugin_kind_python:%=python),$(plugin_kind_pyerl:%=pyerl),$(plugin_kind_greenlet:%=greenlet))
+plugin_stem = $(or $(plugin_kind_jvm:%=jvm),$(plugin_kind_jwsgi:%=jwsgi),$(plugin_kind_lua:%=lua),$(plugin_kind_rack:%=rack),$(plugin_kind_python),$(plugin_kind_pyerl:%=pyerl),$(plugin_kind_greenlet:%=greenlet))
 plugin_basename = $(or $(plugin_stem),$(plugin_name))
 plugin_kind = $(plugin_kind_$(plugin_stem))
 plugin_lang = $(or \
 	$(if $(filter jvm jwsgi,$(plugin_kind)),JAVA),\
 	$(plugin_kind_lua:%=LUA),$(plugin_kind_rack:%=RUBY),\
-	$(if $(filter python pyerl greenlet,$(plugin_kind)),PYTHON),\
+	$(if $(filter python python3 pyerl greenlet,$(plugin_kind)),PYTHON),\
 	)
 plugin_lang_stem = $(if $(filter JAVA,$(plugin_lang)),$(firstword $(subst -, ,$(plugin_kind))))
 plugin_lang_kind = $(if $(filter JAVA PYTHON,$(plugin_lang)),$(lastword $(subst -, ,$(plugin_kind))))
@@ -348,10 +351,6 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_PYTHON)):
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini\
 			         python$(subst .,,$(python_version)); \
 	)
-	sed -e 's/@@python_kind@@/$(plugin_lang_kind)/g' \
-			< $(CURDIR)/debian/uwsgi-plugin-python.dirs.in \
-			> $(CURDIR)/debian/uwsgi-plugin-$(plugin_lang_kind).dirs
-	touch $@
 
 debian/stamp-plugin-greenlet-python:
 	$(foreach python_version,$(plugin_lang_versions_dotless), \
@@ -413,14 +412,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_REGULAR_INSTALL)):: install/
 		$(cdbs_curdestdir)/usr/share/$(plugin_lang_kind)/runtime.d/uwsgi-plugin-$(plugin_stem)-$(plugin_lang_kind).rtupdate)
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_PYTHON))::
-	for TEMPLATE_TYPE in postinst prerm; do \
-		sed \
-			-e 's/@@available_python_versions_dotless@@/$(plugin_lang_versions_dotless)/g' \
-			-e 's/@@default_python_version_dotless@@/$(plugin_lang_defaultversion_dotless)/g' \
-			-e 's/@@python_kind@@/$(plugin_lang_kind)/g' \
-				< $(CURDIR)/debian/uwsgi-plugin-python.$${TEMPLATE_TYPE}.in \
-				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
-	done
 	for PYTHON_VERSION in $(plugin_lang_versions_dotless); do \
 		for TEMPLATE_TYPE in install links manpages; do \
 			sed -e "s/@@plugin_name@@/python$${PYTHON_VERSION}/g" \
@@ -449,20 +440,6 @@ install/uwsgi-plugin-fiber:: install/uwsgi-plugin-%:
 		-e 's/@@plugin_name@@/$(plugin_name)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-__PLUGIN__.install.in \
 			> $(CURDIR)/debian/$(cdbs_curpkg).install
-
-# resolve Python rtupdate scripts
-# -------------------------------
-
-$(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGINS_PYTHON))::
-	$(eval PYTHON_RTUPDATE_SCRIPT = \
-		$(CURDIR)/debian/$(cdbs_curpkg)/usr/share/$(plugin_lang_kind)/runtime.d/uwsgi-plugin-$(plugin_lang_kind).rtupdate \
-	)
-	sed \
-		-e 's/@@available_python_versions_dotless@@/$(plugin_lang_versions_dotless)/g' \
-		-e 's/@@python_kind@@/$(plugin_lang_kind)/g' \
-			< $(CURDIR)/debian/uwsgi-plugin-python.rtupdate.in \
-			> $(PYTHON_RTUPDATE_SCRIPT)
-	chmod 755 $(PYTHON_RTUPDATE_SCRIPT)
 
 # libapache2-mod-% packages
 # -------------------------
