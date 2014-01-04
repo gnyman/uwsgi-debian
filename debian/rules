@@ -67,6 +67,7 @@ UWSGI_PLUGIN_INFILES := $(wildcard debian/*__PLUGIN__*.in)
 UWSGI_PLUGINLANGS = python java lua ruby
 
 UWSGI_KINDS_python = python python3
+UWSGI_SRCPLUGINS_LANG_SELF += python
 UWSGI_SRCPLUGINS_python = greenlet
 
 UWSGI_KINDS_java = openjdk-7
@@ -75,6 +76,7 @@ UWSGI_SRCPLUGINS_java = jvm jwsgi
 
 UWSGI_KINDS_lua = lua5.1 lua5.2
 UWSGI_DEFAULTKIND_lua = lua5.1
+UWSGI_SRCPLUGINS_LANG_SELF += lua
 
 UWSGI_KINDS_ruby = ruby1.9.1
 UWSGI_DEFAULTKIND_ruby = ruby1.9.1
@@ -85,6 +87,33 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
+
+UWSGI_SRCPLUGINS_AVAILABLE := $(sort $(notdir $(wildcard plugins/*)))
+UWSGI_SRCPLUGINS_EXCLUDE = airbrake cplusplus dumbloop dummy \
+	emperor_mongodb example exception_log forkptyrouter gccgo \
+	gevent glusterfs gridfs legion_cache_fetch libffi libtcc \
+	logcrypto logpipe logzmq matheval mongodb mongodblog mongrel2 \
+	mono msgpack objc_gc pty pypy pyuwsgi rados ring \
+	router_expires router_hash router_metrics router_radius \
+	router_redis router_spnego router_xmldir ruby19 servlet \
+	stackless stats_pusher_file stats_pusher_mongodb \
+	stats_pusher_socket systemd_logger tornado \
+	transformation_chunked transformation_offload \
+	transformation_template tuntap webdav xattr zabbix
+UWSGI_SRCPLUGINS_WANTED = $(filter-out $(UWSGI_SRCPLUGINS_EXCLUDE),\
+	$(UWSGI_SRCPLUGINS_AVAILABLE))
+UWSGI_SRCPLUGINS_ADDON_LANG = $(call pkg_name_to_plugin_name,\
+	$(UWSGI_SRCPLUGINS_LANG_SELF) \
+	$(foreach lang,$(UWSGI_PLUGINLANGS),$(UWSGI_SRCPLUGINS_$(lang))))
+UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
+	emperor_pg fiber geoip graylog2 ldap psgi rbthreads \
+	router_access sqlite3 v8 php xslt
+# ZeroMQ is unavailable on the Hurd
+UWSGI_SRCPLUGINS_SKIP = $(if $(filter hurd-%,$(DEB_HOST_ARCH)),emperor_zeromq)
+UWSGI_SRCPLUGINS_CORE = $(filter-out \
+	$(UWSGI_SRCPLUGINS_ADDON_LANG) $(UWSGI_SRCPLUGINS_ADDON_MISC) \
+	$(UWSGI_SRCPLUGINS_SKIP),\
+	$(UWSGI_SRCPLUGINS_WANTED))
 
 UWSGI_MODULE_INFILES := $(wildcard debian/*__MODULE__*.in)
 
@@ -253,63 +282,16 @@ clean::
 
 build/uwsgi-core:: uwsgi-core
 
-# TODO: resolve list more generically (to avoid e.g. ZeroMQ exception)
 uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--build $(CURDIR)/debian/buildconf/uwsgi-core.ini
 	
-	set -e; for PLUGIN_NAME in \
-			alarm_speech \
-			cache \
-			carbon \
-			cgi \
-			cheaper_backlog2 \
-			cheaper_busyness \
-			clock_monotonic \
-			clock_realtime \
-			corerouter \
-			coroae \
-			echo \
-			emperor_amqp \
-			$(if $(filter-out hurd-%,$(DEB_HOST_ARCH)),emperor_zeromq) \
-			fastrouter \
-			http \
-			logfile \
-			logsocket \
-			nagios \
-			notfound \
-			pam \
-			ping \
-			rawrouter \
-			redislog \
-			router_basicauth \
-			router_cache \
-			router_http \
-			router_memcached \
-			router_redirect \
-			router_rewrite \
-			router_static \
-			router_uwsgi \
-			rpc \
-			rrdtool \
-			rsyslog \
-			signal \
-			spooler \
-			ssi \
-			sslrouter \
-			stats_pusher_statsd \
-			symcall \
-			syslog \
-			transformation_gzip \
-			transformation_tofile \
-			transformation_toupper \
-			ugreen \
-			zergpool \
-			; do \
+	set -e; \
+	for PLUGIN_NAME in $(UWSGI_SRCPLUGINS_CORE); do \
 		$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$${PLUGIN_NAME} \
-				     $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
-				     $${PLUGIN_NAME}; \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$${PLUGIN_NAME} \
+		$(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+		$${PLUGIN_NAME}; \
 	done
 clean::
 	rm -f uwsgi-core
