@@ -33,7 +33,7 @@ CFLAGS += $(CPPFLAGS)
 # Common variables
 # ================
 
-UWSGI_BUILDER = $(CURDIR)/uwsgiconfig.py -v
+UWSGI_BUILDER = uwsgiconfig.py -v
 
 APACHE2_API := $(shell perl -ne 'print $$1 if m/our\s+\$$API\s+=\s+"(.*)"/' < $(shell which dh_apache2))
 APACHE2_BUILDER := apxs2 -c $(shell apr-config --link-ld) $(shell apu-config --link-ld)
@@ -57,8 +57,6 @@ python_installdir = usr/lib/$(or $(cdbs_curpythonstem:%=python%),$(cdbs_curpytho
 # * strip trailing openjdk delimiter
 pkg_name_to_plugin_name = $(strip \
 	$(subst openjdk_,openjdk,$(subst -,_,$(subst .,,$(1)))))
-
-UWSGI_PLUGINS_SRC_DIR = plugins
 
 UWSGI_PLUGIN_INFILES := $(wildcard debian/*__PLUGIN__*.in)
 UWSGI_PLUGINLANGS = python java lua ruby
@@ -281,15 +279,15 @@ substvars-list-encode = perl -0 -F'/\s+/' -ane 'print " * ", join("\$${Newline} 
 uwsgi-coreplugins := $(call pkg_name_to_plugin_name,$(UWSGI_SRCPLUGINS_CORE))
 uwsgi-corepluginlist := $(shell echo $(uwsgi-coreplugins) | $(substvars-list-encode))
 build/uwsgi-core:: uwsgi-core
-uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
+uwsgi-core: uwsgi-core-local
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--build $(CURDIR)/debian/buildconf/uwsgi-core.ini
+		--build debian/buildconf/uwsgi-core.ini
 	
 	set -e; \
 	for PLUGIN_NAME in $(UWSGI_SRCPLUGINS_CORE); do \
 		$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$${PLUGIN_NAME} \
-		$(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+		--plugin plugins/$${PLUGIN_NAME} \
+		debian/buildconf/uwsgi-plugin.ini \
 		$${PLUGIN_NAME}; \
 	done
 install/uwsgi-core::
@@ -322,27 +320,20 @@ install/uwsgi-core::
 		--name 'fast (pure C), self-healing, developer-friendly WSGI server' \
 		--section 1 \
 		--no-info \
-		$(CURDIR)/uwsgi-core \
-		> $(CURDIR)/debian/uwsgi-core.1
+		./uwsgi-core \
+		> debian/uwsgi-core.1
 
 # uwsgi-plugin-% packages
 # -----------------------
 
-# setup hook and config for building plugins
+# setup hook for building plugins
 $(patsubst %,build/%,$(UWSGI_PLUGIN_PACKAGES)):: \
  build/uwsgi-plugin-%: \
- debian/buildconf/uwsgi-plugin.ini uwsgi-core-local debian/stamp-uwsgi-plugin-%
-
-debian/buildconf/uwsgi-plugin.ini:
-	sed -e 's|@@curdir@@|$(CURDIR)|g' \
-		< $(CURDIR)/debian/buildconf/uwsgi-plugin.ini.in \
-		> $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
-clean::
-	rm -f debian/buildconf/uwsgi-plugin.ini
+ uwsgi-core-local debian/stamp-uwsgi-plugin-%
 
 uwsgi-core-local:
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--build $(CURDIR)/debian/buildconf/uwsgi-plugin.ini
+		--build debian/buildconf/uwsgi-plugin.ini
 clean::
 	rm -f uwsgi-core-local
 
@@ -358,12 +349,12 @@ $(patsubst %,debian/stamp-%,$(UWSGI_PLUGIN_PACKAGES)): \
 	$(if $(filter python,$(plugin_lang)),\
 		$(foreach flavor,$(plugin_flavors),\
 			$(call cdbs_python_binary,$(flavor)) $(UWSGI_BUILDER) \
-				--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
-				$(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+				--plugin plugins/$(plugin_src) \
+				debian/buildconf/uwsgi-plugin.ini \
 				$(plugin_stem:=_)$(subst .,,$(flavor));),\
 		$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
-			$(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
+			--plugin plugins/$(plugin_src) \
+			debian/buildconf/uwsgi-plugin.ini \
 			$(plugin_name))
 	touch $@
 
