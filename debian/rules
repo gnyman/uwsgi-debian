@@ -362,7 +362,7 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):
 # Build Java plugins
 $(patsubst %,debian/stamp-plugin-%,$(JAVA_PLUGIN_PKGS)):
 	$(eval OPENJDK_VERSION = $(lastword $(subst -, ,$@)))
-	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(DEB_HOST_ARCH))
+	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(JAVA_ARCH))
 	$(eval PLUGIN_NAME = $(call pkg_name_to_plugin_name, \
 		$(subst stamp-plugin-,,$(notdir $@)) \
 	))
