@@ -21,20 +21,20 @@ endif
 
 DEB_UPSTREAM_URL = http://projects.unbit.it/downloads
 
-export LDFLAGS=$(shell dpkg-buildflags --get LDFLAGS)
-export CFLAGS=$(shell dpkg-buildflags --get CFLAGS)
-export CFLAGS+=$(shell dpkg-buildflags --get CPPFLAGS)
-export CPPFLAGS=$(shell dpkg-buildflags --get CPPFLAGS)
+export LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
+export CFLAGS := $(shell dpkg-buildflags --get CFLAGS)
+export CPPFLAGS := $(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS += $(CPPFLAGS)
 
 # Common variables
 # ================
 
-APXS2=/usr/bin/apxs2
-APR_CONFIG=/usr/bin/apr-config
-APU_CONFIG=/usr/bin/apu-config
 UWSGI_BUILDER = $(CURDIR)/uwsgiconfig.py -v
-APACHE2_API = $(shell perl -ne 'print $$1 if m/our\s+\$$API\s+=\s+"(.*)"/' < $(shell which dh_apache2))
-PHP_API = $(shell php-config --phpapi)
+
+APACHE2_API := $(shell perl -ne 'print $$1 if m/our\s+\$$API\s+=\s+"(.*)"/' < $(shell which dh_apache2))
+APACHE2_BUILDER := apxs2 -c $(shell apr-config --link-ld) $(shell apu-config --link-ld)
+
+PHP_API := $(shell php-config --phpapi)
 # TODO: Drop this (and its use) when php5-embed ABI is stable in oldstable
 PHP_VERSION := $(shell dpkg-query -W -f '$${Version}' php5-dev)
 # TODO: Drop this (and its use) when php5 5.5.0+dfsg-13 is in oldstable
@@ -632,9 +632,7 @@ $(patsubst %,build/libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):: build/% : debian
 # Build specific Apache2 module
 $(patsubst %,debian/stamp-libapache2-mod-%,$(LIBAPACHE2_MODS_NAMES)):
 	$(eval MODULE_NAME = $(call libapache2mod_to_orig, $(subst stamp-libapache2-mod-,,$(notdir $@))))
-	$(APXS2) -c \
-		`$(APR_CONFIG) --link-ld` `$(APU_CONFIG) --link-ld` \
-		$(CURDIR)/apache2/mod_$(MODULE_NAME).c
+	$(APACHE2_BUILDER) apache2/mod_$(MODULE_NAME).c
 	touch $@
 
 # Install libapache2-mod-% package
