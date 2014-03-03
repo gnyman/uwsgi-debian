@@ -501,7 +501,7 @@ void uwsgi_reload(char **argv) {
 
 	uwsgi_log("running %s\n", uwsgi.binary_path);
 	uwsgi_flush_logs();
-	argv[0] = uwsgi.binary_path;
+	//argv[0] = uwsgi.binary_path;
 	//strcpy (argv[0], uwsgi.binary_path);
 	if (uwsgi.log_master) {
 		if (uwsgi.original_log_fd > -1) {
@@ -515,7 +515,7 @@ void uwsgi_reload(char **argv) {
 			close(uwsgi.shared->worker_log_pipe[1]);
 		}
 	}
-	execvp(uwsgi.binary_path, argv);
+	execvp(argv[0], argv);
 	uwsgi_error("execvp()");
 	// never here
 	exit(1);

@@ -1,3 +1,30 @@
+uwsgi (2.0.2-1~experimental1) experimental; urgency=medium
+
+  [ upstream ]
+  * New release. (Closes: #737511)
+
+  [ Janos Guljas ]
+  * Remove binary packages:
+    - uwsgi-plugin-jvm-openjdk-6 (Closes: #720571, #732674)
+    - uwsgi-plugin-jwsgi-openjdk-6
+    - uwsgi-plugin-erlang
+    - uwsgi-plugin-pyerl-python
+    - uwsgi-plugin-pyerl-python3 
+  * Remove alarm plugin from uwsgi-core.
+  * Use verbose compilation:
+    - remove 2001_verbose_compilation.patch
+    - add -v option to UWSGI_BUILDER in debian/rules
+  * Remove support for IA64 architecture: (Closes: #724527)
+    - remove 1006_avoid_clone_on_IA64.patch
+  * Remove support for s390 architecture.
+  * Remove patches as applied upstrea: 
+    - 1007_fix_linkage.patch
+    - 020130925~4b60307.patch
+    - 020130925~b190744.patch
+  * Raise standards version to 3.9.5.
+
+ -- Janos Guljas <janos@debian.org>  Mon, 03 Mar 2014 15:44:17 +0100
+
 uwsgi (1.9.17.1-6) unstable; urgency=low
 
   * Fix avoid emperor_zeromq plugin on GNU/Hurd.
