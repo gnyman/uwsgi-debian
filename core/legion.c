@@ -279,9 +279,12 @@ static void legions_check_nodes_step2() {
 		// go on if i am not an arbiter
 		else if (ul->valor > 0) {
 			// no potential Lord is available, i will propose myself
-			best_valor = ul->valor;
-			memcpy(best_uuid, ul->uuid, 36);
-			i_am_the_best = 1;
+			// but only if i am not suspended...
+			if (uwsgi_now() > ul->suspended_til) {
+				best_valor = ul->valor;
+				memcpy(best_uuid, ul->uuid, 36);
+				i_am_the_best = 1;
+			}
 		}
 		else {
 			// empty lord
@@ -337,13 +340,20 @@ static void legions_check_nodes_step2() {
 			}
 			if (i_am_the_best) {
 				if (!ul->i_am_the_lord) {
-					uwsgi_log("[uwsgi-legion] i am now the Lord of the Legion %s\n", ul->legion);
 					// triggering lord hooks
+					uwsgi_log("[uwsgi-legion] attempting to become the Lord of the Legion %s\n", ul->legion);
 					struct uwsgi_string_list *usl = ul->lord_hooks;
 					while (usl) {
 						int ret = uwsgi_legion_action_call("lord", ul, usl);
 						if (ret) {
 							uwsgi_log("[uwsgi-legion] ERROR, lord hook returned: %d\n", ret);
+							if (uwsgi.legion_death_on_lord_error) {
+								ul->dead = 1;
+                						uwsgi_legion_announce(ul);
+								ul->suspended_til = uwsgi_now() + uwsgi.legion_death_on_lord_error;
+								uwsgi_log("[uwsgi-legion] suspending myself from Legion \"%s\" for %d seconds\n", ul->legion, uwsgi.legion_death_on_lord_error);
+								goto next;
+							}
 						}
 						usl = usl->next;
 					}
@@ -356,6 +366,7 @@ static void legions_check_nodes_step2() {
         				else {
                 				ul->lord_scroll_len = 0;
         				}
+					uwsgi_log("[uwsgi-legion] i am now the Lord of the Legion %s\n", ul->legion);
 					ul->i_am_the_lord = uwsgi_now();
 					// trick: reduce the time needed by the old lord to unlord itself
 					uwsgi_legion_announce(ul);
@@ -400,7 +411,7 @@ static void legions_check_nodes_step2() {
 			}
 			ul->last_warning = uwsgi_now();
 		}
-
+next:
 		ul = ul->next;
 	}
 }
@@ -496,7 +507,14 @@ static void *legion_loop(void *foobar) {
 		last_round = now;
 		// wait for event
 		int interesting_fd = -1;
+		if (uwsgi_instance_is_reloading || uwsgi_instance_is_dying) return NULL;
 		int rlen = event_queue_wait(uwsgi.legion_queue, timeout, &interesting_fd);
+
+		if (rlen < 0 && errno != EINTR) {
+			if (uwsgi_instance_is_reloading || uwsgi_instance_is_dying) return NULL;
+			uwsgi_nuclear_blast();
+			return NULL;	
+		}
 
 		now = uwsgi_now();
 		if (timeout == 0 || rlen == 0 || (now - last_round) >= timeout) {
@@ -591,6 +609,8 @@ static void *legion_loop(void *foobar) {
 			// check if the node is already accounted
 			struct uwsgi_legion_node *node = uwsgi_legion_get_node(ul, legion_msg.valor, legion_msg.name, legion_msg.name_len, legion_msg.uuid);
 			if (!node) {
+				// if a lord hook election fails, a node can announce itself as dead for long time...
+				if (legion_msg.dead) continue;
 				// add the new node
 				uwsgi_wlock(ul->lock);
 				node = uwsgi_legion_add_node(ul, legion_msg.valor, legion_msg.name, legion_msg.name_len, legion_msg.uuid);
@@ -648,7 +668,12 @@ int uwsgi_legion_action_call(char *phase, struct uwsgi_legion *ul, struct uwsgi_
 		return -1;
 	}
 
-	uwsgi_log("[uwsgi-legion] (phase: %s legion: %s) calling %s\n", phase, ul->legion, usl->value);
+	if (ula->log_msg) {
+		uwsgi_log("[uwsgi-legion] (phase: %s legion: %s) %s\n", phase, ul->legion, ula->log_msg);
+	}
+	else {
+		uwsgi_log("[uwsgi-legion] (phase: %s legion: %s) calling %s\n", phase, ul->legion, usl->value);
+	}
 	return ula->func(ul, usl->value + usl->custom);
 }
 
@@ -667,6 +692,18 @@ static int legion_action_log(struct uwsgi_legion *ul, char *arg) {
 	return 0;
 }
 
+static int legion_action_alarm(struct uwsgi_legion *ul, char *arg) {
+	char *space = strchr(arg,' ');
+        if (!space) {
+                uwsgi_log("invalid alarm action syntax, must be: <alarm> <msg>\n");
+                return -1;
+        }
+        *space = 0;
+        uwsgi_alarm_trigger(arg, space+1,  strlen(space+1));
+        *space = ' ';
+        return 0;
+}
+
 void uwsgi_start_legions() {
 	pthread_t legion_loop_t;
 
@@ -675,8 +712,10 @@ void uwsgi_start_legions() {
 
 	// register embedded actions
 	uwsgi_legion_action_register("cmd", legion_action_cmd);
+	uwsgi_legion_action_register("exec", legion_action_cmd);
 	uwsgi_legion_action_register("signal", legion_action_signal);
 	uwsgi_legion_action_register("log", legion_action_log);
+	uwsgi_legion_action_register("alarm", legion_action_alarm);
 
 	uwsgi.legion_queue = event_queue_init();
 	struct uwsgi_legion *legion = uwsgi.legions;
@@ -736,13 +775,19 @@ void uwsgi_legion_add(struct uwsgi_legion *ul) {
 }
 
 int uwsgi_legion_announce(struct uwsgi_legion *ul) {
+	time_t now = uwsgi_now();
+
+	if (now <= ul->suspended_til) return 0;
+	ul->suspended_til = 0;
+
 	struct uwsgi_buffer *ub = uwsgi_buffer_new(4096);
+	unsigned char *encrypted = NULL;
 
 	if (uwsgi_buffer_append_keyval(ub, "legion", 6, ul->legion, ul->legion_len))
 		goto err;
 	if (uwsgi_buffer_append_keynum(ub, "valor", 5, ul->valor))
 		goto err;
-	if (uwsgi_buffer_append_keynum(ub, "unix", 4, uwsgi_now()))
+	if (uwsgi_buffer_append_keynum(ub, "unix", 4, now))
 		goto err;
 	if (uwsgi_buffer_append_keynum(ub, "lord", 4, ul->i_am_the_lord ? ul->i_am_the_lord : 0))
 		goto err;
@@ -769,7 +814,7 @@ int uwsgi_legion_announce(struct uwsgi_legion *ul) {
                 	goto err;
 	}
 
-	unsigned char *encrypted = uwsgi_malloc(ub->pos + 4 + EVP_MAX_BLOCK_LENGTH);
+	encrypted = uwsgi_malloc(ub->pos + 4 + EVP_MAX_BLOCK_LENGTH);
 	if (EVP_EncryptInit_ex(ul->encrypt_ctx, NULL, NULL, NULL, NULL) <= 0) {
 		uwsgi_error("[uwsgi-legion] EVP_EncryptInit_ex()");
 		goto err;
@@ -808,6 +853,7 @@ int uwsgi_legion_announce(struct uwsgi_legion *ul) {
 	return 0;
 err:
 	uwsgi_buffer_destroy(ub);
+	free(encrypted);
 	return -1;
 }
 
@@ -824,6 +870,7 @@ void uwsgi_opt_legion_mcast(char *opt, char *value, void *foobar) {
                 exit(1);
         }
 	uwsgi_legion_register_node(ul, uwsgi_str(ul->addr));
+	free(legion);
 }
 
 void uwsgi_opt_legion_node(char *opt, char *value, void *foobar) {
@@ -1112,10 +1159,11 @@ struct uwsgi_legion_action *uwsgi_legion_action_get(char *name) {
 	return NULL;
 }
 
-void uwsgi_legion_action_register(char *name, int (*func) (struct uwsgi_legion *, char *)) {
-	if (uwsgi_legion_action_get(name)) {
+struct uwsgi_legion_action *uwsgi_legion_action_register(char *name, int (*func) (struct uwsgi_legion *, char *)) {
+	struct uwsgi_legion_action *found_ula = uwsgi_legion_action_get(name);
+	if (found_ula) {
 		uwsgi_log("[uwsgi-legion] action \"%s\" is already registered !!!\n", name);
-		return;
+		return found_ula;
 	}
 
 	struct uwsgi_legion_action *old_ula = NULL, *ula = uwsgi.legion_actions;
@@ -1134,6 +1182,8 @@ void uwsgi_legion_action_register(char *name, int (*func) (struct uwsgi_legion *
 	else {
 		uwsgi.legion_actions = ula;
 	}
+
+	return ula;
 }
 
 void uwsgi_legion_announce_death(void) {

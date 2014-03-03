@@ -4,7 +4,7 @@ common functions for various routers (fastrouter, http...)
 
 */
 
-#include "../../uwsgi.h"
+#include <uwsgi.h>
 
 extern struct uwsgi_server uwsgi;
 
@@ -79,6 +79,9 @@ void uwsgi_corerouter_setup_sockets(struct uwsgi_corerouter *ucr) {
 					}
 					else {
 						ugs->fd = bind_to_unix_dgram(ugs->name);
+						if (ugs->fd < 1 || (uwsgi.subscriptions_use_credentials && uwsgi_socket_passcred(ugs->fd))) {
+							exit(1);
+						}
 					}
 					uwsgi_socket_nb(ugs->fd);
 				}
@@ -113,10 +116,17 @@ void uwsgi_corerouter_manage_subscription(struct uwsgi_corerouter *ucr, int id, 
 	int i;
 	struct uwsgi_subscribe_req usr;
 	char bbuf[4096];
+	ssize_t len = -1;
 
-	ssize_t len = recv(ugs->fd, bbuf, 4096, 0);
+	memset(&usr, 0, sizeof(struct uwsgi_subscribe_req));
+
+	if (uwsgi.subscriptions_use_credentials) {
+		len = uwsgi_recv_cred2(ugs->fd, bbuf, 4096, &usr.pid, &usr.uid, &usr.gid);
+	}
+	else {
+		len = recv(ugs->fd, bbuf, 4096, 0);
+	}
 	if (len > 0) {
-		memset(&usr, 0, sizeof(struct uwsgi_subscribe_req));
 		uwsgi_hooked_parse(bbuf + 4, len - 4, corerouter_manage_subscription, &usr);
 		if (usr.sign_len > 0) {
 			// calc the base size
@@ -144,10 +154,6 @@ void uwsgi_corerouter_manage_subscription(struct uwsgi_corerouter *ucr, int id, 
 			if (node && node->len) {
 #ifdef UWSGI_SSL
 				if (uwsgi.subscriptions_sign_check_dir) {
-					if (usr.sign_len == 0 || usr.base_len == 0)
-						return;
-					if (usr.unix_check <= node->unix_check)
-						return;
 					if (!uwsgi_subscription_sign_check(node->slot, &usr)) {
 						return;
 					}
@@ -176,6 +182,51 @@ void uwsgi_corerouter_manage_subscription(struct uwsgi_corerouter *ucr, int id, 
 					uwsgi_error("uwsgi_corerouter_manage_subscription()/send()");
 				}
 			}
+		}
+
+		// resubscribe if needed ?
+		if (ucr->resubscribe) {
+			static char *address = NULL;
+			if (!address) {
+				struct uwsgi_gateway_socket *augs = uwsgi.gateway_sockets;
+        			while (augs) {
+                			if (!strcmp(ucr->name, augs->owner)) {
+                        			if (!augs->subscription) {
+							address = augs->name;
+							break;
+						}
+					}
+					augs = augs->next;
+				}
+			}
+			struct uwsgi_string_list *usl = NULL;
+			char *sni_key = NULL;
+			char *sni_cert = NULL;
+			char *sni_ca = NULL;
+			if (usr.sni_key_len) {
+				sni_key = uwsgi_concat2n(usr.sni_key, usr.sni_key_len, "", 0);
+			}
+			if (usr.sni_crt_len) {
+				sni_cert = uwsgi_concat2n(usr.sni_crt, usr.sni_crt_len, "", 0);
+			}
+			if (usr.sni_ca_len) {
+				sni_ca = uwsgi_concat2n(usr.sni_ca, usr.sni_ca_len, "", 0);
+			}
+			uwsgi_foreach(usl, ucr->resubscribe) {	
+				if (ucr->resubscribe_bind) {
+					static int rfd = -1;
+					if (rfd == -1) {
+						rfd = bind_to_udp(ucr->resubscribe_bind, 0, 0);
+					}
+					uwsgi_send_subscription_from_fd(rfd, usl->value, usr.key, usr.keylen, usr.modifier1, usr.modifier2, bbuf[3], address, NULL, sni_key, sni_cert, sni_ca);
+				}
+				else {
+					uwsgi_send_subscription_from_fd(-2, usl->value, usr.key, usr.keylen, usr.modifier1, usr.modifier2, bbuf[3], address, NULL, sni_key, sni_cert, sni_ca);
+				}
+			}
+			if (sni_key) free(sni_key);
+			if (sni_cert) free(sni_cert);
+			if (sni_ca) free(sni_ca);
 		}
 	}
 

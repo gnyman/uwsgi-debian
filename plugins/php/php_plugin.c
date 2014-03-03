@@ -31,6 +31,9 @@ struct uwsgi_php {
 	int dump_config;
 	char *server_software;
 	size_t server_software_len;
+
+	struct uwsgi_string_list *exec_before;
+	struct uwsgi_string_list *exec_after;
 } uphp;
 
 void uwsgi_opt_php_ini(char *opt, char *value, void *foobar) {
@@ -59,8 +62,11 @@ struct uwsgi_option uwsgi_php_options[] = {
 #endif
         {"php-var", required_argument, 0, "add/overwrite a CGI variable at each request", uwsgi_opt_add_string_list, &uphp.vars, 0},
         {"php-dump-config", no_argument, 0, "dump php config (if modified via --php-set or append options)", uwsgi_opt_true, &uphp.dump_config, 0},
-        {0, 0, 0, 0, 0, 0, 0},
-
+        {"php-exec-before", required_argument, 0, "run specified php code before the requested script", uwsgi_opt_add_string_list, &uphp.exec_before, 0},
+        {"php-exec-begin", required_argument, 0, "run specified php code before the requested script", uwsgi_opt_add_string_list, &uphp.exec_before, 0},
+        {"php-exec-after", required_argument, 0, "run specified php code after the requested script", uwsgi_opt_add_string_list, &uphp.exec_after, 0},
+        {"php-exec-end", required_argument, 0, "run specified php code after the requested script", uwsgi_opt_add_string_list, &uphp.exec_after, 0},
+	UWSGI_END_OF_OPTIONS
 };
 
 
@@ -92,11 +98,13 @@ static int sapi_uwsgi_send_headers(sapi_headers_struct *sapi_headers)
 		int hrc = SG(sapi_headers).http_response_code;
 		if (!hrc) hrc = 200;
 		uwsgi_num2str2n(hrc, status, 4);
-		uwsgi_response_prepare_headers(wsgi_req, status, 3);
+		if (uwsgi_response_prepare_headers(wsgi_req, status, 3))
+			return SAPI_HEADER_SEND_FAILED;
 	}
 	else {
 		char *sl = SG(sapi_headers).http_status_line;
-		uwsgi_response_prepare_headers(wsgi_req, sl + 9 , strlen(sl + 9));
+		if (uwsgi_response_prepare_headers(wsgi_req, sl + 9 , strlen(sl + 9)))
+			return SAPI_HEADER_SEND_FAILED;
 	}
 	
 	h = zend_llist_get_first_ex(&sapi_headers->headers, &pos);
@@ -374,7 +382,7 @@ PHP_FUNCTION(uwsgi_rpc) {
 	zval *z_current_obj;
 	char *argv[256];
         uint16_t argvs[256];
-	uint16_t size = 0;
+	uint64_t size = 0;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "+", &varargs, &num_args) == FAILURE) {
 		RETURN_NULL();
@@ -888,8 +896,19 @@ secure3:
                 return -1;
         }
 
+	struct uwsgi_string_list *usl=NULL;
+
+	uwsgi_foreach(usl, uphp.exec_before) {
+		if (zend_eval_string_ex(usl->value, NULL, "uWSGI php exec before", 1 TSRMLS_CC) == FAILURE) goto end;
+	}
+
         php_execute_script(&file_handle TSRMLS_CC);
 
+	uwsgi_foreach(usl, uphp.exec_after) {
+		if (zend_eval_string_ex(usl->value, NULL, "uWSGI php exec after", 1 TSRMLS_CC) == FAILURE) goto end;
+	}
+
+end:
         php_request_shutdown(NULL);
 
 	return 0;

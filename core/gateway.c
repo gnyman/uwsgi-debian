@@ -29,6 +29,8 @@ struct uwsgi_gateway *register_gateway(char *name, void (*loop) (int, void *), v
 	ug->num = num;
 	ug->fullname = fullname;
 	ug->data = data;
+	ug->uid = 0;
+	ug->gid = 0;
 
 #if defined(SOCK_SEQPACKET) && defined(__linux__)
 	if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, ug->internal_subscription_pipe)) {
@@ -70,6 +72,7 @@ void gateway_respawn(int id) {
 
 	if (gw_pid == 0) {
 		uwsgi_fixup_fds(0, 0, ug);
+		uwsgi_close_all_sockets();
 		if (uwsgi.master_as_root)
 			uwsgi_as_root();
 #ifdef __linux__
@@ -88,6 +91,24 @@ void gateway_respawn(int id) {
 		signal(SIGPIPE, SIG_IGN);
 		signal(SIGSTOP, SIG_IGN);
 		signal(SIGTSTP, SIG_IGN);
+
+		uwsgi_hooks_run(uwsgi.hook_as_gateway, "as-gateway", 1);
+
+		if (ug->gid) {
+			uwsgi_log("%s %d setgid() to %d\n", ug->name, ug->num, (int) ug->gid);
+			if (setgid(ug->gid)) {
+				uwsgi_error("gateway_respawn()/setgid()");
+				exit(1);
+			}
+		}
+
+		if (ug->uid) {
+			uwsgi_log("%s %d setuid() to %d\n", ug->name, ug->num, (int) ug->uid);
+			if (setuid(ug->uid)) {
+				uwsgi_error("gateway_respawn()/setuid()");
+				exit(1);
+			}
+		}
 
 		ug->loop(id, ug->data);
 		// never here !!! (i hope)

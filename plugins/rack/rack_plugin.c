@@ -315,7 +315,7 @@ VALUE rack_call_rpc_handler(VALUE args) {
 }
 
 
-uint16_t uwsgi_ruby_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[], char *buffer) {
+uint64_t uwsgi_ruby_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[], char **buffer) {
 
         uint8_t i;
 	VALUE rb_args = rb_ary_new2(2);
@@ -343,8 +343,9 @@ uint16_t uwsgi_ruby_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[],
 	if (TYPE(ret) == T_STRING) {
         	rv = RSTRING_PTR(ret);
                 rl = RSTRING_LEN(ret);
-                if (rl <= 0xffff) {
-                	memcpy(buffer, rv, rl);
+                if (rl > 0) {
+			*buffer = uwsgi_malloc(rl);
+                	memcpy(*buffer, rv, rl);
                         return rl;
                 }
         }
@@ -416,6 +417,18 @@ void uwsgi_ruby_gem_set_apply(char *gemset) {
 
 void uwsgi_ruby_gemset(char *gemset) {
 
+	struct uwsgi_string_list *rvm_paths = ur.rvm_path;
+	while(rvm_paths) {
+		char *filename = uwsgi_concat3(rvm_paths->value, "/environments/", gemset);
+                if (uwsgi_file_exists(filename)) {
+			uwsgi_ruby_gem_set_apply(filename);
+                        free(filename);
+                        return;
+                }
+                free(filename);
+		rvm_paths = rvm_paths->next;
+	}
+
 	char *home = getenv("HOME");
 
 	if (home) {
@@ -436,18 +449,6 @@ void uwsgi_ruby_gemset(char *gemset) {
         }
         free(filename);
 
-	struct uwsgi_string_list *rvm_paths = ur.rvm_path;
-	while(rvm_paths) {
-		char *filename = uwsgi_concat3(rvm_paths->value, "/environments/", gemset);
-                if (uwsgi_file_exists(filename)) {
-			uwsgi_ruby_gem_set_apply(filename);
-                        free(filename);
-                        return;
-                }
-                free(filename);
-		rvm_paths = rvm_paths->next;
-	}
-
 	uwsgi_log("ERROR: unable to load gemset %s !!!\n", gemset);
 	exit(1);
 	
@@ -457,6 +458,10 @@ static void rack_hack_dollar_zero(VALUE name, ID id) {
 	ur.dollar_zero = rb_obj_as_string(name);
 	rb_obj_taint(ur.dollar_zero);
 }
+
+#ifndef RUBY19
+void Init_stack(VALUE*);
+#endif
 
 int uwsgi_rack_init(){
 
@@ -482,14 +487,16 @@ int uwsgi_rack_init(){
 		uwsgi_log("*** if you get errors about rubygems.rb, you can:\n");
 		uwsgi_log("*** 1) add a directory to the libdir search path using --ruby-libdir ***\n");
 		uwsgi_log("*** 2) force the RUBY_EXEC_PREFIX with --chdir ***\n");
-#ifdef UWSGI_RUBY_LIBDIR
-		uwsgi_string_new_list(&ur.libdir, UWSGI_RUBY_LIBDIR);
-#endif
-#ifdef UWSGI_RUBY_ARCHDIR
-		uwsgi_string_new_list(&ur.libdir, UWSGI_RUBY_ARCHDIR);
-#endif
 	}
 #endif
+
+#ifdef UWSGI_RUBY_LIBDIR
+	uwsgi_string_new_list(&ur.libdir, UWSGI_RUBY_LIBDIR);
+#endif
+#ifdef UWSGI_RUBY_ARCHDIR
+	uwsgi_string_new_list(&ur.libdir, UWSGI_RUBY_ARCHDIR);
+#endif
+
 	ruby_init();
 	struct uwsgi_string_list *usl = ur.libdir;
 	while(usl) {
@@ -500,6 +507,8 @@ int uwsgi_rack_init(){
 	ruby_options(argc, argv);
 #else
 	ruby_init();
+	VALUE dummy;
+	Init_stack(&dummy);
 	ruby_init_loadpath();
 #endif
 
@@ -1106,7 +1115,6 @@ static void uwsgi_rack_hijack(void) {
                                 uwsgi_error("dup2()");
                         }
                 }
-                int ret = -1;
 		int error = 0;
                 if (ur.rbshell[0] != 0) {
 			rb_eval_string(ur.rbshell);
@@ -1122,9 +1130,6 @@ static void uwsgi_rack_hijack(void) {
                         exit(UWSGI_DE_HIJACKED_CODE);
                 }
 
-                if (ret == 0) {
-                        exit(UWSGI_QUIET_CODE);
-                }
                 exit(0);
         }
 

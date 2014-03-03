@@ -13,11 +13,13 @@ struct uwsgi_cheaper_busyness_global {
 	uint64_t busyness_max;
 	uint64_t busyness_min;
 	uint64_t *last_values;
+	uint64_t *current_busyness;
+	uint64_t total_avg_busyness;
 	int *was_busy;
 	uint64_t tcheck;
 	uint64_t last_cheaped;      // last time worker was cheaped due to low busyness
 	uint64_t next_cheap;        // timestamp, we can cheap worker after it
-	uint64_t penalty;       // penelty for respawning to fast, it will be added to multiplier
+	uint64_t penalty;       // penalty for respawning to fast, it will be added to multiplier
 	uint64_t min_multi;     //initial multiplier will be stored here
 	uint64_t cheap_multi;   // current multiplier value
 	int last_action;            // 1 - spawn workers ; 2 - cheap worker
@@ -41,7 +43,7 @@ struct uwsgi_option uwsgi_cheaper_busyness_options[] = {
 		uwsgi_opt_set_64bit, &uwsgi_cheaper_busyness_global.busyness_max, 0},
 
 	{"cheaper-busyness-min", required_argument, 0,
-		"set the cheaper busyness low percent limit, belowe that value worker is considered idle (default 25)",
+		"set the cheaper busyness low percent limit, below that value worker is considered idle (default 25)",
 		uwsgi_opt_set_64bit, &uwsgi_cheaper_busyness_global.busyness_min, 0},
 
 	{"cheaper-busyness-multiplier", required_argument, 0,
@@ -57,7 +59,7 @@ struct uwsgi_option uwsgi_cheaper_busyness_options[] = {
 
 #ifdef __linux__
 	{"cheaper-busyness-backlog-alert", required_argument, 0,
-		"spawn emergency worker(s) if anytime listen queue is higher than this value (default 33)",
+		"spawn emergency worker(s) if any time listen queue is higher than this value (default 33)",
 		uwsgi_opt_set_int, &uwsgi_cheaper_busyness_global.backlog_alert, 0},
 	{"cheaper-busyness-backlog-multiplier", required_argument, 0,
 		"set cheaper multiplier used for emergency workers (default 3)",
@@ -142,51 +144,11 @@ int spawn_emergency_worker(int backlog) {
 #endif
 
 
-int cheaper_busyness_algo(void) {
+int cheaper_busyness_algo(int can_spawn) {
 
 	int i;
 	// we use microseconds
 	uint64_t t = uwsgi.cheaper_overload*1000000;
-
-	// this happens on the first run, the required memory is allocated
-	if (!uwsgi_cheaper_busyness_global.last_values) {
-		uwsgi_cheaper_busyness_global.last_values = uwsgi_calloc(sizeof(uint64_t) * uwsgi.numproc);
-	}
-	if (!uwsgi_cheaper_busyness_global.was_busy) {
-		uwsgi_cheaper_busyness_global.was_busy = uwsgi_calloc(sizeof(int) * uwsgi.numproc);
-	}
-
-	// set defaults
-	if (!uwsgi_cheaper_busyness_global.busyness_max) uwsgi_cheaper_busyness_global.busyness_max = 50;
-	if (!uwsgi_cheaper_busyness_global.busyness_min) uwsgi_cheaper_busyness_global.busyness_min = 25;
-	if (!uwsgi_cheaper_busyness_global.cheap_multi) uwsgi_cheaper_busyness_global.cheap_multi = 10;
-	if (!uwsgi_cheaper_busyness_global.penalty) uwsgi_cheaper_busyness_global.penalty = 2;
-
-#ifdef __linux__
-	if (!uwsgi_cheaper_busyness_global.backlog_alert) uwsgi_cheaper_busyness_global.backlog_alert = 33;
-	if (!uwsgi_cheaper_busyness_global.backlog_multi) uwsgi_cheaper_busyness_global.backlog_multi = 3;
-	if (!uwsgi_cheaper_busyness_global.backlog_step) uwsgi_cheaper_busyness_global.backlog_step = 1;
-	if (!uwsgi_cheaper_busyness_global.backlog_nonzero_alert) uwsgi_cheaper_busyness_global.backlog_nonzero_alert = 60;
-#endif
-
-	if (!uwsgi_cheaper_busyness_global.min_multi) {
-		// store initial multiplier so we don't loose its initial value
-		uwsgi_cheaper_busyness_global.min_multi = uwsgi_cheaper_busyness_global.cheap_multi;
-		// since this is first run we will print current values
-		uwsgi_log("[busyness] settings: min=%llu%%, max=%llu%%, overload=%llu, multiplier=%llu, respawn penalty=%llu\n",
-			uwsgi_cheaper_busyness_global.busyness_min, uwsgi_cheaper_busyness_global.busyness_max,
-			uwsgi.cheaper_overload, uwsgi_cheaper_busyness_global.cheap_multi, uwsgi_cheaper_busyness_global.penalty);
-#ifdef __linux__
-		uwsgi_log("[busyness] backlog alert is set to %d request(s), step is %d\n",
-			uwsgi_cheaper_busyness_global.backlog_alert, uwsgi_cheaper_busyness_global.backlog_step);
-		uwsgi_log("[busyness] backlog non-zero alert is set to %llu second(s)\n", uwsgi_cheaper_busyness_global.backlog_nonzero_alert);
-#endif
-	}
-
-	// initialize with current time
-	if (uwsgi_cheaper_busyness_global.tcheck == 0) uwsgi_cheaper_busyness_global.tcheck = uwsgi_micros();
-
-	if (uwsgi_cheaper_busyness_global.next_cheap == 0) set_next_cheap_time();
 
 	int active_workers = 0;
 	uint64_t total_busyness = 0;
@@ -202,7 +164,7 @@ int cheaper_busyness_algo(void) {
 	}
 
 #ifdef __linux__
-	int backlog = uwsgi.shared->options[UWSGI_OPTION_BACKLOG_STATUS];
+	int backlog = uwsgi.shared->backlog;
 #endif
 
 	uint64_t now = uwsgi_micros();
@@ -228,11 +190,23 @@ int cheaper_busyness_algo(void) {
 				if (uwsgi_cheaper_busyness_global.verbose && active_workers > 1)
 					uwsgi_log("[busyness] worker nr %d %llus average busyness is at %llu%%\n",
 						i+1, uwsgi.cheaper_overload, percent);
+				if (uwsgi.has_metrics) {
+					// update metrics
+					uwsgi_wlock(uwsgi.metrics_lock);
+					uwsgi_cheaper_busyness_global.current_busyness[i] = percent;
+					uwsgi_rwunlock(uwsgi.metrics_lock);
+				}
 			}
 			uwsgi_cheaper_busyness_global.last_values[i] = uwsgi.workers[i+1].running_time;
 		}
 
 		avg_busyness = (active_workers ? total_busyness / active_workers : 0);
+		if (uwsgi.has_metrics) {
+			uwsgi_wlock(uwsgi.metrics_lock);
+			uwsgi_cheaper_busyness_global.total_avg_busyness = avg_busyness;
+			uwsgi_rwunlock(uwsgi.metrics_lock);
+		}
+
 		if (uwsgi_cheaper_busyness_global.verbose)
 			uwsgi_log("[busyness] %ds average busyness of %d worker(s) is at %d%%\n",
 				(int) uwsgi.cheaper_overload, (int) active_workers, (int) avg_busyness);
@@ -243,11 +217,12 @@ int cheaper_busyness_algo(void) {
 			uwsgi_cheaper_busyness_global.tolerance_counter = 0;
 
 			int decheaped = 0;
-			for (i = 1; i <= uwsgi.numproc; i++) {
-				
-				if (uwsgi.workers[i].cheaped == 1 && uwsgi.workers[i].pid == 0) {
-					decheaped++;
-					if (decheaped >= uwsgi.cheaper_step) break;
+			if (can_spawn) {
+				for (i = 1; i <= uwsgi.numproc; i++) {
+					if (uwsgi.workers[i].cheaped == 1 && uwsgi.workers[i].pid == 0) {
+						decheaped++;
+						if (decheaped >= uwsgi.cheaper_step) break;
+					}
 				}
 			}
 
@@ -260,7 +235,7 @@ int cheaper_busyness_algo(void) {
 					// worker was cheaped and then spawned back in less than current multiplier*cheaper_overload seconds
 					// we will increase the multiplier so that next time worker will need to wait longer before being cheaped
 					uwsgi_cheaper_busyness_global.cheap_multi += uwsgi_cheaper_busyness_global.penalty;
-					uwsgi_log("[busyness] worker(s) respawned to fast, increasing chpeaper multiplier to %llu (+%llu)\n",
+					uwsgi_log("[busyness] worker(s) respawned to fast, increasing cheaper multiplier to %llu (+%llu)\n",
 						uwsgi_cheaper_busyness_global.cheap_multi, uwsgi_cheaper_busyness_global.penalty);
 				} else {
 					decrease_multi();
@@ -271,15 +246,15 @@ int cheaper_busyness_algo(void) {
 				uwsgi_log("[busyness] %llus average busyness is at %llu%%, will spawn %d new worker(s)\n",
 					uwsgi.cheaper_overload, avg_busyness, decheaped);
 			} else {
-				uwsgi_log("[busyness] %llus average busyness is at %llu%% but we already started maximum number of workers (%d)\n",
-					uwsgi.cheaper_overload, avg_busyness, uwsgi.numproc);
+				uwsgi_log("[busyness] %llus average busyness is at %llu%% but we already started maximum number of workers available with current limits (%d)\n",
+					uwsgi.cheaper_overload, avg_busyness, active_workers);
 			}
 
 			// return the maximum number of workers to spawn
 			return decheaped;
 
 #ifdef __linux__
-		} else if (backlog > uwsgi_cheaper_busyness_global.backlog_alert && active_workers < uwsgi.numproc) {
+		} else if (can_spawn && backlog > uwsgi_cheaper_busyness_global.backlog_alert && active_workers < uwsgi.numproc) {
 			return spawn_emergency_worker(backlog);
 #endif
 
@@ -332,7 +307,7 @@ int cheaper_busyness_algo(void) {
 				// time needed to cheap them, than a lot min<busy<max when we do not reset timer
 				// and then another idle cycle than would trigger cheaping
 				if (uwsgi_cheaper_busyness_global.verbose)
-					uwsgi_log("[busyness] %llus average busyness is at %llu%%, %llu non-idle cycle(s), reseting cheaper timer\n",
+					uwsgi_log("[busyness] %llus average busyness is at %llu%%, %llu non-idle cycle(s), resetting cheaper timer\n",
 						uwsgi.cheaper_overload, avg_busyness, uwsgi_cheaper_busyness_global.tolerance_counter);
 				set_next_cheap_time();
 			} else {
@@ -347,14 +322,14 @@ int cheaper_busyness_algo(void) {
 	}
 
 #ifdef __linux__
-	else if (backlog > uwsgi_cheaper_busyness_global.backlog_alert && active_workers < uwsgi.numproc) {
+	else if (can_spawn && backlog > uwsgi_cheaper_busyness_global.backlog_alert && active_workers < uwsgi.numproc) {
 		// we check for backlog overload every cycle
 		return spawn_emergency_worker(backlog);
 	}
 	else if (backlog > 0) {
 		if (uwsgi_cheaper_busyness_global.backlog_is_nonzero) {
 			// backlog was > 0 last time, check timestamp and spawn workers if needed
-			if ((now - uwsgi_cheaper_busyness_global.backlog_nonzero_since)/1000000 >= uwsgi_cheaper_busyness_global.backlog_nonzero_alert) {
+			if (can_spawn && (now - uwsgi_cheaper_busyness_global.backlog_nonzero_since)/1000000 >= uwsgi_cheaper_busyness_global.backlog_nonzero_alert) {
 				uwsgi_log("[busyness] backlog was non-zero for %llu second(s), spawning new worker(s)\n", (now - uwsgi_cheaper_busyness_global.backlog_nonzero_since)/1000000);
 				uwsgi_cheaper_busyness_global.backlog_nonzero_since = now;
 				return spawn_emergency_worker(backlog);
@@ -384,11 +359,73 @@ void uwsgi_cheaper_register_busyness(void) {
 	uwsgi_register_cheaper_algo("busyness", cheaper_busyness_algo);
 }
 
+static int uwsgi_cheaper_busyness_init(void) {
+	if (!uwsgi.requested_cheaper_algo || strcmp(uwsgi.requested_cheaper_algo, "busyness")) return 0;
+	// this happens on the first run, the required memory is allocated
+	uwsgi_cheaper_busyness_global.last_values = uwsgi_calloc(sizeof(uint64_t) * uwsgi.numproc);
+	uwsgi_cheaper_busyness_global.was_busy = uwsgi_calloc(sizeof(int) * uwsgi.numproc);
+
+	if (uwsgi.has_metrics) {
+		// allocate metrics memory
+		uwsgi_cheaper_busyness_global.current_busyness = uwsgi_calloc(sizeof(uint64_t) * uwsgi.numproc);
+	}
+
+	// set defaults
+	if (!uwsgi_cheaper_busyness_global.busyness_max) uwsgi_cheaper_busyness_global.busyness_max = 50;
+	if (!uwsgi_cheaper_busyness_global.busyness_min) uwsgi_cheaper_busyness_global.busyness_min = 25;
+	if (!uwsgi_cheaper_busyness_global.cheap_multi) uwsgi_cheaper_busyness_global.cheap_multi = 10;
+	if (!uwsgi_cheaper_busyness_global.penalty) uwsgi_cheaper_busyness_global.penalty = 2;
+
+#ifdef __linux__
+	if (!uwsgi_cheaper_busyness_global.backlog_alert) uwsgi_cheaper_busyness_global.backlog_alert = 33;
+	if (!uwsgi_cheaper_busyness_global.backlog_multi) uwsgi_cheaper_busyness_global.backlog_multi = 3;
+	if (!uwsgi_cheaper_busyness_global.backlog_step) uwsgi_cheaper_busyness_global.backlog_step = 1;
+	if (!uwsgi_cheaper_busyness_global.backlog_nonzero_alert) uwsgi_cheaper_busyness_global.backlog_nonzero_alert = 60;
+#endif
+
+	// store initial multiplier so we don't loose that value
+	uwsgi_cheaper_busyness_global.min_multi = uwsgi_cheaper_busyness_global.cheap_multi;
+	// since this is first run we will print current values
+	uwsgi_log("[busyness] settings: min=%llu%%, max=%llu%%, overload=%llu, multiplier=%llu, respawn penalty=%llu\n",
+		uwsgi_cheaper_busyness_global.busyness_min, uwsgi_cheaper_busyness_global.busyness_max,
+		uwsgi.cheaper_overload, uwsgi_cheaper_busyness_global.cheap_multi, uwsgi_cheaper_busyness_global.penalty);
+#ifdef __linux__
+	uwsgi_log("[busyness] backlog alert is set to %d request(s), step is %d\n",
+		uwsgi_cheaper_busyness_global.backlog_alert, uwsgi_cheaper_busyness_global.backlog_step);
+	uwsgi_log("[busyness] backlog non-zero alert is set to %llu second(s)\n", uwsgi_cheaper_busyness_global.backlog_nonzero_alert);
+#endif
+
+	// register metrics if enabled
+	if (uwsgi.has_metrics) {
+		int i;
+		char buf[4096];
+		char buf2[4096];
+		for (i = 0; i < uwsgi.numproc; i++) {
+			if (snprintf(buf, 4096, "worker.%d.plugin.cheaper_busyness.busyness", i+1) <= 0) {
+				uwsgi_log("[busyness] unable to register busyness metric for worker %d\n", i+1);
+				exit(1);
+			}
+			if (snprintf(buf2, 4096, "3.%d.100.1", i+1) <= 0) {
+				uwsgi_log("[busyness] unable to register busyness metric oid for worker %d\n", i+1);
+				exit(1);
+			}
+			uwsgi_register_metric(buf, buf2, UWSGI_METRIC_GAUGE, "ptr", &uwsgi_cheaper_busyness_global.current_busyness[i], 0, NULL);
+		}
+		uwsgi_register_metric("plugin.cheaper_busyness.total_avg_busyness", "4.100.1", UWSGI_METRIC_GAUGE, "ptr", &uwsgi_cheaper_busyness_global.total_avg_busyness, 0, NULL);
+		uwsgi_log("[busyness] metrics registered\n");
+	}
+
+	// initialize timers
+	uwsgi_cheaper_busyness_global.tcheck = uwsgi_micros();
+	set_next_cheap_time();
+
+	return 0;
+}
+
 struct uwsgi_plugin cheaper_busyness_plugin = {
 
 	.name = "cheaper_busyness",
-        .on_load = uwsgi_cheaper_register_busyness,
+	.on_load = uwsgi_cheaper_register_busyness,
 	.options = uwsgi_cheaper_busyness_options,
-	
+	.init = uwsgi_cheaper_busyness_init
 };
-

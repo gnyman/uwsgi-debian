@@ -53,6 +53,20 @@ struct uwsgi_perl {
 
 	struct uwsgi_string_list *exec;
 	struct uwsgi_string_list *exec_post_fork;
+
+	int auto_reload;
+	time_t last_auto_reload;
+	struct uwsgi_string_list *auto_reload_ignore;
+	HV *auto_reload_hash;
+
+	int enable_psgix_io;
+
+	char *shell;
+	int shell_oneshot;
+
+	CV *spooler;
+
+	int no_plack;
 };
 
 void init_perl_embedded_module(void);
@@ -70,3 +84,6 @@ PerlInterpreter *uwsgi_perl_new_interpreter(void);
 int uwsgi_perl_mule(char *);
 void uwsgi_perl_run_hook(SV *);
 void uwsgi_perl_exec(char *);
+
+void uwsgi_perl_check_auto_reload(void);
+void uwsgi_psgi_preinit_apps(void);

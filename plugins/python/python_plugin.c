@@ -156,7 +156,17 @@ struct uwsgi_option uwsgi_python_options[] = {
 	{"wsgi-env-behavior", required_argument, 0, "set the strategy for allocating/deallocating the WSGI env", uwsgi_opt_set_str, &up.wsgi_env_behaviour, 0},
 	{"start_response-nodelay", no_argument, 0, "send WSGI http headers as soon as possible (PEP violation)", uwsgi_opt_true, &up.start_response_nodelay, 0},
 
+	{"wsgi-strict", no_argument, 0, "try to be fully PEP compliant disabling optimizations", uwsgi_opt_true, &up.wsgi_strict, 0},
+	{"wsgi-accept-buffer", no_argument, 0, "accept CPython buffer-compliant objects as WSGI response in addition to string/bytes", uwsgi_opt_true, &up.wsgi_accept_buffer, 0},
+	{"wsgi-accept-buffers", no_argument, 0, "accept CPython buffer-compliant objects as WSGI response in addition to string/bytes", uwsgi_opt_true, &up.wsgi_accept_buffer, 0},
+
 	{"python-version", no_argument, 0, "report python version", uwsgi_opt_pyver, NULL, UWSGI_OPT_IMMEDIATE},
+
+	{"python-raw", required_argument, 0, "load a python file for managing raw requests", uwsgi_opt_set_str, &up.raw, 0},
+
+#if defined(PYTHREE) || defined(Py_TPFLAGS_HAVE_NEWBUFFER)
+	{"py-sharedarea", required_argument, 0, "create a sharedarea from a python bytearray object of the specified size", uwsgi_opt_add_string_list, &up.sharedarea, 0},
+#endif
 
 	{0, 0, 0, 0, 0, 0, 0},
 };
@@ -257,6 +267,17 @@ pep405:
         up.swap_ts = simple_swap_ts;
         up.reset_ts = simple_reset_ts;
 	
+#if defined(PYTHREE) || defined(Py_TPFLAGS_HAVE_NEWBUFFER)
+	struct uwsgi_string_list *usl = NULL;
+	uwsgi_foreach(usl, up.sharedarea) {
+		uint64_t len = uwsgi_n64(usl->value);
+		PyObject *obj = PyByteArray_FromStringAndSize(NULL, len);
+        	char *storage = PyByteArray_AsString(obj);
+		Py_INCREF(obj);
+		struct uwsgi_sharedarea *sa = uwsgi_sharedarea_init_ptr(storage, len);
+		sa->obj = obj;
+	}
+#endif
 
 	uwsgi_log_initial("Python main interpreter initialized at %p\n", up.main_thread);
 
@@ -307,6 +328,10 @@ realstuff:
 
 	// this time we use this higher level function
 	// as this code can be executed in a signal handler
+
+#ifdef __GNU_kFreeBSD__
+	return;
+#endif
 
 	if (!Py_IsInitialized()) {
 		return;
@@ -823,7 +848,7 @@ void init_uwsgi_embedded_module() {
 		init_uwsgi_module_spooler(new_uwsgi_module);
 	}
 
-	if (uwsgi.sharedareasize > 0 && uwsgi.sharedarea) {
+	if (uwsgi.sharedareas) {
 		init_uwsgi_module_sharedarea(new_uwsgi_module);
 	}
 
@@ -1068,7 +1093,6 @@ void uwsgi_python_init_apps() {
         up.loaders[LOADER_CALLABLE] = uwsgi_callable_loader;
         up.loaders[LOADER_STRING_CALLABLE] = uwsgi_string_callable_loader;
 
-
 	struct uwsgi_string_list *upli = up.import_list;
 	while(upli) {
 		if (strchr(upli->value, '/') || uwsgi_endswith(upli->value, ".py")) {
@@ -1119,6 +1143,12 @@ next:
 		uppa = uppa->next;
         }
 
+	if (up.raw) {
+		up.raw_callable = uwsgi_file_loader(up.raw);
+		if (up.raw_callable) {
+			Py_INCREF(up.raw_callable);
+		}
+	}
 
 	if (up.wsgi_config != NULL) {
 		init_uwsgi_app(LOADER_UWSGI, up.wsgi_config, uwsgi.wsgi_req, up.main_thread, PYTHON_APP_TYPE_WSGI);
@@ -1354,8 +1384,10 @@ void *uwsgi_python_autoreloader_thread(void *foobar) {
 		UWSGI_RELEASE_GIL;
 		sleep(up.auto_reload);
 		UWSGI_GET_GIL;
-		// do not start monitoring til the first app is loaded (required for lazy mode)
-		if (uwsgi_apps_cnt == 0) continue;
+		if (uwsgi.lazy || uwsgi.lazy_apps) {
+			// do not start monitoring til the first app is loaded (required for lazy mode)
+			if (uwsgi_apps_cnt == 0) continue;
+		}
 #ifdef UWSGI_PYTHON_OLD
                 int pos = 0;
 #else
@@ -1363,6 +1395,7 @@ void *uwsgi_python_autoreloader_thread(void *foobar) {
 #endif
 		PyObject *mod_name, *mod;
                 while (PyDict_Next(modules, &pos, &mod_name, &mod)) {
+			if (mod == NULL) continue;
 			int found = 0;
 			struct uwsgi_string_list *usl = up.auto_reload_ignore;
 			while(usl) {
@@ -1504,7 +1537,7 @@ clear:
 	return -1;
 }
 
-uint16_t uwsgi_python_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[], char *buffer) {
+uint64_t uwsgi_python_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[], char **buffer) {
 
 	UWSGI_GET_GIL;
 
@@ -1528,8 +1561,9 @@ uint16_t uwsgi_python_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[
 		if (PyString_Check(ret)) {
 			rv = PyString_AsString(ret);
 			rl = PyString_Size(ret);
-			if (rl <= 65536) {
-				memcpy(buffer, rv, rl);
+			if (rl > 0) {
+				*buffer = uwsgi_malloc(rl);
+				memcpy(*buffer, rv, rl);
 				Py_DECREF(ret);
 				UWSGI_RELEASE_GIL;
 				return rl;
@@ -1551,7 +1585,11 @@ void uwsgi_python_add_item(char *key, uint16_t keylen, char *val, uint16_t valle
 
 	PyObject *pydict = (PyObject *) data;
 
-	PyDict_SetItem(pydict, PyString_FromStringAndSize(key, keylen), PyString_FromStringAndSize(val, vallen));
+	PyObject *o_key = PyString_FromStringAndSize(key, keylen);
+	PyObject *zero = PyString_FromStringAndSize(val, vallen);
+	PyDict_SetItem(pydict, o_key, zero);
+	Py_DECREF(o_key);
+	Py_DECREF(zero);
 }
 
 int uwsgi_python_spooler(char *filename, char *buf, uint16_t len, char *body, size_t body_len) {
@@ -1559,9 +1597,6 @@ int uwsgi_python_spooler(char *filename, char *buf, uint16_t len, char *body, si
 	static int random_seed_reset = 0;
 
 	UWSGI_GET_GIL;
-
-	PyObject *spool_dict = PyDict_New();
-	PyObject *spool_func, *pyargs, *ret;
 
 	if (!random_seed_reset) {
 		uwsgi_python_reset_random_seed();
@@ -1574,25 +1609,32 @@ int uwsgi_python_spooler(char *filename, char *buf, uint16_t len, char *body, si
 		return 0;
 	}
 
-	spool_func = PyDict_GetItemString(up.embedded_dict, "spooler");
+	PyObject *spool_func = PyDict_GetItemString(up.embedded_dict, "spooler");
 	if (!spool_func) {
 		// ignore
 		UWSGI_RELEASE_GIL;
 		return 0;
 	}
 
+	int retval = -1;
+	PyObject *spool_dict = PyDict_New();
+	PyObject *pyargs = PyTuple_New(1);
+	PyObject *ret = NULL;
+
+	PyObject *value = PyString_FromString(filename);
+	PyDict_SetItemString(spool_dict, "spooler_task_name", value);
+	Py_DECREF(value);
+
 	if (uwsgi_hooked_parse(buf, len, uwsgi_python_add_item, spool_dict)) {
 		// malformed packet, destroy it
-		UWSGI_RELEASE_GIL;
-		return -2;
+		retval = -2;
+		goto clear;
 	}
 
-	pyargs = PyTuple_New(1);
-
-	PyDict_SetItemString(spool_dict, "spooler_task_name", PyString_FromString(filename));
-
 	if (body && body_len > 0) {
-		PyDict_SetItemString(spool_dict, "body", PyString_FromStringAndSize(body, body_len));
+		PyObject *value = PyString_FromStringAndSize(body, body_len);
+		PyDict_SetItemString(spool_dict, "body", value);
+		Py_DECREF(value);
 	}
 	PyTuple_SetItem(pyargs, 0, spool_dict);
 
@@ -1600,23 +1642,25 @@ int uwsgi_python_spooler(char *filename, char *buf, uint16_t len, char *body, si
 
 	if (ret) {
 		if (!PyInt_Check(ret)) {
-			// error, retry
-			UWSGI_RELEASE_GIL;
-			return -1;
-		}	
-
-		int retval = (int) PyInt_AsLong(ret);
-		UWSGI_RELEASE_GIL;
-		return retval;
-		
+			retval = -1; // error, retry
+		} else {
+			retval = (int) PyInt_AsLong(ret);
+		}
+		goto clear;
 	}
-	
+
 	if (PyErr_Occurred())
 		PyErr_Print();
 
 	// error, retry
+	retval = -1;
+
+clear:
+	Py_XDECREF(ret);
+	Py_XDECREF(pyargs);
+	Py_XDECREF(spool_dict);
 	UWSGI_RELEASE_GIL;
-	return -1;
+	return retval;
 }
 
 void uwsgi_python_resume(struct wsgi_request *wsgi_req) {
@@ -1744,21 +1788,25 @@ static void uwsgi_python_harakiri(int wid) {
 	if (up.tracebacker) {
 
         	char buf[8192];
-		char *address = uwsgi_concat2(up.tracebacker, uwsgi_num2str(wid));
+		char *wid_str = uwsgi_num2str(wid);
+		char *address = uwsgi_concat2(up.tracebacker, wid_str);
 
         	int fd = uwsgi_connect(address, -1, 0);
-        	while (fd >= 0) {
-                	int ret = uwsgi_waitfd(fd, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
-                	if (ret <= 0) {
-				break;
-                	}
-                	ssize_t len = read(fd, buf, 8192);
-                	if (len <= 0) {
-				break;
-                	}
-                	uwsgi_log("%.*s", (int) len, buf);
-        	}
+		if (fd < 1)
+			goto exit;
 
+		for(;;) {
+                	int ret = uwsgi_waitfd(fd, uwsgi.socket_timeout);
+                	if (ret <= 0) goto cleanup;
+                	ssize_t len = read(fd, buf, 8192);
+                	if (len <= 0) goto cleanup;
+                	uwsgi_log("%.*s", (int) len, buf);
+		}
+
+cleanup:
+		close(fd);
+exit:
+		free(wid_str);
 		free(address);
 	}
 

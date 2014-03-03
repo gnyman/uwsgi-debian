@@ -92,9 +92,9 @@ static char *uwsgi_xslt_apply(xmlDoc *doc, char *xsltfile, char *params, int *rl
         if (!ss) {
 		if (vparams) {
 			int i; for(i=1;i<(count*2);i+=2) free(vparams[i]);
-			free(tmp_params);
 			free(vparams);
 		}
+		free(tmp_params);
                 return NULL;
         }
 
@@ -103,9 +103,9 @@ static char *uwsgi_xslt_apply(xmlDoc *doc, char *xsltfile, char *params, int *rl
 		xsltFreeStylesheet(ss);
 		if (vparams) {
 			int i; for(i=1;i<(count*2);i+=2) free(vparams[i]);
-			free(tmp_params);
 			free(vparams);
 		}
+		free(tmp_params);
 		return NULL;
 	}
 
@@ -115,9 +115,9 @@ static char *uwsgi_xslt_apply(xmlDoc *doc, char *xsltfile, char *params, int *rl
 	xmlFreeDoc(res);
 	if (vparams) {
 		int i; for(i=1;i<(count*2);i+=2) free(vparams[i]);
-		free(tmp_params);
 		free(vparams);
 	}
+	free(tmp_params);
 	if (ret < 0) return NULL;
 	return (char *) output;
 }
@@ -134,6 +134,7 @@ static int uwsgi_request_xslt(struct wsgi_request *wsgi_req) {
 	size_t stylesheet_len = 0;
 	
 	char *params = NULL;
+	xmlDoc *doc = NULL;
 
 	if (uwsgi_parse_vars(wsgi_req)) {
 		return -1;
@@ -183,10 +184,9 @@ static int uwsgi_request_xslt(struct wsgi_request *wsgi_req) {
 		return UWSGI_OK;
 	}
 
-	free(xmlfile);
-
 	if (!uwsgi_is_file(filename)) {
 		uwsgi_403(wsgi_req);
+		free(xmlfile);
 		return UWSGI_OK;
 	}
 	filename_len = strlen(filename);
@@ -268,18 +268,20 @@ static int uwsgi_request_xslt(struct wsgi_request *wsgi_req) {
 	if (found) goto apply;
 	
 	uwsgi_404(wsgi_req);
+	free(xmlfile);
 	return UWSGI_OK;
 
 apply:
-	if (wsgi_req->query_string_len > 0) {
-		params = uwsgi_concat2n(wsgi_req->query_string, wsgi_req->query_string_len, "", 0);
-	}
 	// we have both the file and the stylesheet, let's run the engine
-	xmlDoc *doc = xmlParseFile(xmlfile);
+	doc = xmlParseFile(xmlfile);
+	free(xmlfile);
 	if (!doc) {
 		uwsgi_500(wsgi_req);
                 return UWSGI_OK;
 	} 
+	if (wsgi_req->query_string_len > 0) {
+		params = uwsgi_concat2n(wsgi_req->query_string, wsgi_req->query_string_len, "", 0);
+	}
 	output = uwsgi_xslt_apply(doc, stylesheet, params, &output_rlen);
 	xmlFreeDoc(doc);
 	if (params) free(params);
@@ -398,10 +400,10 @@ static int uwsgi_routing_func_xslt(struct wsgi_request *wsgi_req, struct uwsgi_r
 		if (!ub_params) goto end;
 	}
 
-	if (urxc->content_type) {
-		ub_content_type = uwsgi_routing_translate(wsgi_req, ur, *subject, *subject_len, urxc->content_type, urxc->content_type_len);
-		if (!ub_content_type) goto end;
-	}
+	if (!urxc->content_type) goto end;
+
+	ub_content_type = uwsgi_routing_translate(wsgi_req, ur, *subject, *subject_len, urxc->content_type, urxc->content_type_len);
+	if (!ub_content_type) goto end;
 
 	int rlen;
 	xmlDoc *doc = xmlParseFile(ub_doc->buf) ;
@@ -441,7 +443,7 @@ static int uwsgi_router_xslt(struct uwsgi_route *ur, char *args) {
                         exit(1);
 	}
 
-	if (!urxc->doc && !urxc->stylesheet) {
+	if (!urxc->doc || !urxc->stylesheet) {
                 uwsgi_log("invalid route syntax: you need to specify a doc and a stylesheet\n");
         	exit(1);
 	}

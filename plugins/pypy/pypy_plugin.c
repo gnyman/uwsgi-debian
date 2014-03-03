@@ -16,12 +16,15 @@ struct uwsgi_pypy {
 	char *home;
 	char *wsgi;
 	char *wsgi_file;
+	char *paste;
 	struct uwsgi_string_list *eval;
 	struct uwsgi_string_list *eval_post_fork;
 	struct uwsgi_string_list *exec;
 	struct uwsgi_string_list *exec_post_fork;
 
 	struct uwsgi_string_list *pp;
+
+	pthread_mutex_t attach_thread_lock;
 } upypy;
 
 // the functions exposed by libpypy-c
@@ -32,8 +35,10 @@ void (*u_pypy_thread_attach)(void);
 void (*u_pypy_init_threads)(void);
 
 // the hooks you can override with pypy
+void (*uwsgi_pypy_hook_execute_source)(char *);
 void (*uwsgi_pypy_hook_loader)(char *);
 void (*uwsgi_pypy_hook_file_loader)(char *);
+void (*uwsgi_pypy_hook_paste_loader)(char *);
 void (*uwsgi_pypy_hook_pythonpath)(char *);
 void (*uwsgi_pypy_hook_request)(void *, int);
 void (*uwsgi_pypy_post_fork_hook)(void);
@@ -182,23 +187,21 @@ ready:
 
 static void uwsgi_pypy_preinit_apps() {
 
-	struct uwsgi_string_list *usl = upypy.eval;
-	while(usl) {
-		if (u_pypy_execute_source(usl->value)) {
-			exit(1);
-		}
-		usl = usl->next;
+	if (!uwsgi_pypy_hook_execute_source) {
+		uwsgi_log("*** WARNING your pypy setup code does not expose a callback for \"execute_source\" ***\n");
+		return;
 	}
 
-	usl = upypy.exec;
-	while(usl) {
+	struct uwsgi_string_list *usl = NULL;
+	uwsgi_foreach(usl, upypy.eval) {
+		uwsgi_pypy_hook_execute_source(usl->value);
+	}
+
+	uwsgi_foreach(usl, upypy.exec) {
 		size_t rlen = 0;
 		char *buffer = uwsgi_open_and_read(usl->value, &rlen, 1, NULL);
-		if (u_pypy_execute_source(buffer)) {
-			exit(1);
-		}
+		uwsgi_pypy_hook_execute_source(buffer);
 		free(buffer);
-		usl = usl->next;
 	}
 }
 
@@ -231,6 +234,10 @@ static void uwsgi_pypy_init_apps() {
 	if (uwsgi_pypy_hook_file_loader && upypy.wsgi_file) {
 		uwsgi_pypy_hook_file_loader(upypy.wsgi_file);
 	}
+
+	if (uwsgi_pypy_hook_paste_loader && upypy.paste) {
+		uwsgi_pypy_hook_paste_loader(upypy.paste);
+	}
 }
 
 /*
@@ -240,12 +247,20 @@ static void uwsgi_pypy_atexit() {
 }
 */
 
+static void uwsgi_opt_pypy_ini_paste(char *opt, char *value, void *foobar) {
+        uwsgi_opt_load_ini(opt, value, NULL);
+        upypy.paste = value;
+}
+
+
 static struct uwsgi_option uwsgi_pypy_options[] = {
 	{"pypy-lib", required_argument, 0, "set the path/name of the pypy library", uwsgi_opt_set_str, &upypy.lib, 0},
 	{"pypy-setup", required_argument, 0, "set the path of the python setup script", uwsgi_opt_set_str, &upypy.setup, 0},
 	{"pypy-home", required_argument, 0, "set the home of pypy library", uwsgi_opt_set_str, &upypy.home, 0},
 	{"pypy-wsgi", required_argument, 0, "load a WSGI module", uwsgi_opt_set_str, &upypy.wsgi, 0},
 	{"pypy-wsgi-file", required_argument, 0, "load a WSGI/mod_wsgi file", uwsgi_opt_set_str, &upypy.wsgi_file, 0},
+	{"pypy-ini-paste", required_argument, 0, "load a paste.deploy config file containing uwsgi section", uwsgi_opt_pypy_ini_paste, NULL, UWSGI_OPT_IMMEDIATE},
+	{"pypy-paste", required_argument, 0, "load a paste.deploy config file", uwsgi_opt_set_str, &upypy.paste, 0},
 	{"pypy-eval", required_argument, 0, "evaluate pypy code before fork()", uwsgi_opt_add_string_list, &upypy.eval, 0},
 	{"pypy-eval-post-fork", required_argument, 0, "evaluate pypy code soon after fork()", uwsgi_opt_add_string_list, &upypy.eval_post_fork, 0},
 	{"pypy-exec", required_argument, 0, "execute pypy code from file before fork()", uwsgi_opt_add_string_list, &upypy.exec, 0},
@@ -264,7 +279,9 @@ static void uwsgi_pypy_enable_threads() {
 
 static void uwsgi_pypy_init_thread() {
 	if (u_pypy_thread_attach) {
+		pthread_mutex_lock(&upypy.attach_thread_lock);
 		u_pypy_thread_attach();
+		pthread_mutex_unlock(&upypy.attach_thread_lock);
 	}
 }
 
@@ -274,10 +291,10 @@ static int uwsgi_pypy_signal_handler(uint8_t sig, void *handler) {
 	return 0;
 }
 
-static uint16_t uwsgi_pypy_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[], char *buffer) {
+static uint64_t uwsgi_pypy_rpc(void *func, uint8_t argc, char **argv, uint16_t argvs[], char **buffer) {
 	int iargvs[UMAX8];
 	int i;
-	int (*pypy_func)(int, char **, int*, char *) = (int (*)(int, char **, int*, char *)) func;
+	int (*pypy_func)(int, char **, int*, char **) = (int (*)(int, char **, int*, char **)) func;
 	// we convert 16bit to int
 	for(i=0;i<argc;i++) {
 		iargvs[i] = (int) argvs[i]; 
@@ -286,22 +303,16 @@ static uint16_t uwsgi_pypy_rpc(void *func, uint8_t argc, char **argv, uint16_t a
 }
 
 static void uwsgi_pypy_post_fork() {
-	struct uwsgi_string_list *usl = upypy.eval_post_fork;
-        while(usl) {
-                if (u_pypy_execute_source(usl->value)) {
-			exit(1);
-		}
-                usl = usl->next;
+	pthread_mutex_init(&upypy.attach_thread_lock, NULL);
+	struct uwsgi_string_list *usl = NULL;
+	uwsgi_foreach(usl, upypy.eval_post_fork) {
+                uwsgi_pypy_hook_execute_source(usl->value);
         }
-	usl = upypy.exec_post_fork;
-        while(usl) {
+	uwsgi_foreach(usl, upypy.exec_post_fork) {
                 size_t rlen = 0;
                 char *buffer = uwsgi_open_and_read(usl->value, &rlen, 1, NULL);
-                if (u_pypy_execute_source(buffer)) {
-			exit(1);
-		}
+                uwsgi_pypy_hook_execute_source(buffer);
                 free(buffer);
-                usl = usl->next;
         }
 
 	if (uwsgi_pypy_post_fork_hook) {
@@ -313,14 +324,20 @@ static void uwsgi_pypy_onload() {
 #ifdef UWSGI_PYPY_HOME
 	upypy.home = UWSGI_PYPY_HOME;
 #endif
+	uwsgi.has_threads = 1;
 }
 
 static int uwsgi_pypy_mule(char *opt) {
 
+	if (!uwsgi_pypy_hook_execute_source) {
+		uwsgi_log("!!! no \"execute_source\" callback in your pypy setup code !!!\n");
+		exit(1);
+	}
+
         if (uwsgi_endswith(opt, ".py")) {
                 size_t rlen = 0;
                 char *buffer = uwsgi_open_and_read(opt, &rlen, 1, NULL);
-                u_pypy_execute_source(buffer);
+                uwsgi_pypy_hook_execute_source(buffer);
 		free(buffer);
                 return 1;
         }

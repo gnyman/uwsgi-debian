@@ -16,6 +16,7 @@
 #ifndef MS_REC
 #define MS_REC 16384
 #endif
+#include <sys/statfs.h>
 #endif
 
 struct uwsgi_mount_flag {
@@ -52,6 +53,9 @@ static struct uwsgi_mount_flag umflags[] = {
 #endif
 #ifdef MS_REMOUNT
 	{"remount", MS_REMOUNT},
+#endif
+#ifdef MS_NOSUID
+	{"nosuid", MS_NOSUID},
 #endif
 #ifdef MS_SYNCHRONOUS
 	{"sync", MS_SYNCHRONOUS},
@@ -101,8 +105,8 @@ uint64_t uwsgi_mount_flag(char *mflag) {
 	return 0;
 }
 
-int uwsgi_mount(char *fs, char *what, char *where, char *flags) {
-#ifdef __FreeBSD__
+int uwsgi_mount(char *fs, char *what, char *where, char *flags, char *data) {
+#if defined(__FreeBSD__) || defined(__GNU_kFreeBSD__)
 	struct iovec iov[6];
 #endif
 	unsigned long mountflags = 0;
@@ -120,8 +124,8 @@ int uwsgi_mount(char *fs, char *what, char *where, char *flags) {
 	free(mflags);
 parsed:
 #ifdef __linux__
-	return mount(what, where, fs, mountflags, NULL);
-#elif defined(__FreeBSD__)
+	return mount(what, where, fs, mountflags, data);
+#elif defined(__FreeBSD__) || defined(__GNU_kFreeBSD__)
 	iov[0].iov_base = "fstype";
 	iov[0].iov_len = 7;
 	iov[1].iov_base = fs;
@@ -189,13 +193,14 @@ unmountable:
 		free(slashed);
 	}
         return umount2(where, mountflags);
-#elif defined(__FreeBSD__)
+#elif defined(__FreeBSD__) || defined(__GNU_kFreeBSD__)
 	return unmount(where, mountflags);
 #endif
         return -1;
 }
 
 int uwsgi_mount_hook(char *arg) {
+	char *data = NULL;
 	char *tmp_arg = uwsgi_str(arg);
 	char *fs = tmp_arg;
 	char *what = strchr(fs, ' ');
@@ -207,8 +212,12 @@ int uwsgi_mount_hook(char *arg) {
 	char *flags = strchr(where, ' ');
 	if (flags) {
 		*flags = 0; flags++;
+		data = strchr(flags, ' ');
+		if (data) {
+			*data = 0; data++;
+		}
 	}
-	if (uwsgi_mount(fs, what, where, flags)) {
+	if (uwsgi_mount(fs, what, where, flags, data)) {
 		uwsgi_error("uwsgi_mount()");
 		free(tmp_arg);
 		return -1;
@@ -235,4 +244,19 @@ int uwsgi_umount_hook(char *arg) {
         }       
         free(tmp_arg);
         return 0;
+}
+
+int uwsgi_check_mountpoint(char *mountpoint) {
+#ifdef __linux__
+	struct statfs sfs;
+	int ret = statfs(mountpoint, &sfs);
+	if (ret) {
+		uwsgi_error("uwsgi_check_mountpoint()/statfs()");
+		return -1;
+	}
+	return 0;
+#else
+	uwsgi_log("this platform does not support mountpoints check !!!\n");
+	return -1;
+#endif
 }

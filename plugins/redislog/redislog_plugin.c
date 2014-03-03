@@ -32,7 +32,7 @@ static char *uwsgi_redis_logger_build_command(char *src) {
 	while(*ptr++) {
 		if (*ptr == ' ') {
 			pos = snprintf(dst, len, "$%d\r\n%.*s\r\n", (int) (ptr-base), (int) (ptr-base), base);
-			if (pos > len || pos < 0) {
+			if (pos >= len || pos < 0) {
 				// i do not know what to do, better to exit...
 				exit(1);
 			}
@@ -118,7 +118,7 @@ done:
 
 	uredislog = (struct uwsgi_redislog_state *) ul->data;
 	if (uredislog->fd == -1) {
-		uredislog->fd = uwsgi_connect(uredislog->address, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT], 0);
+		uredislog->fd = uwsgi_connect(uredislog->address, uwsgi.socket_timeout, 0);
 	}
 
 	if (uredislog->fd == -1) return -1;

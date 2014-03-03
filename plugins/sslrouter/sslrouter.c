@@ -139,7 +139,7 @@ static struct uwsgi_option sslrouter_options[] = {
 	{"sslrouter-use-socket", optional_argument, 0, "forward request to the specified uwsgi socket", uwsgi_opt_corerouter_use_socket, &usr, 0},
 	{"sslrouter-to", required_argument, 0, "forward requests to the specified uwsgi server (you can specify it multiple times for load balancing)", uwsgi_opt_add_string_list, &usr.cr.static_nodes, 0},
 	{"sslrouter-gracetime", required_argument, 0, "retry connections to dead static nodes after the specified amount of seconds", uwsgi_opt_set_int, &usr.cr.static_node_gracetime, 0},
-	{"sslrouter-events", required_argument, 0, "set the maximum number of concusrent events", uwsgi_opt_set_int, &usr.cr.nevents, 0},
+	{"sslrouter-events", required_argument, 0, "set the maximum number of concurrent events", uwsgi_opt_set_int, &usr.cr.nevents, 0},
 	{"sslrouter-max-retries", required_argument, 0, "set the maximum number of retries/fallbacks to other nodes", uwsgi_opt_set_int, &usr.cr.max_retries, 0},
 	{"sslrouter-quiet", required_argument, 0, "do not report failed connections to instances", uwsgi_opt_true, &usr.cr.quiet, 0},
 	{"sslrouter-cheap", no_argument, 0, "run the sslrouter in cheap mode", uwsgi_opt_true, &usr.cr.cheap, 0},
@@ -155,6 +155,7 @@ static struct uwsgi_option sslrouter_options[] = {
 #ifdef SSL_CTRL_SET_TLSEXT_HOSTNAME
 	{"sslrouter-sni", no_argument, 0, "use SNI to route requests", uwsgi_opt_true, &usr.sni, 0},
 #endif
+	{"sslrouter-buffer-size", required_argument, 0, "set internal buffer size (default: page size)", uwsgi_opt_set_64bit, &usr.cr.buffer_size, 0},
 
 	{0, 0, 0, 0, 0, 0, 0},
 };
@@ -362,7 +363,8 @@ static int sslrouter_alloc_session(struct uwsgi_corerouter *ucr, struct uwsgi_ga
         SSL_set_fd(sr->ssl, cs->main_peer->fd);
         SSL_set_accept_state(sr->ssl);
 
-	uwsgi_cr_set_hooks(cs->main_peer, sr_read, NULL);
+	if (uwsgi_cr_set_hooks(cs->main_peer, sr_read, NULL))
+		return -1;
 
 	return 0;
 }

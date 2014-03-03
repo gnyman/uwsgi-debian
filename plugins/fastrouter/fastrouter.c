@@ -37,7 +37,7 @@ static struct uwsgi_option fastrouter_options[] = {
 	{"fastrouter-events", required_argument, 0, "set the maximum number of concurrent events", uwsgi_opt_set_int, &ufr.cr.nevents, 0},
 	{"fastrouter-quiet", required_argument, 0, "do not report failed connections to instances", uwsgi_opt_true, &ufr.cr.quiet, 0},
 	{"fastrouter-cheap", no_argument, 0, "run the fastrouter in cheap mode", uwsgi_opt_true, &ufr.cr.cheap, 0},
-	{"fastrouter-subscription-server", required_argument, 0, "run the fastrouter subscription server on the spcified address", uwsgi_opt_corerouter_ss, &ufr, 0},
+	{"fastrouter-subscription-server", required_argument, 0, "run the fastrouter subscription server on the specified address", uwsgi_opt_corerouter_ss, &ufr, 0},
 	{"fastrouter-subscription-slot", required_argument, 0, "*** deprecated ***", uwsgi_opt_deprecated, (void *) "useless thanks to the new implementation", 0},
 
 	{"fastrouter-timeout", required_argument, 0, "set fastrouter timeout", uwsgi_opt_set_int, &ufr.cr.socket_timeout, 0},
@@ -48,6 +48,13 @@ static struct uwsgi_option fastrouter_options[] = {
 	{"fastrouter-stats-server", required_argument, 0, "run the fastrouter stats server", uwsgi_opt_set_str, &ufr.cr.stats_server, 0},
 	{"fastrouter-ss", required_argument, 0, "run the fastrouter stats server", uwsgi_opt_set_str, &ufr.cr.stats_server, 0},
 	{"fastrouter-harakiri", required_argument, 0, "enable fastrouter harakiri", uwsgi_opt_set_int, &ufr.cr.harakiri, 0},
+
+	{"fastrouter-uid", required_argument, 0, "drop fastrouter privileges to the specified uid", uwsgi_opt_uid, &ufr.cr.uid, 0 },
+        {"fastrouter-gid", required_argument, 0, "drop fastrouter privileges to the specified gid", uwsgi_opt_gid, &ufr.cr.gid, 0 },
+	{"fastrouter-resubscribe", required_argument, 0, "forward subscriptions to the specified subscription server", uwsgi_opt_add_string_list, &ufr.cr.resubscribe, 0},
+	{"fastrouter-resubscribe-bind", required_argument, 0, "bind to the specified address when re-subscribing", uwsgi_opt_set_str, &ufr.cr.resubscribe_bind, 0},
+
+	{"fastrouter-buffer-size", required_argument, 0, "set internal buffer size (default: page size)", uwsgi_opt_set_64bit, &ufr.cr.buffer_size, 0},
 	{0, 0, 0, 0, 0, 0, 0},
 };
 
@@ -190,21 +197,23 @@ static ssize_t fr_instance_connected(struct corerouter_peer *peer) {
 // called after receaving the uwsgi header (read vars)
 static ssize_t fr_recv_uwsgi_vars(struct corerouter_peer *main_peer) {
 	struct uwsgi_header *uh = (struct uwsgi_header *) main_peer->in->buf;
+	// better to store it as the original buf address could change
+	uint16_t pktsize = uh->pktsize;
 	// increase buffer if needed
-	if (uwsgi_buffer_fix(main_peer->in, uh->pktsize+4))
+	if (uwsgi_buffer_fix(main_peer->in, pktsize+4))
 		return -1;
-	ssize_t len = cr_read_exact(main_peer, uh->pktsize+4, "fr_recv_uwsgi_vars()");
+	ssize_t len = cr_read_exact(main_peer, pktsize+4, "fr_recv_uwsgi_vars()");
 	if (!len) return 0;
 
 	// headers received, ready to choose the instance
-	if (main_peer->in->pos == (size_t)(uh->pktsize+4)) {
+	if (main_peer->in->pos == (size_t)(pktsize+4)) {
 		struct uwsgi_corerouter *ucr = main_peer->session->corerouter;
 
 		struct corerouter_peer *new_peer = uwsgi_cr_peer_add(main_peer->session);
 		new_peer->last_hook_read = fr_instance_read;
 
 		// find the hostname
-		if (uwsgi_hooked_parse(main_peer->in->buf+4, uh->pktsize, fr_get_hostname, (void *) new_peer)) {
+		if (uwsgi_hooked_parse(main_peer->in->buf+4, pktsize, fr_get_hostname, (void *) new_peer)) {
 			return -1;
 		}
 
