@@ -1,10 +1,6 @@
 #include <uwsgi.h>
 #include <api/glfs.h>
 
-#ifdef UWSGI_MATHEVAL
-#error currently the glusterfs plugins is not compatible with uWSGI built with matheval support
-#endif
-
 extern struct uwsgi_server uwsgi;
 
 /*
@@ -204,7 +200,7 @@ static void uwsgi_glusterfs_add_mountpoint(char *arg, size_t arg_len) {
 static void uwsgi_glusterfs_setup() {
 
 	if (!uglusterfs.timeout) {
-		uglusterfs.timeout = uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT];
+		uglusterfs.timeout = uwsgi.socket_timeout;
 	}
 
 	struct uwsgi_string_list *usl = uglusterfs.mountpoints;

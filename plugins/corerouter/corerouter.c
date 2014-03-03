@@ -41,7 +41,9 @@ struct corerouter_peer *uwsgi_cr_peer_add(struct corerouter_session *cs) {
 	peers->session = cs;
 	peers->fd = -1;
 	// create input buffer
-	peers->in = uwsgi_buffer_new(uwsgi.page_size);
+	size_t bufsize = cs->corerouter->buffer_size;
+	if (!bufsize) bufsize = uwsgi.page_size;
+	peers->in = uwsgi_buffer_new(bufsize);
 	// add timeout
         peers->timeout = cr_add_timeout(cs->corerouter, peers);
 	peers->prev = old_peers;
@@ -187,11 +189,12 @@ void uwsgi_opt_corerouter_zerg(char *opt, char *value, void *cr) {
 
         close(zerg_fd);
 
-                        for(j=0;j<count;j++) {
-                                if (zerg[j] == -1) break;
-                                ugs = uwsgi_new_gateway_socket_from_fd(zerg[j], ucr->name);
-                                ugs->zerg = optarg;
-                        }
+        for(j=0;j<count;j++) {
+                if (zerg[j] == -1) break;
+                ugs = uwsgi_new_gateway_socket_from_fd(zerg[j], ucr->name);
+                ugs->zerg = optarg;
+        }
+        free(zerg);
 }
 
 
@@ -270,6 +273,22 @@ void corerouter_manage_subscription(char *key, uint16_t keylen, char *val, uint1
 	else if (!uwsgi_strncmp("sign", 4, key, keylen)) {
 		usr->sign = val;
                 usr->sign_len = vallen;
+	}
+	else if (!uwsgi_strncmp("sni_key", 7, key, keylen)) {
+		usr->sni_key = val;
+                usr->sni_key_len = vallen;
+	}
+	else if (!uwsgi_strncmp("sni_crt", 7, key, keylen)) {
+		usr->sni_crt = val;
+                usr->sni_crt_len = vallen;
+	}
+	else if (!uwsgi_strncmp("sni_ca", 6, key, keylen)) {
+		usr->sni_ca = val;
+                usr->sni_ca_len = vallen;
+	}
+	else if (!uwsgi_strncmp("notify", 6, key, keylen)) {
+		usr->notify = val;
+                usr->notify_len = vallen;
 	}
 }
 
@@ -549,7 +568,9 @@ struct corerouter_session *corerouter_alloc_session(struct uwsgi_corerouter *ucr
 
 	struct corerouter_peer *peer = uwsgi_calloc(sizeof(struct corerouter_peer));
 	// main_peer has only input buffer as output buffer is taken from backend peers
-	peer->in = uwsgi_buffer_new(uwsgi.page_size);
+	size_t bufsize = ucr->buffer_size;
+	if (!bufsize) bufsize = uwsgi.page_size;
+	peer->in = uwsgi_buffer_new(bufsize);
 
 	ucr->cr_table[new_connection] = peer;
 	cs->main_peer = peer;
@@ -918,10 +939,13 @@ int uwsgi_corerouter_init(struct uwsgi_corerouter *ucr) {
 			uwsgi_log("starting %s in cheap mode\n", ucr->name);
 		}
 		for (i = 0; i < ucr->processes; i++) {
-			if (register_gateway(ucr->name, uwsgi_corerouter_loop, ucr) == NULL) {
+			struct uwsgi_gateway *ug = register_gateway(ucr->name, uwsgi_corerouter_loop, ucr);
+			if (ug == NULL) {
 				uwsgi_log("unable to register the %s gateway\n", ucr->name);
 				exit(1);
 			}
+			ug->uid = ucr->uid;
+			ug->gid = ucr->gid;
 		}
 	}
 
@@ -1020,6 +1044,9 @@ void corerouter_send_stats(struct uwsgi_corerouter *ucr) {
 				if (uwsgi_stats_keyvaln_comma(us, "key", s_slot->key, s_slot->keylen)) goto end0;
 				if (uwsgi_stats_keylong_comma(us, "hash", (unsigned long long) s_slot->hash)) goto end0;
 				if (uwsgi_stats_keylong_comma(us, "hits", (unsigned long long) s_slot->hits)) goto end0;
+#ifdef UWSGI_SSL
+				if (uwsgi_stats_keylong_comma(us, "sni_enabled", (unsigned long long) s_slot->sni_enabled)) goto end0;
+#endif
 
 				if (uwsgi_stats_key(us , "nodes")) goto end0;
 				if (uwsgi_stats_list_open(us)) goto end0;
@@ -1033,9 +1060,13 @@ void corerouter_send_stats(struct uwsgi_corerouter *ucr) {
 					if (uwsgi_stats_keylong_comma(us, "modifier1", (unsigned long long) s_node->modifier1)) goto end0;
 					if (uwsgi_stats_keylong_comma(us, "modifier2", (unsigned long long) s_node->modifier2)) goto end0;
 					if (uwsgi_stats_keylong_comma(us, "last_check", (unsigned long long) s_node->last_check)) goto end0;
+					if (uwsgi_stats_keylong_comma(us, "pid", (unsigned long long) s_node->pid)) goto end0;
+					if (uwsgi_stats_keylong_comma(us, "uid", (unsigned long long) s_node->uid)) goto end0;
+					if (uwsgi_stats_keylong_comma(us, "gid", (unsigned long long) s_node->gid)) goto end0;
 					if (uwsgi_stats_keylong_comma(us, "requests", (unsigned long long) s_node->requests)) goto end0;
 					if (uwsgi_stats_keylong_comma(us, "last_requests", (unsigned long long) s_node->last_requests)) goto end0;
-					if (uwsgi_stats_keylong_comma(us, "tx", (unsigned long long) s_node->transferred)) goto end0;
+					if (uwsgi_stats_keylong_comma(us, "tx", (unsigned long long) s_node->tx)) goto end0;
+					if (uwsgi_stats_keylong_comma(us, "rx", (unsigned long long) s_node->rx)) goto end0;
 					if (uwsgi_stats_keylong_comma(us, "cores", (unsigned long long) s_node->cores)) goto end0;
 					if (uwsgi_stats_keylong_comma(us, "load", (unsigned long long) s_node->load)) goto end0;
 					if (uwsgi_stats_keylong_comma(us, "weight", (unsigned long long) s_node->weight)) goto end0;
@@ -1075,7 +1106,7 @@ void corerouter_send_stats(struct uwsgi_corerouter *ucr) {
         size_t remains = us->pos;
         off_t pos = 0;
         while(remains > 0) {
-		int ret = uwsgi_waitfd_write(client_fd, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT]);
+		int ret = uwsgi_waitfd_write(client_fd, uwsgi.socket_timeout);
                 if (ret <= 0) {
                         goto end0;
                 }

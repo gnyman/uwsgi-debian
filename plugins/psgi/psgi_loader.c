@@ -107,11 +107,67 @@ XS(XS_input_read) {
         SV *read_buf = ST(1);
         unsigned long arg_len = SvIV(ST(2));
 
+	long offset = 0;
+	if (items > 2) {
+		offset = (long) SvIV(ST(3));
+	}
+
 	ssize_t rlen = 0;
 
 	char *buf = uwsgi_request_body_read(wsgi_req, arg_len, &rlen);
         if (buf) {
-		sv_setpvn(read_buf, buf, rlen);
+		if (rlen > 0 && offset != 0) {
+			STRLEN orig_len;
+			// get data from original string
+        		char *orig = SvPV(read_buf, orig_len);	
+			size_t new_size = orig_len;
+			// still valid ?
+			if (offset > 0) {
+				// if the new string is bigger than the old one, allocate a bigger chunk
+				if ((size_t) rlen + offset > orig_len) {
+					new_size = rlen + offset;
+				}
+				// if offset is bigger than orig_len, pad with "\0", so we use (slower) calloc
+				char *new_buf = uwsgi_calloc(new_size);
+				// put back older value
+				memcpy(new_buf, orig, orig_len);
+				// put the new value
+				memcpy(new_buf + offset, buf, rlen);
+				sv_setpvn(read_buf, new_buf, new_size);
+				// free the new value
+				free(new_buf);
+			}
+			// negative (a little bit more complex)
+			else {
+				long orig_offset = 0;
+				 // first of all get the new orig_len;   
+                                offset = abs(offset);
+                                if (offset > (long) orig_len) {
+                                        new_size = offset;
+					orig_offset = offset - orig_len;
+                                        offset = 0;
+                                }
+                                else {
+                                        offset = orig_len - offset;
+                                }
+
+				if ((size_t) rlen + offset > new_size) {
+					new_size = rlen + offset;
+				}
+
+				char *new_buf = uwsgi_calloc(new_size);
+				// put back older value
+                                memcpy(new_buf + orig_offset, orig, orig_len);
+				 // put the new value
+                                memcpy(new_buf + offset, buf, rlen);
+				sv_setpvn(read_buf, new_buf, new_size);
+				// free the new value
+				free(new_buf);
+			}
+		}
+		else {
+			sv_setpvn(read_buf, buf, rlen);
+		}
 		goto ret;
         }
 
@@ -149,7 +205,7 @@ XS(XS_streaming_write) {
 
 	uwsgi_response_write_body_do(wsgi_req, body, blen);
 	uwsgi_pl_check_write_errors {
-		// noop
+		croak("error while streaming PSGI response");
 	}
 
         XSRETURN(0);
@@ -171,20 +227,6 @@ XS(XS_error_print) {
         XSRETURN(0);
 }
 
-XS(XS_uwsgi_stacktrace) {
-
-	dXSARGS;
-
-        psgi_check_args(0);
-	uwsgi_log("%s", SvPV_nolen(ERRSV));
-	uwsgi_log("*** uWSGI perl stacktrace ***\n");
-	SV *ret = perl_eval_pv("Devel::StackTrace->new->as_string;", 0);
-        uwsgi_log("%s", SvPV_nolen(ret));
-	uwsgi_log("*** end of perl stacktrace ***\n\n");
-	XSRETURN(0);
-
-}
-
 
 /* automatically generated */
 
@@ -197,6 +239,7 @@ xs_init(pTHX)
 {
         char *file = __FILE__;
         dXSUB_SYS;
+	HV *stash;
 
         /* DynaLoader is a special case */
         newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
@@ -218,12 +261,15 @@ xs_init(pTHX)
         newXS("uwsgi::streaming::write", XS_streaming_write, "uwsgi::streaming");
         newXS("uwsgi::streaming::close", XS_streaming_close, "uwsgi::streaming");
 
-        newXS("uwsgi::stacktrace", XS_uwsgi_stacktrace, "uwsgi");
-
-
         uperl.tmp_streaming_stash[uperl.tmp_current_i] = gv_stashpv("uwsgi::streaming", 0);
 
 nonworker:
+
+	stash = gv_stashpv("uwsgi", 1);
+	newCONSTSUB(stash, "VERSION", newSVpv(UWSGI_VERSION, 0));
+	newCONSTSUB(stash, "SPOOL_OK", newSViv(-2));
+	newCONSTSUB(stash, "SPOOL_RETRY", newSViv(-1));
+	newCONSTSUB(stash, "SPOOL_IGNORE", newSViv(0));
 
         init_perl_embedded_module();
 
@@ -260,7 +306,6 @@ static void uwsgi_perl_free_stashes(void) {
 
 int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, PerlInterpreter **interpreters) {
 
-	struct stat st;
 	int i;
 	SV **callables;
 
@@ -268,30 +313,10 @@ int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, Pe
 
 	char *app_name = uwsgi_concat2n(app, app_len, "", 0);
 
-	// prepare for $0
-	uperl.embedding[1] = app_name;
-		
-	int fd = open(app_name, O_RDONLY);
-	if (fd < 0) {
-		uwsgi_error_open(app_name);
-		goto clear2;
+	if (uwsgi_file_exists(app_name)) {
+		// prepare for $0 (if the file is local)
+		uperl.embedding[1] = app_name;
 	}
-
-	if (fstat(fd, &st)) {
-		uwsgi_error("fstat()");
-		close(fd);
-		goto clear2;
-	}
-
-	char *buf = uwsgi_calloc(st.st_size+1);
-	if (read(fd, buf, st.st_size) != st.st_size) {
-		uwsgi_error("read()");
-		close(fd);
-		free(buf);
-		goto clear2;
-	}
-
-	close(fd);
 
 	// the first (default) app, should always be loaded in the main interpreter
 	if (interpreters == NULL) {
@@ -309,10 +334,7 @@ int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, Pe
 		}		
 	}
 
-	if (!interpreters) {
-		goto clear2;
-	}
-
+	if (!interpreters) goto clear2;
 
 	callables = uwsgi_calloc(sizeof(SV *) * uwsgi.threads);
 	uperl.tmp_streaming_stash = uwsgi_calloc(sizeof(HV *) * uwsgi.threads);
@@ -343,41 +365,30 @@ int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, Pe
 
 		uperl.tmp_current_i = i;
 
-
-		if (uperl.locallib) {
-                        uwsgi_log("using %s as local::lib directory\n", uperl.locallib);
-                        uperl.embedding[1] = uwsgi_concat2("-Mlocal::lib=", uperl.locallib);
-                        uperl.embedding[2] = app_name;
-                        if (perl_parse(interpreters[i], xs_init, 3, uperl.embedding, NULL)) {
-				// what to do here ? i hope no-one will use threads with dynamic apps... but clear the whole stuff...
-				free(uperl.embedding[1]);
-				uperl.embedding[1] = app_name;
-				free(callables);
-				uwsgi_perl_free_stashes();
-				goto clear;
-                        }
-			free(uperl.embedding[1]);
-			uperl.embedding[1] = app_name;
-                }
-		else {
-			if (perl_parse(interpreters[i], xs_init, 2, uperl.embedding, NULL)) {
+		// We need to initialize the interpreter to execute
+		// our xs_init hook, but we're *not* calling it with
+		// uperl.embedding as an argument so we won't execute
+		// BEGIN blocks in app_name twice.
+		{
+			char *perl_init_arg[] = { "", "-e", "0" };
+			if (perl_parse(interpreters[i], xs_init, 3, perl_init_arg, NULL)) {
 				// what to do here ? i hope no-one will use threads with dynamic apps... but clear the whole stuff...
 				free(callables);
 				uwsgi_perl_free_stashes();
 				goto clear;
-        		}
-		}
-
-		perl_eval_pv("use IO::Handle;", 0);
-		perl_eval_pv("use IO::File;", 0);
-		perl_eval_pv("use Scalar::Util;", 0);
-		if (!uperl.no_die_catch) {
-			perl_eval_pv("use Devel::StackTrace;", 0);
-			if (!SvTRUE(ERRSV)) {
-				uperl.stacktrace_available = 1;
-				perl_eval_pv("$SIG{__DIE__} = \\&uwsgi::stacktrace;", 0);
 			}
 		}
+
+		if (uperl.locallib) {
+			uwsgi_log("using %s as local::lib directory\n", uperl.locallib);
+			char *local_lib_use = uwsgi_concat3("use local::lib qw(", uperl.locallib, ");");
+			perl_eval_pv(local_lib_use, 1);
+			free(local_lib_use);
+		}
+		perl_eval_pv("use IO::Handle;", 1);
+		perl_eval_pv("use IO::File;", 1);
+		perl_eval_pv("use IO::Socket;", 1);
+		perl_eval_pv("use Scalar::Util;", 1);
 
 		if (uperl.argv_items || uperl.argv_item) {
 			AV *uperl_argv = GvAV(PL_argvgv);
@@ -395,12 +406,32 @@ int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, Pe
 			}
 		}
 		
-
 		SV *dollar_zero = get_sv("0", GV_ADD);
 		sv_setsv(dollar_zero, newSVpv(app, app_len));
 
-		callables[i] = perl_eval_pv(uwsgi_concat4("#line 1 ", app_name, "\n", buf), 0);
-		if (!callables[i]) {
+		SV *has_plack = NULL;
+		if (!uperl.no_plack) {
+			has_plack = perl_eval_pv("use Plack::Util;", 0);
+		}
+
+		if (!has_plack || SvTRUE(ERRSV)) {
+			if (!uperl.no_plack) { 
+				uwsgi_log("Plack::Util is not installed, using \"do\" instead of \"load_psgi\"\n");
+			}
+			char *code = uwsgi_concat3("my $app = do '", app_name, "';  if ( !$app && ( my $error = $@ || $! )) { die $error; }; $app");
+			callables[i] = perl_eval_pv(code, 0);
+			free(code);
+		}
+		else {
+			char *code = uwsgi_concat3("Plack::Util::load_psgi '", app_name , "';");
+			callables[i] = perl_eval_pv(code, 0);
+			free(code);
+		}
+
+		if (!callables[i] || SvTYPE(callables[i]) == SVt_NULL || SvTRUE(ERRSV)) {
+			if (SvTRUE(ERRSV)) {
+        			uwsgi_log("%s", SvPV_nolen(ERRSV));
+			}
 			uwsgi_log("unable to find PSGI function entry point.\n");
 			// what to do here ? i hope no-one will use threads with dynamic apps...
 			free(callables);
@@ -408,17 +439,15 @@ int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, Pe
                 	goto clear;
 		}
 
+		if (!uperl.no_die_catch) {
+			perl_eval_pv("use Devel::StackTrace; $SIG{__DIE__} = sub { print Devel::StackTrace->new()->as_string() };", 0);
+			if(SvTRUE(ERRSV)) {
+				uwsgi_log("%s", SvPV_nolen(ERRSV));
+			}
+		}
+
 		PERL_SET_CONTEXT(interpreters[0]);
 	}
-
-	free(buf);
-
-	if(SvTRUE(ERRSV)) {
-        	uwsgi_log("%s\n", SvPV_nolen(ERRSV));
-		free(callables);
-		uwsgi_perl_free_stashes();
-		goto clear;
-        }
 
 	if (uwsgi_apps_cnt >= uwsgi.max_apps) {
 		uwsgi_log("ERROR: you cannot load more than %d apps in a worker\n", uwsgi.max_apps);
@@ -476,6 +505,19 @@ clear2:
        	return -1; 
 }
 
+void uwsgi_psgi_preinit_apps() {
+	if (uperl.exec) {
+		PERL_SET_CONTEXT(uperl.main[0]);
+                perl_parse(uperl.main[0], xs_init, 3, uperl.embedding, NULL);
+		struct uwsgi_string_list *usl;
+        	uwsgi_foreach(usl, uperl.exec) {
+			SV *dollar_zero = get_sv("0", GV_ADD);
+                	sv_setsv(dollar_zero, newSVpv(usl->value, usl->len));
+                	uwsgi_perl_exec(usl->value);
+        	}
+	}
+}
+
 void uwsgi_psgi_app() {
 
         if (uperl.psgi) {
@@ -483,15 +525,11 @@ void uwsgi_psgi_app() {
 		init_psgi_app(NULL, uperl.psgi, strlen(uperl.psgi), uperl.main);
         }
 	// create a perl environment (if needed)
-	else if (uperl.exec) {
+	else if (!uperl.exec && uperl.shell) {
 		PERL_SET_CONTEXT(uperl.main[0]);
-                perl_parse(uperl.main[0], xs_init, 2, uperl.embedding, NULL);
+                perl_parse(uperl.main[0], xs_init, 3, uperl.embedding, NULL);
 	}
 
-	struct uwsgi_string_list *usl;
-        uwsgi_foreach(usl, uperl.exec) {
-                uwsgi_perl_exec(usl->value);
-        }
 
 }
 
@@ -500,7 +538,7 @@ int uwsgi_perl_mule(char *opt) {
         if (uwsgi_endswith(opt, ".pl")) {
                 PERL_SET_CONTEXT(uperl.main[0]);
                 uperl.embedding[1] = opt;
-                if (perl_parse(uperl.main[0], xs_init, 2, uperl.embedding, NULL)) {
+                if (perl_parse(uperl.main[0], xs_init, 3, uperl.embedding, NULL)) {
                         return 0;
                 }
                 perl_run(uperl.main[0]);
@@ -515,6 +553,6 @@ int uwsgi_perl_mule(char *opt) {
 void uwsgi_perl_exec(char *filename) {
 	size_t size = 0;
         char *buf = uwsgi_open_and_read(filename, &size, 1, NULL);
-        perl_eval_pv(buf, 0);
+        perl_eval_pv(buf, 1);
 	free(buf);
 }

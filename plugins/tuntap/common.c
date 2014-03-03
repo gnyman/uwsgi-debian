@@ -3,7 +3,7 @@
 extern struct uwsgi_tuntap utt;
 
 // create a new peer
-struct uwsgi_tuntap_peer *uwsgi_tuntap_peer_create(struct uwsgi_tuntap_router *uttr, int fd) {
+struct uwsgi_tuntap_peer *uwsgi_tuntap_peer_create(struct uwsgi_tuntap_router *uttr, int fd, int is_router) {
 
 	struct uwsgi_tuntap_peer *uttp = uwsgi_calloc(sizeof(struct uwsgi_tuntap_peer));
 	uttp->fd = fd;
@@ -19,6 +19,23 @@ struct uwsgi_tuntap_peer *uwsgi_tuntap_peer_create(struct uwsgi_tuntap_router *u
 	else {
 		uttr->peers_head = uttp;
 		uttr->peers_tail = uttp;
+	}
+
+	if (!is_router) {
+		if (utt.use_credentials) {
+			uwsgi_log_verbose("[uwsgi-tuntap] waiting for privileges drop...\n");
+			for(;;) {
+				if (getuid() > 0) break;
+				sleep(1);
+			}
+			uwsgi_log_verbose("[uwsgi-tuntap] privileges dropped\n");
+			if (uwsgi_pass_cred(fd, "uwsgi-tuntap", 12)) {
+				// better to exit
+				exit(1);
+			}
+		}
+
+		uwsgi_tuntap_peer_send_rules(fd, uttp);
 	}
 
 	return uttp;
@@ -47,6 +64,7 @@ void uwsgi_tuntap_peer_destroy(struct uwsgi_tuntap_router *uttr, struct uwsgi_tu
 
 	free(uttp->buf);
 	free(uttp->write_buf);
+	if (uttp->rules) free(uttp->rules);
 	close(uttp->fd);
 	free(uttp);
 }
@@ -159,8 +177,26 @@ retry:
 	}
 }
 
+int uwsgi_tuntap_register_addr(struct uwsgi_tuntap_router *uttr, struct uwsgi_tuntap_peer *uttp) {
+
+	struct uwsgi_tuntap_peer *tmp_uttp = uwsgi_tuntap_peer_get_by_addr(uttr, uttp->addr);
+        char ip[INET_ADDRSTRLEN + 1];
+        memset(ip, 0, INET_ADDRSTRLEN + 1);
+        if (!inet_ntop(AF_INET, &uttp->addr, ip, INET_ADDRSTRLEN)) {
+        	uwsgi_error("uwsgi_tuntap_register_addr()/inet_ntop()");
+                return -1;
+        }
+        if (uttp != tmp_uttp) {
+        	uwsgi_log("[tuntap-router] detected ip collision for %s\n", ip);
+                uwsgi_tuntap_peer_destroy(uttr, tmp_uttp);
+        }
+        uwsgi_log("[tuntap-router] registered new peer %s (fd: %d)\n", ip, uttp->fd);
+        memcpy(uttp->ip, ip, INET_ADDRSTRLEN + 1);
+	return 0;
+}
+
 // receive a packet from the client
-int uwsgi_tuntap_peer_dequeue(struct uwsgi_tuntap_router *uttr, struct uwsgi_tuntap_peer *uttp) {
+int uwsgi_tuntap_peer_dequeue(struct uwsgi_tuntap_router *uttr, struct uwsgi_tuntap_peer *uttp, int is_router) {
 	// get body
 	if (uttp->header_pos >= 4) {
 		ssize_t rlen = read(uttp->fd, uttp->buf + uttp->buf_pos, uttp->buf_pktsize - uttp->buf_pos);
@@ -180,29 +216,42 @@ int uwsgi_tuntap_peer_dequeue(struct uwsgi_tuntap_router *uttr, struct uwsgi_tun
 			uttp->header_pos = 0;
 			uttp->buf_pos = 0;
 
+			if (!is_router) goto enqueue;
+
+			// a rule block
+			if (uttp->header[3] == 1) {
+				if (uttp->rules) free(uttp->rules);
+				uttp->rules = uwsgi_malloc(uttp->buf_pktsize);
+				memcpy(uttp->rules, uttp->buf, uttp->buf_pktsize);
+				uttp->rules_cnt = uttp->buf_pktsize / sizeof(struct uwsgi_tuntap_peer_rule);
+				return 0;
+			}
+
 			if (uwsgi_tuntap_firewall_check(utt.fw_out, uttp->buf, uttp->buf_pktsize)) return 0;
 
 			// if there is no associated address store the source
 			if (!uttp->addr) {
-				uint32_t *src_ip = (uint32_t *) & uttp->buf[12];
+				// close on invalid first packet
+				if (uttp->buf_pktsize < 20) return -1;
+				uint32_t *src_ip = (uint32_t *) (&uttp->buf[12]);
 				uttp->addr = *src_ip;
 				// drop invalid ip addresses
 				if (!uttp->addr)
 					return -1;
 
-				struct uwsgi_tuntap_peer *tmp_uttp = uwsgi_tuntap_peer_get_by_addr(uttr, uttp->addr);
-				char ip[INET_ADDRSTRLEN + 1];
-				memset(ip, 0, INET_ADDRSTRLEN + 1);
-				if (!inet_ntop(AF_INET, &uttp->addr, ip, INET_ADDRSTRLEN)) {
-					uwsgi_error("inet_ntop()");
+				if (uwsgi_tuntap_register_addr(uttr, uttp)) {
 					return -1;
 				}
-				if (uttp != tmp_uttp) {
-					uwsgi_log("[tuntap-router] detected ip collision for %s\n", ip);
-					uwsgi_tuntap_peer_destroy(uttr, tmp_uttp);
-				}
-				uwsgi_log("[tuntap-router] registered new peer %s (fd: %d)\n", ip, uttp->fd);
+
 			}
+
+			if (uwsgi_tuntap_peer_rules_check(uttr, uttp, uttp->buf, uttp->buf_pktsize, 1)) return 0;
+
+			// check four routing rule
+			if (uttr->gateway_fd > -1) {
+				if (uwsgi_tuntap_route_check(uttr->gateway_fd, uttp->buf, uttp->buf_pktsize)) return 0;
+			}
+enqueue:
 
 			memcpy(uttr->write_buf, uttp->buf, uttp->buf_pktsize);
 			uttr->write_pktsize = uttp->buf_pktsize;

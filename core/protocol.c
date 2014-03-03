@@ -18,81 +18,6 @@ static size_t get_content_length(char *buf, uint16_t size) {
 }
 
 
-ssize_t send_udp_message(uint8_t modifier1, uint8_t modifier2, char *host, char *message, uint16_t message_size) {
-
-	int fd;
-	struct sockaddr_in udp_addr;
-	struct sockaddr_un un_addr;
-	char *udp_port;
-	ssize_t ret;
-
-	struct uwsgi_header *uh;
-
-	udp_port = strchr(host, ':');
-	if (udp_port) {
-		udp_port[0] = 0;
-
-		fd = socket(AF_INET, SOCK_DGRAM, 0);
-		if (fd < 0) {
-			uwsgi_error("socket()");
-			return -1;
-		}
-
-		memset(&udp_addr, 0, sizeof(struct sockaddr_in));
-		udp_addr.sin_family = AF_INET;
-		udp_addr.sin_port = htons(atoi(udp_port + 1));
-		udp_addr.sin_addr.s_addr = inet_addr(host);
-	}
-	else {
-		fd = socket(AF_UNIX, SOCK_DGRAM, 0);
-		if (fd < 0) {
-			uwsgi_error("socket()");
-			return -1;
-		}
-
-		memset(&un_addr, 0, sizeof(struct sockaddr_un));
-		un_addr.sun_family = AF_UNIX;
-		// use 102 as the magic number
-		strncat(un_addr.sun_path, host, 102);
-
-	}
-
-	if (message) {
-		uh = (struct uwsgi_header *) message;
-	}
-	else {
-		uh = (struct uwsgi_header *) uwsgi_malloc(4);
-	}
-
-	uh->modifier1 = modifier1;
-#ifdef __BIG_ENDIAN__
-	uh->pktsize = uwsgi_swap16(message_size);
-#else
-	uh->pktsize = message_size;
-#endif
-	uh->modifier2 = modifier2;
-
-	if (udp_port) {
-		ret = sendto(fd, (char *) uh, message_size + 4, 0, (struct sockaddr *) &udp_addr, sizeof(udp_addr));
-		udp_port[0] = ':';
-	}
-	else {
-		ret = sendto(fd, (char *) uh, message_size + 4, 0, (struct sockaddr *) &un_addr, sizeof(un_addr));
-	}
-	if (ret < 0) {
-		uwsgi_error("send_udp_message()/sendto()");
-	}
-	close(fd);
-
-	if ((char *) uh != message) {
-		free(uh);
-	}
-
-	return ret;
-
-}
-
-
 int uwsgi_read_response(int fd, struct uwsgi_header *uh, int timeout, char **buf) {
 
 	char *ptr = (char *) uh;
@@ -412,6 +337,12 @@ static int uwsgi_proto_check_11(struct wsgi_request *wsgi_req, char *key, char *
 		return 0;
 	}
 
+	if (!uwsgi_proto_key("HTTP_ORIGIN", 11)) {
+                wsgi_req->http_origin = buf;
+                wsgi_req->http_origin_len = len;
+                return 0;
+        }
+
 	return 0;
 }
 
@@ -563,7 +494,7 @@ static int uwsgi_proto_check_18(struct wsgi_request *wsgi_req, char *key, char *
 
 
 static int uwsgi_proto_check_20(struct wsgi_request *wsgi_req, char *key, char *buf, uint16_t len) {
-	if (uwsgi.log_x_forwarded_for && !uwsgi_proto_key("HTTP_X_FORWARDED_FOR", 20)) {
+	if (uwsgi.logging_options.log_x_forwarded_for && !uwsgi_proto_key("HTTP_X_FORWARDED_FOR", 20)) {
 		wsgi_req->remote_addr = buf;
 		wsgi_req->remote_addr_len = len;
 		return 0;
@@ -589,8 +520,27 @@ static int uwsgi_proto_check_22(struct wsgi_request *wsgi_req, char *key, char *
 		wsgi_req->if_modified_since_len = len;
 		return 0;
 	}
+
+	if (!uwsgi_proto_key("HTTP_SEC_WEBSOCKET_KEY", 22)) {
+		wsgi_req->http_sec_websocket_key = buf;
+		wsgi_req->http_sec_websocket_key_len = len;
+		return 0;
+	}
+
 	return 0;
 }
+
+static int uwsgi_proto_check_27(struct wsgi_request *wsgi_req, char *key, char *buf, uint16_t len) {
+
+        if (!uwsgi_proto_key("HTTP_SEC_WEBSOCKET_PROTOCOL", 27)) {
+                wsgi_req->http_sec_websocket_protocol = buf;
+                wsgi_req->http_sec_websocket_protocol_len = len;
+                return 0;
+        }
+
+        return 0;
+}
+
 
 void uwsgi_proto_hooks_setup() {
 	int i = 0;
@@ -609,6 +559,7 @@ void uwsgi_proto_hooks_setup() {
 	uwsgi.proto_hooks[18] = uwsgi_proto_check_18;
 	uwsgi.proto_hooks[20] = uwsgi_proto_check_20;
 	uwsgi.proto_hooks[22] = uwsgi_proto_check_22;
+	uwsgi.proto_hooks[27] = uwsgi_proto_check_27;
 }
 
 

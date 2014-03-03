@@ -45,21 +45,21 @@ int uwsgi_signal_handler(uint8_t sig) {
 		uwsgi.workers[uwsgi.mywid].sig = 1;
 		uwsgi.workers[uwsgi.mywid].signum = sig;
 		uwsgi.workers[uwsgi.mywid].signals++;
-		if (uwsgi.shared->options[UWSGI_OPTION_HARAKIRI] > 0) {
-			set_harakiri(uwsgi.shared->options[UWSGI_OPTION_HARAKIRI]);
+		if (uwsgi.harakiri_options.workers > 0) {
+			set_harakiri(uwsgi.harakiri_options.workers);
 		}
 	}
 	else if (uwsgi.muleid > 0) {
 		uwsgi.mules[uwsgi.muleid - 1].sig = 1;
 		uwsgi.mules[uwsgi.muleid - 1].signum = sig;
 		uwsgi.mules[uwsgi.muleid - 1].signals++;
-		if (uwsgi.shared->options[UWSGI_OPTION_MULE_HARAKIRI] > 0) {
-			set_mule_harakiri(uwsgi.shared->options[UWSGI_OPTION_MULE_HARAKIRI]);
+		if (uwsgi.harakiri_options.mules > 0) {
+			set_mule_harakiri(uwsgi.harakiri_options.mules);
 		}
 	}
 	else if (uwsgi.i_am_a_spooler && (getpid() == uwsgi.i_am_a_spooler->pid)) {
-		if (uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI] > 0) {
-			set_spooler_harakiri(uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI]);
+		if (uwsgi.harakiri_options.spoolers > 0) {
+			set_spooler_harakiri(uwsgi.harakiri_options.spoolers);
 		}
 	}
 
@@ -78,7 +78,7 @@ int uwsgi_signal_handler(uint8_t sig) {
 		}
 	}
 	else if (uwsgi.i_am_a_spooler && (getpid() == uwsgi.i_am_a_spooler->pid)) {
-		if (uwsgi.shared->options[UWSGI_OPTION_SPOOLER_HARAKIRI] > 0) {
+		if (uwsgi.harakiri_options.spoolers > 0) {
 			set_spooler_harakiri(0);
 		}
 	}
@@ -269,20 +269,22 @@ int uwsgi_remote_signal_send(char *addr, uint8_t sig) {
 	uh.pktsize = 0;
 	uh.modifier2 = sig;
 
-	int fd = uwsgi_connect(addr, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT], 0);
-	if (fd < 0)
-		return -1;
+        int fd = uwsgi_connect(addr, 0, 1);
+        if (fd < 0) return -1;
 
-	if (write(fd, (char *) &uh, 4) != 4) {
-		uwsgi_error("uwsgi_remote_signal_send()");
-		close(fd);
-		return -1;
-	}
+        // wait for connection
+        if (uwsgi.wait_write_hook(fd, uwsgi.socket_timeout) <= 0) goto end;
 
-	int ret = uwsgi_read_response(fd, &uh, uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT], NULL);
+        if (uwsgi_write_true_nb(fd, (char *) &uh, 4, uwsgi.socket_timeout)) goto end;
 
+	if (uwsgi_read_whole_true_nb(fd, (char *) &uh, 4, uwsgi.socket_timeout)) goto end;
 	close(fd);
-	return ret;
+
+	return uh.modifier2;
+
+end:
+	close(fd);
+	return -1;
 
 }
 
@@ -301,8 +303,10 @@ int uwsgi_signal_send(int fd, uint8_t sig) {
 		else {
 			uwsgi_error("uwsgi_signal_send()");
 		}
+		uwsgi.shared->unrouted_signals++;
 		return -1;
 	}
+	uwsgi.shared->routed_signals++;
 	return 0;
 
 }

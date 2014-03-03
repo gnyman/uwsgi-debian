@@ -5,8 +5,10 @@
 #include <lauxlib.h>
 
 #if LUA_VERSION_NUM < 502
-# define luaL_newlib(L,l) (lua_newtable(L), luaL_register(L,NULL,l))
+# define luaL_newuwsgilib(L,l) luaL_register(L, "uwsgi",l)
 # define lua_rawlen lua_objlen
+#else
+# define luaL_newuwsgilib(L,l) lua_newtable(L);luaL_setfuncs (L, l, 0);lua_pushvalue(L,-1);lua_setglobal(L,"uwsgi")
 #endif
 
 extern struct uwsgi_server uwsgi;
@@ -16,6 +18,7 @@ struct uwsgi_lua {
 	char *shell;
 	char *filename;
 	struct uwsgi_string_list *load;
+	int gc_freq;
 } ulua;
 
 struct uwsgi_plugin lua_plugin;
@@ -40,6 +43,7 @@ static struct uwsgi_option uwsgi_lua_options[] = {
 	{"lua-load", required_argument, 0, "load a lua file", uwsgi_opt_add_string_list, &ulua.load, 0},
 	{"lua-shell", no_argument, 0, "run the lua interactive shell (debug.debug())", uwsgi_opt_luashell, NULL, 0},
 	{"luashell", no_argument, 0, "run the lua interactive shell (debug.debug())", uwsgi_opt_luashell, NULL, 0},
+	{"lua-gc-freq", no_argument, 0, "set the lua gc frequency (default: 0, runs after every request)", uwsgi_opt_set_int, &ulua.gc_freq, 0},
 
 	{0, 0, 0, 0},
 
@@ -265,6 +269,250 @@ error:
 
 }
 
+static int uwsgi_api_async_sleep(lua_State *L) {
+	uint8_t argc = lua_gettop(L);
+        if (argc == 0) goto end;
+
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+        int timeout = lua_tonumber(L, 1);
+
+        if (timeout >= 0) {
+                async_add_timeout(wsgi_req, timeout);
+        }
+end:
+	lua_pushnil(L);
+        return 1;
+}
+
+static int uwsgi_api_wait_fd_read(lua_State *L) {
+        uint8_t argc = lua_gettop(L);
+        if (argc == 0) goto end;
+
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+	int fd = lua_tonumber(L, 1);
+	int timeout = 0;
+	if (argc > 1) {
+        	timeout = lua_tonumber(L, 2);
+	}
+
+	if (async_add_fd_read(wsgi_req, fd, timeout)) {
+		lua_pushstring(L, "unable to call async_add_fd_read()");
+        	lua_error(L);
+        	return 0;
+        }
+end:
+        lua_pushnil(L);
+        return 1;
+}
+
+static int uwsgi_api_wait_fd_write(lua_State *L) {
+        uint8_t argc = lua_gettop(L);
+        if (argc == 0) goto end;
+
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+        int fd = lua_tonumber(L, 1);
+        int timeout = 0;
+        if (argc > 1) {
+                timeout = lua_tonumber(L, 2);
+        }
+
+        if (async_add_fd_write(wsgi_req, fd, timeout)) {
+                lua_pushstring(L, "unable to call async_add_fd_write()");
+                lua_error(L);
+                return 0;
+        }
+end:
+        lua_pushnil(L);
+        return 1;
+}
+
+static int uwsgi_api_async_connect(lua_State *L) {
+        uint8_t argc = lua_gettop(L);
+        if (argc == 0) goto end;
+
+	int fd = uwsgi_connect((char *)lua_tostring(L, 1), 0, 1);
+	lua_pushnumber(L, fd);
+	return 1;
+end:
+        lua_pushnil(L);
+        return 1;
+}
+
+static int uwsgi_api_is_connected(lua_State *L) {
+        uint8_t argc = lua_gettop(L);
+        if (argc == 0) goto end;
+	int fd = lua_tonumber(L, 1);
+	if (uwsgi_is_connected(fd)) {
+		lua_pushboolean(L, 1);
+		return 1;
+	}
+	lua_pushboolean(L, 0);
+        return 1;
+end:
+        lua_pushnil(L);
+        return 1;
+}
+
+static int uwsgi_api_close(lua_State *L) {
+        uint8_t argc = lua_gettop(L);
+        if (argc == 0) goto end;
+        int fd = lua_tonumber(L, 1);
+	close(fd);
+end:
+        lua_pushnil(L);
+        return 1;
+}
+
+
+static int uwsgi_api_ready_fd(lua_State *L) {
+	struct wsgi_request *wsgi_req = current_wsgi_req();
+        int fd = uwsgi_ready_fd(wsgi_req);
+        lua_pushnumber(L, fd);
+        return 1;
+}
+
+static int uwsgi_api_websocket_handshake(lua_State *L) {
+	uint8_t argc = lua_gettop(L);
+
+	const char *key = NULL, *origin = NULL, *proto = NULL;
+	size_t key_len = 0, origin_len = 0, proto_len = 0;
+		
+	if (argc > 0) {
+		key = lua_tolstring(L, 1, &key_len);
+		if (argc > 1) {
+			origin = lua_tolstring(L, 2, &origin_len);
+			if (argc > 2) {
+				proto = lua_tolstring(L, 3, &proto_len);
+			}
+		}
+	}
+
+	struct wsgi_request *wsgi_req = current_wsgi_req();
+	if (uwsgi_websocket_handshake(wsgi_req, (char *)key, key_len, (char *)origin, origin_len, (char *) proto, proto_len)) {
+		goto error;
+	}	
+
+	lua_pushnil(L);
+        return 1;
+
+error:
+	lua_pushstring(L, "unable to complete websocket handshake");
+	lua_error(L);
+	return 0;	
+}
+
+static int uwsgi_api_websocket_send(lua_State *L) {
+	uint8_t argc = lua_gettop(L);
+        if (argc == 0) goto error;
+
+	size_t message_len = 0;
+	const char *message = lua_tolstring(L, 1, &message_len);
+	struct wsgi_request *wsgi_req = current_wsgi_req();
+
+        if (uwsgi_websocket_send(wsgi_req, (char *) message, message_len)) {
+		goto error;
+        }
+	lua_pushnil(L);
+        return 1;
+error:
+        lua_pushstring(L, "unable to send websocket message");    
+        lua_error(L);
+        return 0;
+}
+
+static int uwsgi_api_websocket_send_binary(lua_State *L) {
+        uint8_t argc = lua_gettop(L);
+        if (argc == 0) goto error;
+
+        size_t message_len = 0;
+        const char *message = lua_tolstring(L, 1, &message_len);
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+        if (uwsgi_websocket_send_binary(wsgi_req, (char *) message, message_len)) {
+                goto error;
+        }
+	lua_pushnil(L);
+        return 1;
+error:
+        lua_pushstring(L, "unable to send websocket binary message");      
+        lua_error(L);
+        return 0;
+}
+
+static int uwsgi_api_websocket_send_from_sharedarea(lua_State *L) {
+        uint8_t argc = lua_gettop(L);
+        if (argc < 2) goto error;
+
+	int id = lua_tonumber(L, 1);
+	uint64_t pos = lua_tonumber(L, 2);
+	uint64_t len = 0;
+	if (argc > 2) {
+		len = lua_tonumber(L, 3);
+	}
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+	if (uwsgi_websocket_send_from_sharedarea(wsgi_req, id, pos, len)) {
+                goto error;
+        }
+	lua_pushnil(L);
+        return 1;
+error:
+        lua_pushstring(L, "unable to send websocket message from sharedarea");      
+        lua_error(L);
+        return 0;
+}
+
+static int uwsgi_api_websocket_send_binary_from_sharedarea(lua_State *L) {
+        uint8_t argc = lua_gettop(L);
+        if (argc < 2) goto error;
+
+        int id = lua_tonumber(L, 1);
+        uint64_t pos = lua_tonumber(L, 2);
+        uint64_t len = 0;
+        if (argc > 2) {
+                len = lua_tonumber(L, 3);
+        }
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+
+        if (uwsgi_websocket_send_binary_from_sharedarea(wsgi_req, id, pos, len)) {
+                goto error;
+        }
+        lua_pushnil(L);
+        return 1;
+error:
+        lua_pushstring(L, "unable to send websocket message from sharedarea");
+        lua_error(L);
+        return 0;
+}
+
+static int uwsgi_api_websocket_recv(lua_State *L) {
+	struct wsgi_request *wsgi_req = current_wsgi_req();
+        struct uwsgi_buffer *ub = uwsgi_websocket_recv(wsgi_req);
+	if (!ub) {
+        	lua_pushstring(L, "unable to receive websocket message");
+        	lua_error(L);
+        	return 0;
+	}
+	lua_pushlstring(L, ub->buf, ub->pos);
+	uwsgi_buffer_destroy(ub);
+	return 1;
+}
+
+static int uwsgi_api_websocket_recv_nb(lua_State *L) {
+        struct wsgi_request *wsgi_req = current_wsgi_req();
+        struct uwsgi_buffer *ub = uwsgi_websocket_recv_nb(wsgi_req);
+        if (!ub) {
+                lua_pushstring(L, "unable to receive websocket message");
+                lua_error(L);
+                return 0;
+        }
+        lua_pushlstring(L, ub->buf, ub->pos);
+        uwsgi_buffer_destroy(ub);
+        return 1;
+}
 
 static int uwsgi_api_cache_get(lua_State *L) {
 
@@ -366,8 +614,24 @@ static const luaL_Reg uwsgi_api[] = {
   {"register_signal", uwsgi_api_register_signal},
   {"register_rpc", uwsgi_api_register_rpc},
 
+  {"websocket_handshake", uwsgi_api_websocket_handshake},
+  {"websocket_recv", uwsgi_api_websocket_recv},
+  {"websocket_recv_nb", uwsgi_api_websocket_recv_nb},
+  {"websocket_send", uwsgi_api_websocket_send},
+  {"websocket_send_from_sharedarea", uwsgi_api_websocket_send_from_sharedarea},
+  {"websocket_send_binary", uwsgi_api_websocket_send_binary},
+  {"websocket_send_binary_from_sharedarea", uwsgi_api_websocket_send_binary_from_sharedarea},
+
   {"lock", uwsgi_api_lock},
   {"unlock", uwsgi_api_unlock},
+
+  {"async_sleep", uwsgi_api_async_sleep},
+  {"async_connect", uwsgi_api_async_connect},
+  {"is_connected", uwsgi_api_is_connected},
+  {"close", uwsgi_api_close},
+  {"wait_fd_read", uwsgi_api_wait_fd_read},
+  {"wait_fd_write", uwsgi_api_wait_fd_write},
+  {"ready_fd", uwsgi_api_ready_fd},
 
   {NULL, NULL}
 };
@@ -416,7 +680,7 @@ static void uwsgi_lua_app() {
 		for(i=0;i<uwsgi.cores;i++) {
 			ulua.L[i] = luaL_newstate();
 			luaL_openlibs(ulua.L[i]);
-			luaL_newlib(ulua.L[i], uwsgi_api);
+			luaL_newuwsgilib(ulua.L[i], uwsgi_api);
 
 			lua_pushstring(ulua.L[i], UWSGI_VERSION);
         		lua_setfield(ulua.L[i], -2, "version");
@@ -526,7 +790,7 @@ static int uwsgi_lua_request(struct wsgi_request *wsgi_req) {
 		uwsgi_log("%s\n", lua_tostring(L, -1));
 		lua_pop(L, 1);
                 lua_pushvalue(L, -1);
-		goto clear;
+		goto clear2;
 	}
 
 	//uwsgi_log("%d %s %s %s\n",i,lua_typename(L, lua_type(L, -3)), lua_typename(L, lua_type(L, -2)) ,  lua_typename(L, lua_type(L, -1)));
@@ -534,7 +798,8 @@ static int uwsgi_lua_request(struct wsgi_request *wsgi_req) {
 	// send status
 	if (lua_type(L, -3) == LUA_TSTRING || lua_type(L, -3) == LUA_TNUMBER) {
 		http = lua_tolstring(L, -3, &slen);
-		uwsgi_response_prepare_headers(wsgi_req, (char *) http, slen);
+		if (uwsgi_response_prepare_headers(wsgi_req, (char *) http, slen))
+			goto clear2;
 	}
 	else {
 		uwsgi_log("[uwsgi-lua] invalid response status !!!\n");
@@ -565,11 +830,13 @@ static int uwsgi_lua_request(struct wsgi_request *wsgi_req) {
 			return UWSGI_AGAIN;
 		}
 	}
-
 clear:
 	lua_pop(L, 4);
+clear2:
 	// set frequency
-	lua_gc(L, LUA_GCCOLLECT, 0);
+	if (!ulua.gc_freq || uwsgi.workers[uwsgi.mywid].cores[wsgi_req->async_id].requests % ulua.gc_freq == 0) {
+		lua_gc(L, LUA_GCCOLLECT, 0);
+	}
 
 	return UWSGI_OK;
 
@@ -670,7 +937,7 @@ static int uwsgi_lua_signal_handler(uint8_t sig, void *handler) {
 	
 }
 
-static uint16_t uwsgi_lua_rpc(void * func, uint8_t argc, char **argv, uint16_t argvs[], char *buffer) {
+static uint64_t uwsgi_lua_rpc(void * func, uint8_t argc, char **argv, uint16_t argvs[], char **buffer) {
 
         uint8_t i;
         const char *sv;
@@ -702,8 +969,9 @@ static uint16_t uwsgi_lua_rpc(void * func, uint8_t argc, char **argv, uint16_t a
 #ifdef UWSGI_DEBUG
 	uwsgi_log("sv = %s sl = %lu\n", sv, (unsigned long) sl);
 #endif
-	if (sl <= 0xffff) {
-		memcpy(buffer, sv, sl);
+	if (sl > 0) {
+		*buffer = uwsgi_malloc(sl);
+		memcpy(*buffer, sv, sl);
 		lua_pop(L, 1);
 		return sl;
 	}

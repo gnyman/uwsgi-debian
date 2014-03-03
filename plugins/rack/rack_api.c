@@ -7,6 +7,88 @@ extern struct uwsgi_plugin rack_plugin;
 
 #define uwsgi_rack_api(x, y, z) rb_define_module_function(rb_uwsgi_embedded, x, y, z)
 
+static VALUE rack_uwsgi_metric_get(VALUE *class, VALUE key) {
+	Check_Type(key, T_STRING);
+	int64_t value = uwsgi_metric_get(RSTRING_PTR(key), NULL);
+	return LONG2NUM(value);	
+}
+
+static VALUE rack_uwsgi_metric_set(VALUE *class, VALUE key, VALUE val) {
+        Check_Type(key, T_STRING);
+        Check_Type(val, T_FIXNUM); // should be T_BIGNUM...
+        if (uwsgi_metric_set(RSTRING_PTR(key), NULL, NUM2LONG(val) )) {
+		return Qnil;
+	}
+        return Qtrue;
+}
+
+static VALUE rack_uwsgi_metric_inc(int argc, VALUE *argv, VALUE *class) {
+	int64_t value = 1;
+	if (argc == 0) return Qnil;
+	Check_Type(argv[0], T_STRING);
+
+	if (argc > 1) {
+		Check_Type(argv[1], T_FIXNUM); // should be T_BIGNUM...
+		value = NUM2LONG(argv[1]);
+	}
+
+	if (uwsgi_metric_inc(RSTRING_PTR(argv[0]), NULL, value )) {
+                return Qnil;
+        }
+        return Qtrue;
+}
+
+static VALUE rack_uwsgi_metric_dec(int argc, VALUE *argv, VALUE *class) {
+        int64_t value = 1;
+        if (argc == 0) return Qnil;
+        Check_Type(argv[0], T_STRING);
+
+        if (argc > 1) {
+                Check_Type(argv[1], T_FIXNUM); // should be T_BIGNUM...
+                value = NUM2LONG(argv[1]);
+        }
+
+        if (uwsgi_metric_dec(RSTRING_PTR(argv[0]), NULL, value )) {
+                return Qnil;
+        }
+        return Qtrue;
+}
+
+static VALUE rack_uwsgi_metric_mul(int argc, VALUE *argv, VALUE *class) {
+        int64_t value = 1;
+        if (argc == 0) return Qnil;
+        Check_Type(argv[0], T_STRING);
+
+        if (argc > 1) {
+                Check_Type(argv[1], T_FIXNUM); // should be T_BIGNUM...
+                value = NUM2LONG(argv[1]);
+        }
+
+        if (uwsgi_metric_mul(RSTRING_PTR(argv[0]), NULL, value )) {
+                return Qnil;
+        }
+        return Qtrue;
+}
+
+static VALUE rack_uwsgi_metric_div(int argc, VALUE *argv, VALUE *class) {
+        int64_t value = 1;
+        if (argc == 0) return Qnil;
+        Check_Type(argv[0], T_STRING);
+
+        if (argc > 1) {
+                Check_Type(argv[1], T_FIXNUM); // should be T_BIGNUM...
+                value = NUM2LONG(argv[1]);
+        }
+
+        if (uwsgi_metric_div(RSTRING_PTR(argv[0]), NULL, value )) {
+                return Qnil;
+        }
+        return Qtrue;
+}
+
+
+
+
 static VALUE rack_uwsgi_warning(VALUE *class, VALUE rbmessage) {
 
 	Check_Type(rbmessage, T_STRING);
@@ -58,6 +140,11 @@ static VALUE rack_uwsgi_i_am_the_lord(VALUE *class, VALUE legion_name) {
         return Qfalse;
 }
 #endif
+
+static VALUE rack_uwsgi_connection_fd(VALUE *class) {
+	struct wsgi_request *wsgi_req = current_wsgi_req();
+        return INT2NUM(wsgi_req->fd);
+}
 
 
 
@@ -718,7 +805,7 @@ static VALUE uwsgi_ruby_signal_registered(VALUE *class, VALUE signum) {
 static VALUE uwsgi_ruby_do_rpc(int argc, VALUE *rpc_argv, VALUE *class) {
 
 	char *node = NULL, *func;
-        uint16_t size = 0;
+        uint64_t size = 0;
 
         char *argv[256];
         uint16_t argvs[256];
@@ -845,35 +932,36 @@ static VALUE uwsgi_ruby_signal(int argc, VALUE *argv, VALUE *class) {
         return Qtrue;
 }
 
-int rack_uwsgi_build_spool(VALUE rbkey, VALUE rbval, VALUE argv) {
-	char **sa = (char **) argv;
+static int rack_uwsgi_build_spool(VALUE rbkey, VALUE rbval, VALUE argv) {
+	struct uwsgi_buffer *ub = (struct uwsgi_buffer *) argv;
 
-	char *cur_buf = sa[0];
-	char *watermark = sa[1];
-
-	if (TYPE(rbkey) != T_STRING || TYPE(rbval) != T_STRING) {
+	if (TYPE(rbkey) != T_STRING) {
 		rb_raise(rb_eRuntimeError, "spool hash must contains only strings");
 		return ST_STOP;
 	}
 
 	char *key = RSTRING_PTR(rbkey); uint16_t keylen = RSTRING_LEN(rbkey);
-	char *val = RSTRING_PTR(rbval); uint16_t vallen = RSTRING_LEN(rbval);
 
-	if (cur_buf + (2+keylen+2+vallen) > watermark) {
-		rb_raise(rb_eRuntimeError, "spool hash size can be no more than 64K");
-		return ST_STOP;
+	if (TYPE(rbval) == T_STRING) {
+		char *val = RSTRING_PTR(rbval); uint16_t vallen = RSTRING_LEN(rbval);
+		if (uwsgi_buffer_append_keyval(ub, key, keylen, val, vallen)) {
+			rb_raise(rb_eRuntimeError, "error building the spool packet");
+                	return ST_STOP;
+		}
 	}
-
-	*cur_buf++ = (uint8_t) (keylen & 0xff);
-        *cur_buf++ = (uint8_t) ((keylen >> 8) & 0xff);
-	memcpy(cur_buf, key, keylen); cur_buf += keylen;
-
-	*cur_buf++ = (uint8_t) (vallen & 0xff);
-        *cur_buf++ = (uint8_t) ((vallen >> 8) & 0xff);
-	memcpy(cur_buf, val, vallen); cur_buf += vallen;
-
-	// fix the ptr
-	sa[0] = cur_buf;
+	else {
+		//VALUE str = rb_any_to_s(rbval);
+		VALUE str = rb_funcall( rbval, rb_intern("to_s"), 0);
+		if (!str) {
+			rb_raise(rb_eRuntimeError, "error building the spool packet");
+                        return ST_STOP;
+		}
+		char *val = RSTRING_PTR(str); uint16_t vallen = RSTRING_LEN(str);
+		if (uwsgi_buffer_append_keyval(ub, key, keylen, val, vallen)) {
+                        rb_raise(rb_eRuntimeError, "error building the spool packet");
+                        return ST_STOP;
+                }
+	}
 
 	return ST_CONTINUE;
 }
@@ -881,37 +969,11 @@ int rack_uwsgi_build_spool(VALUE rbkey, VALUE rbval, VALUE argv) {
 
 static VALUE rack_uwsgi_send_spool(VALUE *class, VALUE args) {
 
-        char spool_filename[1024];
         struct wsgi_request *wsgi_req = current_wsgi_req();
-        char *priority = NULL;
-        long numprio = 0;
-        time_t at = 0;
         char *body = NULL;
         size_t body_len= 0;
 
 	Check_Type(args, T_HASH);
-
-	// priority
-#ifdef RUBY19
-       VALUE rbprio = rb_hash_lookup(args, rb_str_new2("priority"));
-#else
-       VALUE rbprio = rb_hash_aref(args, rb_str_new2("priority"));
-#endif
-        if (TYPE(rbprio) == T_FIXNUM) {
-        	numprio = NUM2INT(rbprio);
-             	rb_hash_delete(args, rb_str_new2("priority")); 
-        }
-
-	// at
-#ifdef RUBY19
-       VALUE rbat = rb_hash_lookup(args, rb_str_new2("at"));
-#else
-       VALUE rbat = rb_hash_aref(args, rb_str_new2("at"));
-#endif
-        if (TYPE(rbat) == T_FIXNUM) {
-        	at = NUM2INT(rbat);
-             	rb_hash_delete(args, rb_str_new2("at")); 
-        }
 
 	// body
 #ifdef RUBY19
@@ -925,31 +987,18 @@ static VALUE rack_uwsgi_send_spool(VALUE *class, VALUE args) {
              	rb_hash_delete(args, rb_str_new2("body")); 
         }
 
-	char *spool_buffer = uwsgi_malloc(UMAX16);
-	char *argv[2];
-	argv[0] = spool_buffer;
-	argv[1] = spool_buffer + UMAX16 ;
+	struct uwsgi_buffer *ub = uwsgi_buffer_new(uwsgi.page_size);
 
-	rb_hash_foreach(args, rack_uwsgi_build_spool, (VALUE) argv); 
+	rb_hash_foreach(args, rack_uwsgi_build_spool, (VALUE) ub); 
 
-        if (numprio) {
-                priority = uwsgi_num2str((int)numprio);
-        }
+        char *filename = uwsgi_spool_request(wsgi_req, ub->buf, ub->pos, body, body_len);
 
-        int ret = spool_request(uwsgi.spoolers, spool_filename, (int)(uwsgi.workers[0].requests + 1), wsgi_req->async_id, spool_buffer, (int)(argv[0] - spool_buffer), priority, at, body, body_len);
+	uwsgi_buffer_destroy(ub);
 
-        if (priority) {
-                free(priority);
-        }
-
-        free(spool_buffer);
-
-        if (ret > 0) {
-                char *slash = uwsgi_get_last_char(spool_filename, '/');
-                if (slash) {
-                        return rb_str_new2(slash+1);
-                }
-		return rb_str_new2(spool_filename);
+        if (filename) {
+		VALUE ret = rb_str_new2(filename);
+		free(filename);
+		return ret;
         }
 
         rb_raise(rb_eRuntimeError, "unable to spool job");
@@ -961,25 +1010,26 @@ static VALUE uwsgi_ruby_websocket_handshake(int argc, VALUE *argv, VALUE *class)
 
         struct wsgi_request *wsgi_req = current_wsgi_req();
 
-	if (argc < 1) {
-		rb_raise(rb_eRuntimeError, "you neeto specify a valid websocket key");
-		return Qnil;
+	char *key = NULL, *origin = NULL, *proto = NULL;
+	size_t key_len = 0, origin_len = 0, proto_len = 0;
+
+	if (argc > 0) {
+        	Check_Type(argv[0], T_STRING);
+        	key = RSTRING_PTR(argv[0]);
+        	key_len = RSTRING_LEN(argv[0]);
+		if (argc > 1) {
+			Check_Type(argv[1], T_STRING);
+                	origin = RSTRING_PTR(argv[1]);
+                	origin_len = RSTRING_LEN(argv[1]);
+			if (argc > 2) {
+				Check_Type(argv[2], T_STRING);
+                		proto = RSTRING_PTR(argv[2]);
+                		proto_len = RSTRING_LEN(argv[2]);
+			}
+		}
 	}
 
-        Check_Type(argv[0], T_STRING);
-        char *key = RSTRING_PTR(argv[0]);
-        size_t key_len = RSTRING_LEN(argv[0]);
-
-	char *origin = NULL;
-	size_t origin_len = 0;
-
-	if (argc > 1) {
-		Check_Type(argv[1], T_STRING);
-		origin = RSTRING_PTR(argv[1]);
-        	origin_len = RSTRING_LEN(argv[1]);
-	}
-
-	if (uwsgi_websocket_handshake(wsgi_req, key, key_len, origin, origin_len)) {
+	if (uwsgi_websocket_handshake(wsgi_req, key, key_len, origin, origin_len, proto, proto_len)) {
         	rb_raise(rb_eRuntimeError, "unable to complete websocket handshake");
         }
 	return Qnil;
@@ -1084,6 +1134,8 @@ void uwsgi_rack_init_api() {
 #ifdef UWSGI_SSL
 	uwsgi_rack_api("i_am_the_lord", rack_uwsgi_i_am_the_lord, 1);
 #endif
+
+	uwsgi_rack_api("connection_fd", rack_uwsgi_connection_fd, 0);
 	
 
         uwsgi_rack_api("cache_get", rack_uwsgi_cache_get, -1);
@@ -1098,6 +1150,13 @@ void uwsgi_rack_init_api() {
         uwsgi_rack_api("cache_update!", rack_uwsgi_cache_update_exc, -1);
         uwsgi_rack_api("cache_clear", rack_uwsgi_cache_clear, -1);
         uwsgi_rack_api("cache_clear!", rack_uwsgi_cache_clear_exc, -1);
+
+        uwsgi_rack_api("metric_get", rack_uwsgi_metric_get, 1);
+        uwsgi_rack_api("metric_set", rack_uwsgi_metric_set, 2);
+        uwsgi_rack_api("metric_inc", rack_uwsgi_metric_inc, -1);
+        uwsgi_rack_api("metric_dec", rack_uwsgi_metric_dec, -1);
+        uwsgi_rack_api("metric_mul", rack_uwsgi_metric_mul, -1);
+        uwsgi_rack_api("metric_div", rack_uwsgi_metric_div, -1);
 
         VALUE uwsgi_rb_opt_hash = rb_hash_new();
         int i;

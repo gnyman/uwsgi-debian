@@ -24,8 +24,10 @@ ssize_t read(int, void *, size_t);
 ssize_t write(int, const void *, size_t);
 int close(int);
 
+void (*uwsgi_pypy_hook_execute_source)(char *);
 void (*uwsgi_pypy_hook_loader)(char *);
 void (*uwsgi_pypy_hook_file_loader)(char *);
+void (*uwsgi_pypy_hook_paste_loader)(char *);
 void (*uwsgi_pypy_hook_pythonpath)(char *);
 void (*uwsgi_pypy_hook_request)(struct wsgi_request *);
 void (*uwsgi_pypy_post_fork_hook)(void);
@@ -172,6 +174,8 @@ const char *uwsgi_pypy_version;
 
 char *uwsgi_binary_path();
 
+void *uwsgi_malloc(size_t);
+
 int uwsgi_response_prepare_headers(struct wsgi_request *, char *, size_t);
 int uwsgi_response_add_header(struct wsgi_request *, char *, uint16_t, char *, uint16_t);
 int uwsgi_response_write_body_do(struct wsgi_request *, char *, size_t);
@@ -186,7 +190,7 @@ int uwsgi_is_again();
 int uwsgi_register_rpc(char *, struct uwsgi_plugin *, uint8_t, void *);
 int uwsgi_register_signal(uint8_t, char *, void *, uint8_t);
 
-char *uwsgi_do_rpc(char *, char *, uint8_t, char **, uint16_t *, uint16_t *);
+char *uwsgi_do_rpc(char *, char *, uint8_t, char **, uint16_t *, uint64_t *);
 
 void uwsgi_set_processname(char *);
 int uwsgi_signal_send(int, uint8_t);
@@ -222,7 +226,7 @@ int async_add_fd_write(struct wsgi_request *, int, int);
 int async_add_fd_read(struct wsgi_request *, int, int);
 int uwsgi_connect(char *, int, int);
 
-int uwsgi_websocket_handshake(struct wsgi_request *, char *, uint16_t, char *, uint16_t);
+int uwsgi_websocket_handshake(struct wsgi_request *, char *, uint16_t, char *, uint16_t, char *, uint16_t);
 int uwsgi_websocket_send(struct wsgi_request *, char *, size_t);
 struct uwsgi_buffer *uwsgi_websocket_recv(struct wsgi_request *);
 struct uwsgi_buffer *uwsgi_websocket_recv_nb(struct wsgi_request *);
@@ -234,6 +238,13 @@ void uwsgi_disconnect(struct wsgi_request *);
 int uwsgi_ready_fd(struct wsgi_request *);
 
 void set_user_harakiri(int);
+
+int uwsgi_metric_set(char *, char *, int64_t);
+int uwsgi_metric_inc(char *, char *, int64_t);
+int uwsgi_metric_dec(char *, char *, int64_t);
+int uwsgi_metric_mul(char *, char *, int64_t);
+int uwsgi_metric_div(char *, char *, int64_t);
+int64_t uwsgi_metric_get(char *, char *);
 
 %s
 
@@ -267,6 +278,14 @@ wsgi_application = None
 if len(sys.argv) == 0:
     sys.argv.insert(0, ffi.string(lib.uwsgi_binary_path()))
 
+"""
+execute source, we expose it as cffi callback to avoid deadlocks
+after GIL initialization
+"""
+@ffi.callback("void(char *)")
+def uwsgi_pypy_execute_source(s):
+    source = ffi.string(s)
+    exec(source)
 
 """
 load a wsgi module
@@ -294,6 +313,25 @@ def uwsgi_pypy_file_loader(filename):
     c = 'application'
     mod = imp.load_source('uwsgi_file_wsgi', w)
     wsgi_application = getattr(mod, c)
+
+"""
+load a .ini paste app
+"""
+@ffi.callback("void(char *)")
+def uwsgi_pypy_paste_loader(config):
+    global wsgi_application
+    c = ffi.string(config)
+    if c.startswith('config:'):
+        c = c[7:]
+    if c[0] != '/':
+        c = os.getcwd() + '/' + c
+    try:
+        from paste.script.util.logging_config import fileConfig
+        fileConfig(c)
+    except ImportError:
+        print "PyPy WARNING: unable to load paste.script.util.logging_config"
+    from paste.deploy import loadapp
+    wsgi_application = loadapp('config:%s' % c)
 
 """
 .post_fork_hook
@@ -451,8 +489,10 @@ def uwsgi_pypy_wsgi_handler(wsgi_req):
             if hasattr(response, 'close'):
                 response.close()
 
+lib.uwsgi_pypy_hook_execute_source = uwsgi_pypy_execute_source
 lib.uwsgi_pypy_hook_loader = uwsgi_pypy_loader
 lib.uwsgi_pypy_hook_file_loader = uwsgi_pypy_file_loader
+lib.uwsgi_pypy_hook_paste_loader = uwsgi_pypy_paste_loader
 lib.uwsgi_pypy_hook_pythonpath = uwsgi_pypy_pythonpath
 lib.uwsgi_pypy_hook_request = uwsgi_pypy_wsgi_handler
 lib.uwsgi_pypy_post_fork_hook = uwsgi_pypy_post_fork_hook
@@ -483,15 +523,16 @@ class uwsgi_pypy_RPC(object):
         for i in range(0, argc):
             pargs.append(ffi.string(argv[i], argvs[i]))
         response = self.func(*pargs)
-        if len(response) > 0 and len(response) <= 65535:
-            dst = ffi.buffer(buf, 65536)
+        if len(response) > 0:
+            buf[0] = lib.uwsgi_malloc(len(response))
+            dst = ffi.buffer(buf[0], len(response))
             dst[:len(response)] = response
         return len(response)
 
 
 def uwsgi_pypy_uwsgi_register_rpc(name, func, argc=0):
     rpc_func = uwsgi_pypy_RPC(func)
-    cb = ffi.callback("int(int, char*[], int[], char*)", rpc_func)
+    cb = ffi.callback("int(int, char*[], int[], char**)", rpc_func)
     uwsgi_gc.append(cb)
     if lib.uwsgi_register_rpc(ffi.new("char[]", name), ffi.addressof(lib.pypy_plugin), argc, cb) < 0:
         raise Exception("unable to register rpc func %s" % name)
@@ -501,7 +542,7 @@ def uwsgi_pypy_rpc(node, func, *args):
     argc = 0
     argv = ffi.new('char*[256]')
     argvs = ffi.new('uint16_t[256]')
-    rsize = ffi.new('uint16_t*')
+    rsize = ffi.new('uint64_t*')
 
     for arg in args:
         if argc >= 255:
@@ -534,6 +575,12 @@ uwsgi.call = uwsgi_pypy_call
     
 uwsgi.signal = lambda x: lib.uwsgi_signal_send(lib.uwsgi.signal_socket, x)
 
+uwsgi.metric_get = lambda x: lib.uwsgi_metric_get(x, ffi.NULL)
+uwsgi.metric_set = lambda x, y: lib.uwsgi_metric_set(x, ffi.NULL, y)
+uwsgi.metric_inc = lambda x, y=1: lib.uwsgi_metric_inc(x, ffi.NULL, y)
+uwsgi.metric_dec = lambda x, y=1: lib.uwsgi_metric_dec(x, ffi.NULL, y)
+uwsgi.metric_mul = lambda x, y=1: lib.uwsgi_metric_mul(x, ffi.NULL, y)
+uwsgi.metric_div = lambda x, y=1: lib.uwsgi_metric_div(x, ffi.NULL, y)
 
 def uwsgi_pypy_uwsgi_cache_get(key, cache=ffi.NULL):
     vallen = ffi.new('uint64_t*')
@@ -823,9 +870,12 @@ uwsgi.websocket_recv_nb = uwsgi_pypy_websocket_recv_nb
 """
 uwsgi.websocket_handshake(key, origin)
 """
-def uwsgi_pypy_websocket_handshake(key, origin=''):
+def uwsgi_pypy_websocket_handshake(key='', origin='', proto=''):
     wsgi_req = uwsgi_pypy_current_wsgi_req();
-    if lib.uwsgi_websocket_handshake(wsgi_req, ffi.new('char[]', key), len(key), ffi.new('char[]',origin), len(origin)) < 0:
+    c_key = ffi.new('char[]', key)
+    c_origin = ffi.new('char[]', origin)
+    c_proto = ffi.new('char[]', proto)
+    if lib.uwsgi_websocket_handshake(wsgi_req, c_key, len(key), c_origin, len(origin), c_proto, len(proto)) < 0:
         raise IOError("unable to complete websocket handshake")
 uwsgi.websocket_handshake = uwsgi_pypy_websocket_handshake
 

@@ -1,4 +1,4 @@
-#include "../../uwsgi.h"
+#include <uwsgi.h>
 #include <Python.h>
 
 #include <frameobject.h>
@@ -15,6 +15,10 @@
 #endif
 
 #if PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION < 7
+#define HAS_NOT_PyMemoryView_FromBuffer
+#endif
+
+#if PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION < 7
 #define HAS_NOT_PyFrame_GetLineNumber 
 #endif
 
@@ -28,6 +32,12 @@
 
 #if PY_MAJOR_VERSION > 2
 #define PYTHREE
+#endif
+
+#if (PY_VERSION_HEX < 0x02060000)
+#ifndef Py_SIZE
+#define Py_SIZE(ob)             (((PyVarObject*)(ob))->ob_size)
+#endif
 #endif
 
 #define UWSGI_GET_GIL up.gil_get();
@@ -180,6 +190,13 @@ struct uwsgi_python {
 	int start_response_nodelay;
 
 	char *programname;
+	int wsgi_strict;
+	int wsgi_accept_buffer;
+
+	char *raw;
+	PyObject *raw_callable;
+
+	struct uwsgi_string_list *sharedarea;
 };
 
 
@@ -275,6 +292,10 @@ struct uwsgi_buffer *uwsgi_python_exception_msg(struct wsgi_request *);
 struct uwsgi_buffer *uwsgi_python_exception_repr(struct wsgi_request *);
 struct uwsgi_buffer *uwsgi_python_backtrace(struct wsgi_request *);
 void uwsgi_python_exception_log(struct wsgi_request *);
+
+int uwsgi_python_send_body(struct wsgi_request *, PyObject *);
+
+int uwsgi_request_python_raw(struct wsgi_request *);
 
 #define py_current_wsgi_req() current_wsgi_req();\
 			if (!wsgi_req) {\

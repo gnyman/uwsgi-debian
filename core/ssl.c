@@ -95,15 +95,38 @@ static int uwsgi_sni_cb(SSL *ssl, int *ad, void *arg) {
         const char *servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
         if (!servername) return SSL_TLSEXT_ERR_NOACK;
         size_t servername_len = strlen(servername);
+	// reduce DOS attempts
+	int count = 5;
 
-        struct uwsgi_string_list *usl = uwsgi.sni;
-        while(usl) {
-                if (!uwsgi_strncmp(usl->value, usl->len, (char *)servername, servername_len)) {
-                        SSL_set_SSL_CTX(ssl, usl->custom_ptr);
-                        return SSL_TLSEXT_ERR_OK;
-                }
-                usl = usl->next;
-        }
+	while(count > 0) {
+        	struct uwsgi_string_list *usl = uwsgi.sni;
+        	while(usl) {
+                	if (!uwsgi_strncmp(usl->value, usl->len, (char *)servername, servername_len)) {
+                        	SSL_set_SSL_CTX(ssl, (SSL_CTX *) usl->custom_ptr);
+				// the following steps are taken from nginx
+				SSL_set_verify(ssl, SSL_CTX_get_verify_mode((SSL_CTX *)usl->custom_ptr),
+				SSL_CTX_get_verify_callback((SSL_CTX *)usl->custom_ptr));
+				SSL_set_verify_depth(ssl, SSL_CTX_get_verify_depth((SSL_CTX *)usl->custom_ptr));	
+#ifdef SSL_CTRL_CLEAR_OPTIONS
+				SSL_clear_options(ssl, SSL_get_options(ssl) & ~SSL_CTX_get_options((SSL_CTX *)usl->custom_ptr));
+#endif
+				SSL_set_options(ssl, SSL_CTX_get_options((SSL_CTX *)usl->custom_ptr));
+                        	return SSL_TLSEXT_ERR_OK;
+                	}
+                	usl = usl->next;
+        	}
+		if (!uwsgi.subscription_dotsplit) break;
+		char *next = memchr(servername+1, '.', servername_len-1);
+		if (next) {
+			servername_len -= next - servername;
+			servername = next;
+			count--;
+			continue;
+		}
+		break;
+	}
+
+	if (uwsgi.subscription_dotsplit) goto end;
 
 #ifdef UWSGI_PCRE
         struct uwsgi_regexp_list *url = uwsgi.sni_regexp;
@@ -126,13 +149,12 @@ static int uwsgi_sni_cb(SSL *ssl, int *ad, void *arg) {
 			if (uwsgi_file_exists(sni_dir_client_ca)) {
 				client_ca = sni_dir_client_ca;
 			}
-			usl = uwsgi_ssl_add_sni_item(uwsgi_str((char *)servername), sni_dir_cert, sni_dir_key, uwsgi.sni_dir_ciphers, client_ca);
+			struct uwsgi_string_list *usl = uwsgi_ssl_add_sni_item(uwsgi_str((char *)servername), sni_dir_cert, sni_dir_key, uwsgi.sni_dir_ciphers, client_ca);
 			if (!usl) goto done;
 			free(sni_dir_cert);
 			free(sni_dir_key);
 			free(sni_dir_client_ca);
 			SSL_set_SSL_CTX(ssl, usl->custom_ptr);
-			uwsgi_log("[uwsgi-sni for pid %d] added context for %s\n", (int) getpid(), servername);
 			return SSL_TLSEXT_ERR_OK;
 		}
 done:
@@ -140,12 +162,38 @@ done:
 		free(sni_dir_key);
 		free(sni_dir_client_ca);
 	}
-
+end:
         return SSL_TLSEXT_ERR_NOACK;
 }
 #endif
 
+char *uwsgi_write_pem_to_file(char *name, char *buf, size_t len, char *ext) {
+	if (!uwsgi.ssl_tmp_dir) return NULL;
+	char *filename = uwsgi_concat4(uwsgi.ssl_tmp_dir, "/", name, ext);
+	int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR);
+	if (fd < 0) {
+		uwsgi_error_open(filename);
+		free(filename);
+		return NULL;
+	}
+
+	if (write(fd, buf, len) != (ssize_t) len) {
+		uwsgi_log("unable to write pem data in file %s\n", filename);
+		uwsgi_error("uwsgi_write_pem_to_file()/write()");
+		free(filename);
+		close(fd);
+                return NULL;
+	}
+
+	close(fd);
+	return filename;
+}
+
 SSL_CTX *uwsgi_ssl_new_server_context(char *name, char *crt, char *key, char *ciphers, char *client_ca) {
+
+	int crt_need_free = 0;
+	int key_need_free = 0;
+	int client_ca_need_free = 0;
 
         SSL_CTX *ctx = SSL_CTX_new(SSLv23_server_method());
         if (!ctx) {
@@ -166,11 +214,27 @@ SSL_CTX *uwsgi_ssl_new_server_context(char *name, char *crt, char *key, char *ci
 #ifdef SSL_MODE_RELEASE_BUFFERS
         SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
 #endif
+	
+	/*
+		we need to support both file-based certs and stream based
+		as dealing with openssl memory bio for keys is really overkill,
+		we store them in a tmp directory
+	*/
+
+	if (uwsgi.ssl_tmp_dir && !uwsgi_starts_with(crt, strlen(crt), "-----BEGIN ", 11)) {
+		crt = uwsgi_write_pem_to_file(name, crt, strlen(crt), ".crt");
+		if (!crt) {
+			SSL_CTX_free(ctx);
+                	return NULL;
+		}	
+		crt_need_free = 1;	
+	}
 
         if (SSL_CTX_use_certificate_chain_file(ctx, crt) <= 0) {
-                uwsgi_log("[uwsgi-ssl] unable to assign certificate %s for context \"%s\"\n", crt, name);
-                SSL_CTX_free(ctx);
-                return NULL;
+               	uwsgi_log("[uwsgi-ssl] unable to assign certificate %s for context \"%s\"\n", crt, name);
+               	SSL_CTX_free(ctx);
+		if (crt_need_free) free(crt);
+               	return NULL;
         }
 
 // this part is based from stud
@@ -193,12 +257,25 @@ SSL_CTX *uwsgi_ssl_new_server_context(char *name, char *crt, char *key, char *ci
                 }
         }
 
+	if (crt_need_free) free(crt);
+
+	if (uwsgi.ssl_tmp_dir && !uwsgi_starts_with(key, strlen(key), "-----BEGIN ", 11)) {
+                key = uwsgi_write_pem_to_file(name, key, strlen(key), ".key");
+                if (!key) {
+                        SSL_CTX_free(ctx);
+                        return NULL;
+                }
+                key_need_free = 1;
+        }
+
         if (SSL_CTX_use_PrivateKey_file(ctx, key, SSL_FILETYPE_PEM) <= 0) {
                 uwsgi_log("[uwsgi-ssl] unable to assign key %s for context \"%s\"\n", key, name);
                 SSL_CTX_free(ctx);
+		if (key_need_free) free(key);
                 return NULL;
         }
 
+	if (key_need_free) free(key);
 
 	// if ciphers are specified, prefer server ciphers
         if (ciphers && strlen(ciphers) > 0) {
@@ -226,19 +303,37 @@ SSL_CTX *uwsgi_ssl_new_server_context(char *name, char *crt, char *key, char *ci
                 }
                 // in the future we should allow to set the verify depth
                 SSL_CTX_set_verify_depth(ctx, 1);
+
+		if (uwsgi.ssl_tmp_dir && !uwsgi_starts_with(client_ca, strlen(client_ca), "-----BEGIN ", 11)) {
+			if (!name) {
+                        	SSL_CTX_free(ctx);
+                        	return NULL;
+			}
+                	client_ca = uwsgi_write_pem_to_file(name, client_ca, strlen(client_ca), ".ca");
+                	if (!client_ca) {
+                        	SSL_CTX_free(ctx);
+                        	return NULL;
+                	}
+                	client_ca_need_free = 1;
+        	}
+
                 if (SSL_CTX_load_verify_locations(ctx, client_ca, NULL) == 0) {
                         uwsgi_log("[uwsgi-ssl] unable to set ssl verify locations (%s) for context \"%s\"\n", client_ca, name);
                         SSL_CTX_free(ctx);
+			if (client_ca_need_free) free(client_ca);
                         return NULL;
                 }
                 STACK_OF(X509_NAME) * list = SSL_load_client_CA_file(client_ca);
                 if (!list) {
                         uwsgi_log("unable to load client CA certificate (%s) for context \"%s\"\n", client_ca, name);
                         SSL_CTX_free(ctx);
+			if (client_ca_need_free) free(client_ca);
                         return NULL;
                 }
 
                 SSL_CTX_set_client_CA_list(ctx, list);
+
+		if (client_ca_need_free) free(client_ca);
         }
 
 
@@ -511,10 +606,41 @@ struct uwsgi_string_list *uwsgi_ssl_add_sni_item(char *name, char *crt, char *ke
 	SSL_CTX *ctx = uwsgi_ssl_new_server_context(name, crt, key, ciphers, client_ca);
         if (!ctx) {
                 uwsgi_log("[uwsgi-ssl] DANGER unable to initialize context for \"%s\"\n", name);
+		free(name);
 		return NULL;
 	}
 
 	struct uwsgi_string_list *usl = uwsgi_string_new_list(&uwsgi.sni, name);
 	usl->custom_ptr = ctx;
+	// mark it as dynamic
+	usl->custom = 1;
+	uwsgi_log_verbose("[uwsgi-sni for pid %d] added SSL context for %s\n", (int) getpid(), name);
 	return usl;
+}
+
+void uwsgi_ssl_del_sni_item(char *name, uint16_t name_len) {
+	struct uwsgi_string_list *usl = NULL, *last_sni = NULL, *sni_item = NULL;
+	uwsgi_foreach(usl, uwsgi.sni) {
+		if (!uwsgi_strncmp(usl->value, usl->len, name, name_len) && usl->custom) {
+			sni_item = usl;
+			break;
+		}
+		last_sni = usl;
+	}
+
+	if (!sni_item) return;
+
+	if (last_sni) {
+		last_sni->next = sni_item->next;
+	}
+	else {
+		uwsgi.sni = sni_item->next;
+	}
+
+	// we are free to destroy it as no more clients are using it
+	SSL_CTX_free((SSL_CTX *) sni_item->custom_ptr);
+	free(sni_item->value);
+	free(sni_item);	
+
+	uwsgi_log_verbose("[uwsgi-sni for pid %d] destroyed SSL context for %s\n",(int) getpid(), name);
 }

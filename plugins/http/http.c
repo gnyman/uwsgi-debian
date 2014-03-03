@@ -54,6 +54,12 @@ struct uwsgi_option http_options[] = {
 	{"http-ss", required_argument, 0, "run the http router stats server", uwsgi_opt_set_str, &uhttp.cr.stats_server, 0},
 	{"http-harakiri", required_argument, 0, "enable http router harakiri", uwsgi_opt_set_int, &uhttp.cr.harakiri, 0},
 	{"http-stud-prefix", required_argument, 0, "expect a stud prefix (1byte family + 4/16 bytes address) on connections from the specified address", uwsgi_opt_add_addr_list, &uhttp.stud_prefix, 0},
+	{"http-uid", required_argument, 0, "drop http router privileges to the specified uid", uwsgi_opt_uid, &uhttp.cr.uid, 0 },
+	{"http-gid", required_argument, 0, "drop http router privileges to the specified gid", uwsgi_opt_gid, &uhttp.cr.gid, 0 },
+	{"http-resubscribe", required_argument, 0, "forward subscriptions to the specified subscription server", uwsgi_opt_add_string_list, &uhttp.cr.resubscribe, 0},
+	{"http-buffer-size", required_argument, 0, "set internal buffer size (default: page size)", uwsgi_opt_set_64bit, &uhttp.cr.buffer_size, 0},
+
+	{"http-server-name-as-http-host", required_argument, 0, "force SERVER_NAME to HTTP_HOST", uwsgi_opt_true, &uhttp.server_name_as_http_host, 0},
 	{0, 0, 0, 0, 0, 0, 0},
 };
 
@@ -118,6 +124,7 @@ int http_add_uwsgi_header(struct corerouter_peer *peer, char *hh, uint16_t hhlen
 	if (!uwsgi_strncmp("HOST", 4, hh, keylen)) {
 		peer->key = val;
 		peer->key_len = vallen;
+		if (uhttp.server_name_as_http_host && uwsgi_buffer_append_keyval(out, "SERVER_NAME", 11, peer->key, peer->key_len)) return -1;
 	}
 
 	else if (!uwsgi_strncmp("CONTENT_LENGTH", 14, hh, keylen)) {
@@ -292,7 +299,7 @@ int http_headers_parse(struct corerouter_peer *peer) {
 	if (uwsgi_buffer_append_keyval(out, "SCRIPT_NAME", 11, "", 0)) return -1;
 
 	// SERVER_NAME
-	if (uwsgi_buffer_append_keyval(out, "SERVER_NAME", 11, uwsgi.hostname, uwsgi.hostname_len)) return -1;
+	if (!uhttp.server_name_as_http_host && uwsgi_buffer_append_keyval(out, "SERVER_NAME", 11, uwsgi.hostname, uwsgi.hostname_len)) return -1;
 	peer->key = uwsgi.hostname;
 	peer->key_len = uwsgi.hostname_len;
 
@@ -616,6 +623,9 @@ ssize_t http_parse(struct corerouter_peer *main_peer) {
 
 	// is it http body ?
 	if (hr->rnrn == 4) {
+		// something bad happened in keepalive mode...
+		if (!main_peer->session->peers) return -1;
+
 		if (hr->content_length == 0 && !hr->raw_body) {
 			// ignore data...
 			main_peer->in->pos = 0;
@@ -869,7 +879,8 @@ int http_alloc_session(struct uwsgi_corerouter *ucr, struct uwsgi_gateway_socket
 			break;
 #endif
 		default:
-			uwsgi_cr_set_hooks(cs->main_peer, cs->main_peer->last_hook_read, NULL);
+			if (uwsgi_cr_set_hooks(cs->main_peer, cs->main_peer->last_hook_read, NULL))
+				return -1;
 			cs->close = hr_session_close;
 			break;
 	}

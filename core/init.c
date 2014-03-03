@@ -51,6 +51,7 @@ struct http_status_codes hsc[] = {
         {"503", "Service Unavailable"},
         {"504", "Gateway Timeout"},
         {"505", "HTTP Version Not Supported"},
+        {"509", "Bandwidth Limit Exceeded"},
         {"", NULL},
 };
 
@@ -75,10 +76,12 @@ void uwsgi_init_default() {
 	uwsgi.original_log_fd = -1;
 
 	uwsgi.emperor_fd_config = -1;
+	uwsgi.emperor_fd_proxy = -1;
 	// default emperor scan frequency
 	uwsgi.emperor_freq = 3;
 	uwsgi.emperor_throttle = 1000;
 	uwsgi.emperor_heartbeat = 30;
+	uwsgi.emperor_curse_tolerance = 30;
 	// max 3 minutes throttling
 	uwsgi.emperor_max_throttle = 1000 * 180;
 	uwsgi.emperor_pid = -1;
@@ -114,13 +117,13 @@ void uwsgi_init_default() {
 	uwsgi.max_vars = MAX_VARS;
 	uwsgi.vec_size = 4 + 1 + (4 * MAX_VARS);
 
-	uwsgi.shared->options[UWSGI_OPTION_SOCKET_TIMEOUT] = 4;
-	uwsgi.shared->options[UWSGI_OPTION_LOGGING] = 1;
+	uwsgi.socket_timeout = 4;
+	uwsgi.logging_options.enabled = 1;
 
 	// a workers hould be running for at least 10 seconds
-	uwsgi.shared->options[UWSGI_OPTION_MIN_WORKER_LIFETIME] = 10;
+	uwsgi.min_worker_lifetime = 10;
 
-	uwsgi.shared->spooler_frequency = 30;
+	uwsgi.spooler_frequency = 30;
 
 	uwsgi.shared->spooler_signal_pipe[0] = -1;
 	uwsgi.shared->spooler_signal_pipe[1] = -1;
@@ -167,6 +170,8 @@ void uwsgi_init_default() {
 
 	uwsgi.wait_read_hook = uwsgi_simple_wait_read_hook;
 	uwsgi.wait_write_hook = uwsgi_simple_wait_write_hook;
+	uwsgi.wait_milliseconds_hook = uwsgi_simple_wait_milliseconds_hook;
+	uwsgi.wait_read2_hook = uwsgi_simple_wait_read2_hook;
 
 	uwsgi_websockets_init();
 	
@@ -178,6 +183,8 @@ void uwsgi_init_default() {
 
 	uwsgi.master_fifo_fd = -1;
 	uwsgi_master_fifo_prepare();
+
+	uwsgi.notify_socket_fd = -1;
 }
 
 void uwsgi_setup_reload() {
@@ -191,7 +198,7 @@ void uwsgi_setup_reload() {
 		uwsgi.reloads++;
 		//convert reloads to string
 		int rlen = snprintf(env_reload_buf, 10, "%u", uwsgi.reloads);
-		if (rlen > 0) {
+		if (rlen > 0 && rlen < 10) {
 			env_reload_buf[rlen] = 0;
 			if (setenv("UWSGI_RELOADS", env_reload_buf, 1)) {
 				uwsgi_error("setenv()");
@@ -343,7 +350,6 @@ void uwsgi_setup_workers() {
 		uwsgi.workers[i].signal_pipe[0] = -1;
 		uwsgi.workers[i].signal_pipe[1] = -1;
 		snprintf(uwsgi.workers[i].name, 0xff, "uWSGI worker %d", i);
-		snprintf(uwsgi.workers[i].snapshot_name, 0xff, "uWSGI snapshot %d", i);
 	}
 
 	uint64_t total_memory = (sizeof(struct uwsgi_app) * uwsgi.max_apps) + (sizeof(struct uwsgi_core) * uwsgi.cores) + (sizeof(void *) * uwsgi.max_apps * uwsgi.cores) + (uwsgi.buffer_size * uwsgi.cores) + (sizeof(struct iovec) * uwsgi.vec_size * uwsgi.cores);
@@ -409,7 +415,7 @@ void sanitize_args() {
                 uwsgi.cores = uwsgi.threads;
         }
 
-        if (uwsgi.shared->options[UWSGI_OPTION_HARAKIRI] > 0) {
+        if (uwsgi.harakiri_options.workers > 0) {
                 if (!uwsgi.post_buffering) {
                         uwsgi_log(" *** WARNING: you have enabled harakiri without post buffering. Slow upload could be rejected on post-unbuffered webservers *** \n");
                 }
@@ -445,18 +451,13 @@ void sanitize_args() {
 		}
         }
 
-        if (uwsgi.auto_snapshot > 0 && uwsgi.auto_snapshot > uwsgi.numproc) {
-                uwsgi_log("invalid auto-snapshot value: must be <= than processes\n");
-                exit(1);
-        }
-
-	if (uwsgi.shared->options[UWSGI_OPTION_MAX_WORKER_LIFETIME] > 0 && uwsgi.shared->options[UWSGI_OPTION_MIN_WORKER_LIFETIME] >= uwsgi.shared->options[UWSGI_OPTION_MAX_WORKER_LIFETIME]) {
+	if (uwsgi.max_worker_lifetime > 0 && uwsgi.min_worker_lifetime >= uwsgi.max_worker_lifetime) {
 		uwsgi_log("invalid min-worker-lifetime value (%d), must be lower than max-worker-lifetime (%d)\n",
-			uwsgi.shared->options[UWSGI_OPTION_MIN_WORKER_LIFETIME], uwsgi.shared->options[UWSGI_OPTION_MAX_WORKER_LIFETIME]);
+			uwsgi.min_worker_lifetime, uwsgi.max_worker_lifetime);
 		exit(1);
 	}
 
-	if (uwsgi.cheaper_rss_limit_soft && uwsgi.shared->options[UWSGI_OPTION_MEMORY_DEBUG] != 1 && uwsgi.force_get_memusage != 1) {
+	if (uwsgi.cheaper_rss_limit_soft && uwsgi.logging_options.memory_report != 1 && uwsgi.force_get_memusage != 1) {
 		uwsgi_log("enabling cheaper-rss-limit-soft requires enabling also memory-report\n");
 		exit(1);
 	}
@@ -464,7 +465,7 @@ void sanitize_args() {
 		uwsgi_log("enabling cheaper-rss-limit-hard requires setting also cheaper-rss-limit-soft\n");
 		exit(1);
 	}
-	if ( uwsgi.cheaper_rss_limit_soft && uwsgi.cheaper_rss_limit_hard <= uwsgi.cheaper_rss_limit_soft) {
+	if ( uwsgi.cheaper_rss_limit_hard && uwsgi.cheaper_rss_limit_hard <= uwsgi.cheaper_rss_limit_soft) {
 		uwsgi_log("cheaper-rss-limit-hard value must be higher than cheaper-rss-limit-soft value\n");
 		exit(1);
 	}

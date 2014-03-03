@@ -22,6 +22,10 @@ int uwsgi_master_manage_events(int interesting_fd) {
 		return uwsgi_master_fifo_manage(uwsgi.master_fifo_fd);
 	}
 
+	if (uwsgi.notify_socket_fd > -1 && interesting_fd == uwsgi.notify_socket_fd) {
+		return uwsgi_notify_socket_manage(interesting_fd);
+	}
+
 	// stats server ?
 	if (uwsgi.stats && uwsgi.stats_fd > -1) {
 		if (interesting_fd == uwsgi.stats_fd) {
@@ -40,11 +44,22 @@ int uwsgi_master_manage_events(int interesting_fd) {
 
 	// emperor event ?
 	if (uwsgi.has_emperor) {
+		if (uwsgi.emperor_fd_proxy > -1 && interesting_fd == uwsgi.emperor_fd_proxy) {
+			uwsgi_master_manage_emperor_proxy();	
+			return 0;
+		}
+
 		if (interesting_fd == uwsgi.emperor_fd) {
 			uwsgi_master_manage_emperor();
 			return 0;
 		}
 	}
+
+#ifdef __linux__
+	if (uwsgi.setns_socket && uwsgi.setns_socket_fd > -1 && interesting_fd == uwsgi.setns_socket_fd) {
+		uwsgi_master_manage_setns(uwsgi.setns_socket_fd);
+	}
+#endif
 
 	if (uwsgi_fsmon_event(interesting_fd)) {
                 return 0;
@@ -113,6 +128,7 @@ int uwsgi_master_manage_events(int interesting_fd) {
                                 	reap_them_all(0);
                                 	uwsgi_unblock_signal(SIGTERM);
 				}
+                                if (usl->custom2 > 8) free(tmp);
                                 return 0;
                         }
                         usl = usl->next;
