@@ -1,0 +1,7 @@
+  * Add Greenlet for Python3
+  * Fix add Replaces: (?) for PSGI plugin
+  * Package each python flavor separately
+  * Build ruby plugins for jruby
+  * Build python modules for pypy
+  * Maybe build python/JAVA modules for jython
+  * Package fiber and rbthreads for any ruby interpreter
