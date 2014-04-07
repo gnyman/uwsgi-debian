@@ -54,7 +54,7 @@ XS(XS_psgix_logger) {
 	psgi_check_args(1);
 	HV *hv_args = (HV *) (SvRV(ST(0)));
 	if (!hv_exists(hv_args, "level", 5) || !hv_exists(hv_args, "message", 7)) {
-		Perl_croak(aTHX_ "psgix.logger requires bot level and message items");
+		Perl_croak(aTHX_ "psgix.logger requires both level and message items");
 	}
 	char *level = SvPV_nolen(*(hv_fetch(hv_args, "level", 5, 0)));
 	char *message = SvPV_nolen(*(hv_fetch(hv_args, "message", 7, 0)));
@@ -108,7 +108,7 @@ XS(XS_input_read) {
         unsigned long arg_len = SvIV(ST(2));
 
 	long offset = 0;
-	if (items > 2) {
+	if (items > 3) {
 		offset = (long) SvIV(ST(3));
 	}
 
@@ -370,12 +370,16 @@ int init_psgi_app(struct wsgi_request *wsgi_req, char *app, uint16_t app_len, Pe
 		// uperl.embedding as an argument so we won't execute
 		// BEGIN blocks in app_name twice.
 		{
-			char *perl_init_arg[] = { "", "-e", "0" };
+			char *perl_e_arg = uwsgi_concat2("#line 0 ", app_name);
+			char *perl_init_arg[] = { "", "-e", perl_e_arg };
 			if (perl_parse(interpreters[i], xs_init, 3, perl_init_arg, NULL)) {
 				// what to do here ? i hope no-one will use threads with dynamic apps... but clear the whole stuff...
 				free(callables);
+                                free(perl_e_arg);
 				uwsgi_perl_free_stashes();
 				goto clear;
+			} else {
+				free(perl_e_arg);
 			}
 		}
 

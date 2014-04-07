@@ -102,6 +102,10 @@ static int uwsgi_mongrel2_json_parse(json_t * root, struct wsgi_request *wsgi_re
 		}
 	}
 
+	if ((json_val = uwsgi_mongrel2_json_get_string(root, "URL_SCHEME"))) {
+                wsgi_req->uh->pktsize += proto_base_add_uwsgi_var(wsgi_req, "UWSGI_SCHEME", 12, json_val, strlen(json_val));
+        }
+
 	if ((json_val = uwsgi_mongrel2_json_get_string(root, "host"))) {
 		char *colon = strchr(json_val, ':');
 		if (colon) {
@@ -210,6 +214,9 @@ static int uwsgi_mongrel2_tnetstring_parse(struct wsgi_request *wsgi_req, char *
 					wsgi_req->uh->pktsize += proto_base_add_uwsgi_var(wsgi_req, "REQUEST_URI", 11, val, vallen);
 				}
 			}
+			else if (!uwsgi_strncmp("URL_SCHEME", 10, key, keylen)) {	
+				wsgi_req->uh->pktsize += proto_base_add_uwsgi_var(wsgi_req, "UWSGI_SCHEME", 12, val, vallen);
+			}
 		}
 		else {
 			// add header
@@ -299,6 +306,13 @@ void uwsgi_proto_zeromq_thread_fixup(struct uwsgi_socket *uwsgi_sock, int async_
 
 // fake function, the body is in a file or completely in memory
 ssize_t uwsgi_proto_zeromq_read_body(struct wsgi_request *wsgi_req, char *buf, size_t len) {
+	size_t remains = wsgi_req->post_cl - wsgi_req->proto_parser_status;
+	if (remains > 0) {
+		if (len > remains) len = remains;
+		memcpy(buf, wsgi_req->proto_parser_buf + wsgi_req->proto_parser_buf_size + wsgi_req->proto_parser_status, len);
+		wsgi_req->proto_parser_status += len;
+		return len;
+	}
 	return 0;
 }
 
@@ -410,7 +424,8 @@ int uwsgi_proto_zeromq_accept(struct wsgi_request *wsgi_req, int fd) {
 		}
 
 		// pre-build the mongrel2 response_header
-		wsgi_req->proto_parser_buf = uwsgi_malloc(req_uuid_len + 1 + 11 + 1 + req_id_len + 1 + 1);
+		wsgi_req->proto_parser_buf_size = req_uuid_len + 1 + 11 + 1 + req_id_len + 1 + 1;
+		wsgi_req->proto_parser_buf = uwsgi_malloc(wsgi_req->proto_parser_buf_size);
 		memcpy(wsgi_req->proto_parser_buf, req_uuid, req_uuid_len);
 		((char *) wsgi_req->proto_parser_buf)[req_uuid_len] = ' ';
 		resp_id_len = uwsgi_num2str2(req_id_len, wsgi_req->proto_parser_buf + req_uuid_len + 1);
@@ -422,13 +437,22 @@ int uwsgi_proto_zeromq_accept(struct wsgi_request *wsgi_req, int fd) {
 		wsgi_req->proto_parser_pos = (uint64_t) req_uuid_len + 1 + resp_id_len + 1 + req_id_len + 1 + 1;
 
 		// handle post data (in memory)
+		// reallocate wsgi_req->proto_parser_buf and change its size to be able to store request body
+		// the parser status holds the current position for read_body hook
 		if (wsgi_req->post_cl > 0 && !wsgi_req->post_file) {
 			if (uwsgi_netstring(post_data, message_size - (post_data - message_ptr), &message_ptr, &wsgi_req->post_cl)) {
+				char *tmp = realloc(wsgi_req->proto_parser_buf, wsgi_req->proto_parser_buf_size + wsgi_req->post_cl);
+				if (!tmp) {
+					uwsgi_error("realloc()");
+					exit(1);	
+				}
+				wsgi_req->proto_parser_buf = tmp;
+				// status is an offset...
+				wsgi_req->proto_parser_status = 0;
 #ifdef UWSGI_DEBUG
 				uwsgi_log("post_size: %d\n", wsgi_req->post_cl);
 #endif
-				wsgi_req->post_read_buf = uwsgi_malloc(wsgi_req->post_cl);
-				memcpy(wsgi_req->post_read_buf, message_ptr, wsgi_req->post_cl);
+				memcpy(wsgi_req->proto_parser_buf + wsgi_req->proto_parser_buf_size, message_ptr, wsgi_req->post_cl);
 			}
 		}
 
@@ -452,33 +476,7 @@ retry:
 	return -1;
 }
 
-void uwsgi_proto_zeromq_close(struct wsgi_request *wsgi_req) {
-	zmq_msg_t reply;
-
-	// check for already freed wsgi_req->proto_parser_buf/wsgi_req->proto_parser_pos
-	if (!wsgi_req->proto_parser_pos)
-		return;
-
-	// no need to pass a free function (the buffer will be freed during cloe_request)
-	zmq_msg_init_data(&reply, wsgi_req->proto_parser_buf, wsgi_req->proto_parser_pos, NULL, NULL);
-	if (uwsgi.threads > 1)
-		pthread_mutex_lock(&wsgi_req->socket->lock);
-#if ZMQ_VERSION >= ZMQ_MAKE_VERSION(3,0,0)
-	if (zmq_sendmsg(wsgi_req->socket->pub, &reply, 0)) {
-		uwsgi_error("uwsgi_proto_zeromq_close()/zmq_sendmsg()");
-#else
-	if (zmq_send(wsgi_req->socket->pub, &reply, 0)) {
-		uwsgi_error("uwsgi_proto_zeromq_close()/zmq_send()");
-#endif
-	}
-	if (uwsgi.threads > 1)
-		pthread_mutex_unlock(&wsgi_req->socket->lock);
-	zmq_msg_close(&reply);
-
-}
-
-
-int uwsgi_proto_zeromq_write(struct wsgi_request *wsgi_req, char *buf, size_t len) {
+static int uwsgi_proto_zeromq_write_do(struct wsgi_request *wsgi_req, char *buf, size_t len) {
 	zmq_msg_t reply;
 
 	if (zmq_msg_init_size(&reply, wsgi_req->proto_parser_pos + len)) {
@@ -489,7 +487,8 @@ int uwsgi_proto_zeromq_write(struct wsgi_request *wsgi_req, char *buf, size_t le
 
 	char *zmq_body = zmq_msg_data(&reply);
 	memcpy(zmq_body, wsgi_req->proto_parser_buf, wsgi_req->proto_parser_pos);
-	memcpy(zmq_body + wsgi_req->proto_parser_pos, buf, len);
+	if (len > 0)
+		memcpy(zmq_body + wsgi_req->proto_parser_pos, buf, len);
 
 	if (uwsgi.threads > 1)
 		pthread_mutex_lock(&wsgi_req->socket->lock);
@@ -508,6 +507,18 @@ int uwsgi_proto_zeromq_write(struct wsgi_request *wsgi_req, char *buf, size_t le
 	zmq_msg_close(&reply);
 
 	return UWSGI_OK;
+}
+
+int uwsgi_proto_zeromq_write(struct wsgi_request *wsgi_req, char *buf, size_t len) {
+	int ret = uwsgi_proto_zeromq_write_do(wsgi_req, buf, len);
+	if (ret == UWSGI_OK) {
+		wsgi_req->write_pos += len;
+	}
+	return ret;
+}
+
+void uwsgi_proto_zeromq_close(struct wsgi_request *wsgi_req) {
+        uwsgi_proto_zeromq_write_do(wsgi_req, "", 0);
 }
 
 /*
@@ -532,7 +543,7 @@ int uwsgi_proto_zeromq_sendfile(struct wsgi_request *wsgi_req, int fd, size_t po
 		return -1;
 	}
 	wsgi_req->write_pos += rlen;
-	if (uwsgi_proto_zeromq_write(wsgi_req, tmp_buf, rlen) < 0) {
+	if (uwsgi_proto_zeromq_write_do(wsgi_req, tmp_buf, rlen) < 0) {
 		free(tmp_buf);
 		return -1;
 	}
@@ -574,6 +585,7 @@ static void mongrel2_register_proto() {
 static void mongrel2_connect() {
 	struct uwsgi_socket *uwsgi_sock = uwsgi.sockets;
 	while(uwsgi_sock) {
+		if (uwsgi_sock->proto != uwsgi_proto_zeromq_parser) goto next;
 		uwsgi_sock->ctx = zmq_init(1);
 		if (!uwsgi_sock->ctx) {
 			uwsgi_error("mongrel2_connect()/zmq_init()");
@@ -581,7 +593,7 @@ static void mongrel2_connect() {
 		}
 		char *responder = strchr(uwsgi_sock->name, ',');
         	if (!responder) {
-                	uwsgi_log("invalid zeromq address\n");
+                	uwsgi_log("invalid zeromq address: %s\n", uwsgi_sock->name);
                 	exit(1);
         	}
         	uwsgi_sock->receiver = uwsgi_concat2n(uwsgi_sock->name, responder - uwsgi_sock->name, "", 0);
@@ -653,6 +665,7 @@ static void mongrel2_connect() {
 #else
         	uwsgi_sock->recv_flag = ZMQ_NOBLOCK;
 #endif
+next:
 		uwsgi_sock = uwsgi_sock->next;
 	}
 }
