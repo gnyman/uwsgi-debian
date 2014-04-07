@@ -1,3 +1,10 @@
+uwsgi (2.0.3-1) unstable; urgency=medium
+
+  [ upstream ]
+  * New release.
+
+ -- Janos Guljas <janos@debian.org>  Mon, 07 Apr 2014 15:09:01 +0200
+
 uwsgi (2.0.2-1~experimental1) experimental; urgency=medium
 
   [ upstream ]
