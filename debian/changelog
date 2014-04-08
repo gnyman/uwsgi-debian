@@ -1,3 +1,19 @@
+uwsgi (2.0.3-2) UNRELEASED; urgency=medium
+
+  * Update copyright file:
+    + Extend main licensing with newly introduced linking exception.
+  * Update package relations:
+    + Auto-resolve CDBS-related build-dependencies.
+    + Have libapache2-* packages recommend uwsgi-core and suggest uwsgi.
+    + Relax to build-depend unversioned on debhelper: Needed version
+      satisfied even on oldstable.
+    + Fix build-depend on python3: Needed since 1.2.3+dfsg-1 for
+      dh_python3 call (and for compiling as well).
+  * Document use of CDBS and git-buildpackage in README.source.
+  * Fix install tests as example files (was dropped since 1.9.17-1).
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 08 Apr 2014 09:59:45 +0200
+
 uwsgi (2.0.3-1) unstable; urgency=medium
 
   [ upstream ]
@@ -16,7 +32,7 @@ uwsgi (2.0.2-1~experimental1) experimental; urgency=medium
     - uwsgi-plugin-jwsgi-openjdk-6
     - uwsgi-plugin-erlang
     - uwsgi-plugin-pyerl-python
-    - uwsgi-plugin-pyerl-python3 
+    - uwsgi-plugin-pyerl-python3
   * Remove alarm plugin from uwsgi-core.
   * Use verbose compilation:
     - remove 2001_verbose_compilation.patch
@@ -24,7 +40,7 @@ uwsgi (2.0.2-1~experimental1) experimental; urgency=medium
   * Remove support for IA64 architecture: (Closes: #724527)
     - remove 1006_avoid_clone_on_IA64.patch
   * Remove support for s390 architecture.
-  * Remove patches as applied upstrea: 
+  * Remove patches as applied upstrea:
     - 1007_fix_linkage.patch
     - 020130925~4b60307.patch
     - 020130925~b190744.patch

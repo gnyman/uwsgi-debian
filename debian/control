@@ -5,7 +5,10 @@ Maintainer: Janos Guljas <janos@debian.org>
 Uploaders: Jonas Smedegaard <dr@jones.dk>
 Build-Depends:
  cdbs,
- debhelper (>= 8),
+ python,
+ python3,
+ debhelper,
+ dh-buildinfo,
  apache2-dev | apache2-threaded-dev,
  help2man,
  javahelper,
@@ -42,7 +45,6 @@ Build-Depends:
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
  pkg-config,
- python,
  python-all-dev,
  python-greenlet-dev [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  python3-all-dev,
@@ -623,6 +625,8 @@ Description: XSLT request plugin for uWSGI
 Package: libapache2-mod-proxy-uwsgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${cdbs:Depends}
+Recommends: ${cdbs:Recommends}
+Suggests: ${cdbs:Suggests}
 Description: uwsgi proxy module for Apache2 (mod_uwsgi)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -651,6 +655,8 @@ Package: libapache2-mod-uwsgi
 Architecture: any
 Section: httpd
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${cdbs:Depends}
+Recommends: ${cdbs:Recommends}
+Suggests: ${cdbs:Suggests}
 Conflicts: libapache2-mod-ruwsgi
 Replaces: libapache2-mod-ruwsgi
 Description: uwsgi module for Apache2 (mod_uwsgi)
@@ -679,6 +685,8 @@ Package: libapache2-mod-ruwsgi
 Architecture: any
 Section: httpd
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${cdbs:Depends}
+Recommends: ${cdbs:Recommends}
+Suggests: ${cdbs:Suggests}
 Conflicts: libapache2-mod-uwsgi
 Replaces: libapache2-mod-uwsgi
 Description: uwsgi module for Apache2 (mod_Ruwsgi)
