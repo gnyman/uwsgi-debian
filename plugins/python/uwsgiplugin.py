@@ -52,8 +52,10 @@ if not 'UWSGI_PYTHON_NOLIB' in os.environ:
     else:
         try:
             LDFLAGS.append("-L%s" % sysconfig.get_config_var('LIBDIR'))
+            os.environ['LD_RUN_PATH'] = "%s" % (sysconfig.get_config_var('LIBDIR'))
         except:
             LDFLAGS.append("-L%s/lib" % sysconfig.PREFIX)
+            os.environ['LD_RUN_PATH'] = "%s/lib" % sysconfig.PREFIX
 
         LIBS.append('-lpython%s' % get_python_version())
 else:

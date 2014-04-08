@@ -14,13 +14,12 @@ PHPPATH = os.environ.get('UWSGICONFIG_PHPPATH', PHPPATH)
 
 CFLAGS = [os.popen(PHPPATH + ' --includes').read().rstrip(), '-Wno-sign-compare']
 LDFLAGS = os.popen(PHPPATH + ' --ldflags').read().rstrip().split()
-LDFLAGS.append('-L/usr/lib/php5')
 
 if ld_run_path:
     LDFLAGS.append('-L%s' % ld_run_path)
     os.environ['LD_RUN_PATH'] = ld_run_path
 
-LIBS = ['-lphp5']
+LIBS = [os.popen(PHPPATH + ' --libs').read().rstrip(), '-lphp5']
 
 phplibdir = os.environ.get('UWSGICONFIG_PHPLIBDIR')
 if phplibdir:
