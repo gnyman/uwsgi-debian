@@ -21,6 +21,13 @@ endif
 
 DEB_UPSTREAM_URL = http://projects.unbit.it/downloads
 
+# TODO: Drop this before importing next upstream release
+DEB_UPSTREAM_REPACKAGE_DELIMITER = +
+
+# exclude binary file without source
+DEB_UPSTREAM_REPACKAGE_EXCLUDES += \
+ ./contrib/uwsgi.class
+
 export LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
 export CFLAGS := $(shell dpkg-buildflags --get CFLAGS)
 export CPPFLAGS := $(shell dpkg-buildflags --get CPPFLAGS)

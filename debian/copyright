@@ -4,6 +4,9 @@ Upstream-Contact: uWSGI developers and users list <uwsgi@lists.unbit.it>
                   Roberto De Ioris <roberto@unbit.it>
 Source: http://projects.unbit.it/uwsgi/
  git://github.com/unbit/uwsgi
+ Repackaged, excluding binary file without source
+Files-Excluded:
+  contrib/uwsgi.class
 
 Files: *
 Copyright: 2009-2013, Unbit S.a.s <info@unbit.it>
