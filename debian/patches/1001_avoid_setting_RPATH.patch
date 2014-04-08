@@ -10,7 +10,7 @@ Last-Update: 2013-04-24
 
 --- a/plugins/rack/uwsgiplugin.py
 +++ b/plugins/rack/uwsgiplugin.py
-@@ -44,7 +44,6 @@
+@@ -46,7 +46,6 @@
  
  if has_shared == 'yes':
      LDFLAGS.append('-L' + libpath )
@@ -20,7 +20,7 @@ Last-Update: 2013-04-24
      rubylibdir = os.popen(RUBYPATH + " -e \"require 'rbconfig';print RbConfig::CONFIG['rubylibdir']\"").read().rstrip()
 --- a/plugins/python/uwsgiplugin.py
 +++ b/plugins/python/uwsgiplugin.py
-@@ -44,10 +44,8 @@
+@@ -52,10 +52,8 @@
      else:
          try:
              LDFLAGS.append("-L%s" % sysconfig.get_config_var('LIBDIR'))
