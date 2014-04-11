@@ -280,8 +280,10 @@ clean::
 # uwsgi-core package
 # ------------------
 
+substvars-list-encode = perl -0 -F'/\s+/' -ane 'print " * ", join("\$${Newline} * ",@F)'
+uwsgi-coreplugins := $(call pkg_name_to_plugin_name,$(UWSGI_SRCPLUGINS_CORE))
+uwsgi-corepluginlist := $(shell echo $(uwsgi-coreplugins) | $(substvars-list-encode))
 build/uwsgi-core:: uwsgi-core
-
 uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--build $(CURDIR)/debian/buildconf/uwsgi-core.ini
@@ -293,6 +295,8 @@ uwsgi-core: debian/buildconf/uwsgi-plugin.ini uwsgi-core-local
 		$(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		$${PLUGIN_NAME}; \
 	done
+install/uwsgi-core::
+	echo 'uwsgi:corepluginlist=$(uwsgi-corepluginlist)' >> debian/$(cdbs_curpkg).substvars
 clean::
 	rm -f uwsgi-core
 	find -type l -name 'uwsgi_*' -delete
