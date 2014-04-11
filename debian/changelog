@@ -16,11 +16,29 @@ uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
       satisfied even on oldstable.
     + Fix build-depend on python3: Needed since 1.2.3+dfsg-1 for
       dh_python3 call (and for compiling as well).
+    + Build-depend on devscripts: Needed for copyright check.
   * Document use of CDBS and git-buildpackage in README.source.
   * Fix install tests as example files (was dropped since 1.9.17-1).
+  * Refactor packaging files:
+    + Use more consistent variable naming
+    + Resolve packaging hints more elegantly.
+    + Expand packaging hint files from templates before build (not
+      during install).
+    + Fix clean properly after build.
+    + Avoid use of CURDIR where unneeded.
+  * Fix use JAVA_ARCH (not DEB_HOST_ARCH) to resolve java paths (broken
+    since 1.2.3+dfsg-2~experimental1).
+  * Include CDBS utils snippet, to enable copyright check (and ensure it
+    is done before packaging hint file expansion).
+  * Add placeholder to ease excluding broken plugins.
+  * Add TODO file.
   * Fix unapply patches (applied since 2.0.2-1~experimental1).
   * Unfuzz patches.
   * Extend V8-supported architectures to include hurd-i386 and mips.
+  * Auto-resolve plugin list in long description of uwsgi-core package.
+  * Update watch file:
+    + Strip trailing ~dfsg.
+    + Drop comments about obsolete version scheme for pre-releases.
 
  -- Jonas Smedegaard <dr@jones.dk>  Tue, 08 Apr 2014 09:59:45 +0200
 

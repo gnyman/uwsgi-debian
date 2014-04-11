@@ -5,6 +5,7 @@ Maintainer: Janos Guljas <janos@debian.org>
 Uploaders: Jonas Smedegaard <dr@jones.dk>
 Build-Depends:
  cdbs,
+ devscripts,
  python,
  python3,
  debhelper,
@@ -155,57 +156,12 @@ Description: fast, self-healing application container server (core)
  different plugins can be used in order to add compatibility with tons of
  different technology on top of the same core.
  .
- This package provides:
-  * executable uWSGI core binary (built without any embedded plugins)
-  * uWSGI usage examples
-  * uWSGI test suite
-  * plugins that do not require additional dependencies:
-    - alarm_speech
-    - cache
-    - carbon
-    - cgi
-    - cheaper_backlog2
-    - cheaper_busyness
-    - clock_monothonic
-    - clock_realtime
-    - corerouter
-    - echo
-    - emperor_amqp
-    - emperor_zeromq (on supported architectures)
-    - fastrouter
-    - http
-    - logfile
-    - logfile
-    - logsocket
-    - nagios
-    - notfound
-    - pam
-    - ping
-    - rawrouter
-    - redislog
-    - router_basicauth
-    - router_cache
-    - router_http
-    - router_memcached
-    - router_redirect
-    - router_rewrite
-    - router_static
-    - router_uwsgi
-    - rpc
-    - rrdtool
-    - rsyslog
-    - signal
-    - spooler
-    - ssi
-    - sslrouter
-    - stats_pusher_statsd
-    - symcall
-    - syslog
-    - transformation_gzip
-    - transformation_tofile
-    - transformation_toupper
-    - ugreen
-    - zergpool
+ This package provides core uWSGI binary (built without any embedded
+ plugins) and plugins with no or few dependencies:
+ .
+ ${uwsgi:corepluginlist}
+ .
+ Plugin emperor_zeromq is provided only on supported architectures.
 
 Package: uwsgi-emperor
 Architecture: any
