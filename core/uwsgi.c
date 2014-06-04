@@ -101,6 +101,8 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"declare-option", required_argument, 0, "declare a new uWSGI custom option", uwsgi_opt_add_custom_option, NULL, UWSGI_OPT_IMMEDIATE},
 	{"declare-option2", required_argument, 0, "declare a new uWSGI custom option (non-immediate)", uwsgi_opt_add_custom_option, NULL, 0},
 
+	{"resolve", required_argument, 0, "place the result of a dns query in the specified placeholder, sytax: placeholder=name (immediate option)", uwsgi_opt_resolve, NULL, UWSGI_OPT_IMMEDIATE},
+
 	{"for", required_argument, 0, "(opt logic) for cycle", uwsgi_opt_logic, (void *) uwsgi_logic_opt_for, UWSGI_OPT_IMMEDIATE},
 	{"for-glob", required_argument, 0, "(opt logic) for cycle (expand glob)", uwsgi_opt_logic, (void *) uwsgi_logic_opt_for_glob, UWSGI_OPT_IMMEDIATE},
 	{"for-times", required_argument, 0, "(opt logic) for cycle (expand the specified num to a list starting from 1)", uwsgi_opt_logic, (void *) uwsgi_logic_opt_for_times, UWSGI_OPT_IMMEDIATE},
@@ -219,6 +221,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"emperor-on-demand-exec", required_argument, 0, "use the output of the specified command as on demand socket name (the vassal name is passed as the only argument)", uwsgi_opt_set_str, &uwsgi.emperor_on_demand_exec, 0},
 	{"emperor-extra-extension", required_argument, 0, "allows the specified extension in the Emperor (vassal will be called with --config)", uwsgi_opt_add_string_list, &uwsgi.emperor_extra_extension, 0},
 	{"emperor-extra-ext", required_argument, 0, "allows the specified extension in the Emperor (vassal will be called with --config)", uwsgi_opt_add_string_list, &uwsgi.emperor_extra_extension, 0},
+	{"emperor-no-blacklist", no_argument, 0, "disable Emperor blacklisting subsystem", uwsgi_opt_true, &uwsgi.emperor_no_blacklist, 0},
 #if defined(__linux__) && !defined(OBSOLETE_LINUX_KERNEL)
 	{"emperor-use-clone", required_argument, 0, "use clone() instead of fork() passing the specified unshare() flags", uwsgi_opt_set_unshare, &uwsgi.emperor_clone, 0},
 #endif
@@ -243,6 +246,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 
 	{"reload-mercy", required_argument, 0, "set the maximum time (in seconds) we wait for workers and other processes to die during reload/shutdown", uwsgi_opt_set_int, &uwsgi.reload_mercy, 0},
 	{"worker-reload-mercy", required_argument, 0, "set the maximum time (in seconds) a worker can take to reload/shutdown (default is 60)", uwsgi_opt_set_int, &uwsgi.worker_reload_mercy, 0},
+	{"mule-reload-mercy", required_argument, 0, "set the maximum time (in seconds) a mule can take to reload/shutdown (default is 60)", uwsgi_opt_set_int, &uwsgi.mule_reload_mercy, 0},
 	{"exit-on-reload", no_argument, 0, "force exit even if a reload is requested", uwsgi_opt_true, &uwsgi.exit_on_reload, 0},
 	{"die-on-term", no_argument, 0, "exit instead of brutal reload on SIGTERM", uwsgi_opt_true, &uwsgi.die_on_term, 0},
 	{"force-gateway", no_argument, 0, "force the spawn of the first registered gateway without a master", uwsgi_opt_true, &uwsgi.force_gateway, 0},
@@ -560,6 +564,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"metrics-dir-restore", no_argument, 0, "restore last value taken from the metrics dir", uwsgi_opt_true, &uwsgi.metrics_dir_restore, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
 	{"metric-dir", required_argument, 0, "export metrics as text files to the specified directory", uwsgi_opt_set_str, &uwsgi.metrics_dir, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
 	{"metric-dir-restore", no_argument, 0, "restore last value taken from the metrics dir", uwsgi_opt_true, &uwsgi.metrics_dir_restore, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
+	{"metrics-no-cores", no_argument, 0, "disable generation of cores-related metrics", uwsgi_opt_true, &uwsgi.metrics_no_cores, UWSGI_OPT_METRICS|UWSGI_OPT_MASTER},
 
 	{"udp", required_argument, 0, "run the udp server on the specified address", uwsgi_opt_set_str, &uwsgi.udp_socket, UWSGI_OPT_MASTER},
 	{"stats", required_argument, 0, "enable the stats server on the specified address", uwsgi_opt_set_str, &uwsgi.stats, UWSGI_OPT_MASTER},
@@ -570,6 +575,8 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"stats-push", required_argument, 0, "push the stats json to the specified destination", uwsgi_opt_add_string_list, &uwsgi.requested_stats_pushers, UWSGI_OPT_MASTER|UWSGI_OPT_METRICS},
 	{"stats-pusher-default-freq", required_argument, 0, "set the default frequency of stats pushers", uwsgi_opt_set_int, &uwsgi.stats_pusher_default_freq, UWSGI_OPT_MASTER},
 	{"stats-pushers-default-freq", required_argument, 0, "set the default frequency of stats pushers", uwsgi_opt_set_int, &uwsgi.stats_pusher_default_freq, UWSGI_OPT_MASTER},
+	{"stats-no-cores", no_argument, 0, "disable generation of cores-related stats", uwsgi_opt_true, &uwsgi.stats_no_cores, UWSGI_OPT_MASTER},
+	{"stats-no-metrics", no_argument, 0, "do not include metrics in stats output", uwsgi_opt_true, &uwsgi.stats_no_metrics, UWSGI_OPT_MASTER},
 	{"multicast", required_argument, 0, "subscribe to specified multicast group", uwsgi_opt_set_str, &uwsgi.multicast_group, UWSGI_OPT_MASTER},
 	{"multicast-ttl", required_argument, 0, "set multicast ttl", uwsgi_opt_set_int, &uwsgi.multicast_ttl, 0},
 	{"multicast-loop", required_argument, 0, "set multicast loop (default 1)", uwsgi_opt_set_int, &uwsgi.multicast_loop, 0},
@@ -672,6 +679,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"use-abort", no_argument, 0, "call abort() on segfault/fpe, could be useful for generating a core dump", uwsgi_opt_true, &uwsgi.use_abort, 0},
 
 	{"alarm", required_argument, 0, "create a new alarm, syntax: <alarm> <plugin:args>", uwsgi_opt_add_string_list, &uwsgi.alarm_list, UWSGI_OPT_MASTER},
+	{"alarm-cheap", required_argument, 0, "use main alarm thread rather than create dedicated threads for curl-based alarms", uwsgi_opt_true, &uwsgi.alarm_cheap, 0},
 	{"alarm-freq", required_argument, 0, "tune the anti-loop alam system (default 3 seconds)", uwsgi_opt_set_int, &uwsgi.alarm_freq, 0},
 	{"alarm-fd", required_argument, 0, "raise the specified alarm when an fd is read for read (by default it reads 1 byte, set 8 for eventfd)", uwsgi_opt_add_string_list, &uwsgi.alarm_fd_list, UWSGI_OPT_MASTER},
 	{"alarm-segfault", required_argument, 0, "raise the specified alarm when the segmentation fault handler is executed", uwsgi_opt_add_string_list, &uwsgi.alarm_segfault, UWSGI_OPT_MASTER},
@@ -691,13 +699,13 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"alarm-list", no_argument, 0, "list enabled alarms", uwsgi_opt_true, &uwsgi.alarms_list, 0},
 	{"alarms-list", no_argument, 0, "list enabled alarms", uwsgi_opt_true, &uwsgi.alarms_list, 0},
 	{"alarm-msg-size", required_argument, 0, "set the max size of an alarm message (default 8192)", uwsgi_opt_set_64bit, &uwsgi.alarm_msg_size, 0},
-	{"log-master", no_argument, 0, "delegate logging to master process", uwsgi_opt_true, &uwsgi.log_master, UWSGI_OPT_MASTER},
+	{"log-master", no_argument, 0, "delegate logging to master process", uwsgi_opt_true, &uwsgi.log_master, UWSGI_OPT_MASTER|UWSGI_OPT_LOG_MASTER},
 	{"log-master-bufsize", required_argument, 0, "set the buffer size for the master logger. bigger log messages will be truncated", uwsgi_opt_set_64bit, &uwsgi.log_master_bufsize, 0},
 	{"log-master-stream", no_argument, 0, "create the master logpipe as SOCK_STREAM", uwsgi_opt_true, &uwsgi.log_master_stream, 0},
 	{"log-master-req-stream", no_argument, 0, "create the master requests logpipe as SOCK_STREAM", uwsgi_opt_true, &uwsgi.log_master_req_stream, 0},
 	{"log-reopen", no_argument, 0, "reopen log after reload", uwsgi_opt_true, &uwsgi.log_reopen, 0},
 	{"log-truncate", no_argument, 0, "truncate log on startup", uwsgi_opt_true, &uwsgi.log_truncate, 0},
-	{"log-maxsize", required_argument, 0, "set maximum logfile size", uwsgi_opt_set_64bit, &uwsgi.log_maxsize, UWSGI_OPT_LOG_MASTER},
+	{"log-maxsize", required_argument, 0, "set maximum logfile size", uwsgi_opt_set_64bit, &uwsgi.log_maxsize, UWSGI_OPT_MASTER|UWSGI_OPT_LOG_MASTER},
 	{"log-backupname", required_argument, 0, "set logfile name after rotation", uwsgi_opt_set_str, &uwsgi.log_backupname, 0},
 
 	{"logdate", optional_argument, 0, "prefix logs with date or a strftime string", uwsgi_opt_log_date, NULL, 0},
@@ -1247,6 +1255,11 @@ void kill_them_all(int signum) {
                         uwsgi_curse(i, SIGINT);
                 }
         }
+	for (i = 0; i < uwsgi.mules_cnt; i++) {
+		if (uwsgi.mules[i].pid > 0) {
+			uwsgi_curse_mule(i, SIGINT);
+		}
+	}
 
 	uwsgi_destroy_processes();
 }
@@ -1266,6 +1279,11 @@ void gracefully_kill_them_all(int signum) {
         for (i = 1; i <= uwsgi.numproc; i++) {
                 if (uwsgi.workers[i].pid > 0) {
                         uwsgi_curse(i, SIGHUP);
+                }
+        }
+        for (i = 0; i < uwsgi.mules_cnt; i++) {
+                if (uwsgi.mules[i].pid > 0) {
+                        uwsgi_curse_mule(i, SIGHUP);
                 }
         }
 
@@ -1307,6 +1325,12 @@ void grace_them_all(int signum) {
 	for (i = 1; i <= uwsgi.numproc; i++) {
 		if (uwsgi.workers[i].pid > 0) {
 			uwsgi_curse(i, SIGHUP);
+		}
+	}
+
+	for (i = 0; i < uwsgi.mules_cnt; i++) {
+		if (uwsgi.mules[i].pid > 0) {
+			uwsgi_curse_mule(i, SIGHUP);
 		}
 	}
 }
@@ -1354,6 +1378,11 @@ void reap_them_all(int signum) {
 	for (i = 1; i <= uwsgi.numproc; i++) {
 		if (uwsgi.workers[i].pid > 0)
 			uwsgi_curse(i, SIGTERM);
+	}
+	for (i = 0; i < uwsgi.mules_cnt; i++) {
+		if (uwsgi.mules[i].pid > 0) {
+			uwsgi_curse_mule(i, SIGTERM);
+		}
 	}
 }
 
@@ -1555,21 +1584,25 @@ next:
 	}
 }
 
-void signal_pidfile(int sig, char *filename) {
+int signal_pidfile(int sig, char *filename) {
 
+	int ret = 0;
 	size_t size = 0;
 
 	char *buffer = uwsgi_open_and_read(filename, &size, 1, NULL);
 
 	if (size > 0) {
 		if (kill((pid_t) atoi(buffer), sig)) {
-			uwsgi_error("kill()");
+			uwsgi_error("signal_pidfile()/kill()");
+			ret = -1;
 		}
 	}
 	else {
 		uwsgi_log("error: invalid pidfile\n");
+		ret = -1;
 	}
 	free(buffer);
+	return ret;
 }
 
 /*static*/ void uwsgi_command_signal(char *opt) {
@@ -2198,7 +2231,7 @@ void uwsgi_setup(int argc, char *argv[], char *envp[]) {
 		uwsgi_opt_flock(NULL, uwsgi.flock_wait2, NULL);
 
 	// setup master logging
-	if (uwsgi.log_master && !uwsgi.daemonize2)
+	if (uwsgi.log_master)
 		uwsgi_setup_log_master();
 
 	// setup offload engines
@@ -3663,6 +3696,13 @@ void uwsgi_init_all_apps() {
 		if (uwsgi.need_app) {
 			if (!uwsgi.lazy)
 				uwsgi_log("*** no app loaded. GAME OVER ***\n");
+			if (uwsgi.lazy_apps) {
+				if (uwsgi.master_process) {
+					if (kill(uwsgi.workers[0].pid, SIGINT)) {
+						uwsgi_error("kill()");
+					}
+				}
+			}
 			exit(UWSGI_FAILED_APP_CODE);
 		}
 		else {
@@ -4193,8 +4233,7 @@ void uwsgi_opt_pidfile_signal(char *opt, char *pidfile, void *sig) {
 
 	long *signum_fake_ptr = (long *) sig;
 	int signum = (long) signum_fake_ptr;
-	signal_pidfile(signum, pidfile);
-	exit(0);
+	exit(signal_pidfile(signum, pidfile));
 }
 
 void uwsgi_opt_load_dl(char *opt, char *value, void *none) {

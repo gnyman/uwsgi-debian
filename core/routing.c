@@ -583,6 +583,39 @@ static int uwsgi_router_break(struct uwsgi_route *ur, char *arg) {
 	return 0;
 }
 
+static int uwsgi_router_return_func(struct wsgi_request *wsgi_req, struct uwsgi_route *route)
+{
+
+	if (route->data_len < 3)
+		return UWSGI_ROUTE_BREAK;
+	uint16_t status_msg_len = 0;
+	const char *status_msg = uwsgi_http_status_msg(route->data, &status_msg_len);
+
+	if (!status_msg)
+		return UWSGI_ROUTE_BREAK;
+
+	char *buf = uwsgi_concat3n(route->data, route->data_len, " ", 1, (char *) status_msg, status_msg_len);
+	if (uwsgi_response_prepare_headers(wsgi_req, buf, route->data_len + 1 + status_msg_len))
+		goto end;
+	if (uwsgi_response_add_content_type(wsgi_req, "text/plain", 10))
+		goto end;
+	if (uwsgi_response_add_content_length(wsgi_req, status_msg_len))
+		goto end;
+	uwsgi_response_write_body_do(wsgi_req, (char *) status_msg, status_msg_len);
+
+end:
+	free(buf);
+	return UWSGI_ROUTE_BREAK;
+}
+
+static int uwsgi_router_return(struct uwsgi_route *ur, char *arg)
+{
+	ur->func = uwsgi_router_return_func;
+	ur->data = arg;
+	ur->data_len = strlen(arg);
+	return 0;
+}
+
 // simple math router
 static int uwsgi_router_simple_math_func(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
 	char **subject = (char **) (((char *)(wsgi_req))+ur->subject);
@@ -1086,6 +1119,32 @@ static int uwsgi_router_seturi(struct uwsgi_route *ur, char *arg) {
         ur->data_len = strlen(arg);
         return 0;
 }
+
+// setremoteaddr route
+static int uwsgi_router_setremoteaddr_func(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
+        char **subject = (char **) (((char *)(wsgi_req))+ur->subject);
+        uint16_t *subject_len = (uint16_t *)  (((char *)(wsgi_req))+ur->subject_len);
+
+        struct uwsgi_buffer *ub = uwsgi_routing_translate(wsgi_req, ur, *subject, *subject_len, ur->data, ur->data_len);
+        if (!ub) return UWSGI_ROUTE_BREAK;
+        char *ptr = uwsgi_req_append(wsgi_req, "REMOTE_ADDR", 11, ub->buf, ub->pos);
+        if (!ptr) {
+                uwsgi_buffer_destroy(ub);
+                return UWSGI_ROUTE_BREAK;
+        }
+        wsgi_req->remote_addr = ptr;
+        wsgi_req->remote_addr_len = ub->pos;
+        uwsgi_buffer_destroy(ub);
+        return UWSGI_ROUTE_NEXT;
+}
+static int uwsgi_router_setremoteaddr(struct uwsgi_route *ur, char *arg) {
+        ur->func = uwsgi_router_setremoteaddr_func;
+        ur->data = arg;
+        ur->data_len = strlen(arg);
+        return 0;
+}
+
+
 // setdocroot route
 static int uwsgi_router_setdocroot_func(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
         char **subject = (char **) (((char *)(wsgi_req))+ur->subject);
@@ -1156,6 +1215,26 @@ static int uwsgi_router_setscheme(struct uwsgi_route *ur, char *arg) {
         ur->func = uwsgi_router_setscheme_func;
         ur->data = arg;
         ur->data_len = strlen(arg);
+        return 0;
+}
+
+// setmodifiers
+static int uwsgi_router_setmodifier1_func(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
+	wsgi_req->uh->modifier1 = ur->custom;
+	return UWSGI_ROUTE_NEXT;
+}
+static int uwsgi_router_setmodifier1(struct uwsgi_route *ur, char *arg) {
+        ur->func = uwsgi_router_setmodifier1_func;
+	ur->custom = atoi(arg);
+        return 0;
+}
+static int uwsgi_router_setmodifier2_func(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
+	wsgi_req->uh->modifier2 = ur->custom;
+	return UWSGI_ROUTE_NEXT;
+}
+static int uwsgi_router_setmodifier2(struct uwsgi_route *ur, char *arg) {
+        ur->func = uwsgi_router_setmodifier2_func;
+	ur->custom = atoi(arg);
         return 0;
 }
 
@@ -1684,7 +1763,7 @@ static char *uwsgi_route_var_mime(struct wsgi_request *wsgi_req, char *key, uint
         char *var_value = uwsgi_get_var(wsgi_req, key, keylen, &var_vallen);
         if (var_value) {
 		size_t mime_type_len = 0;
-		char *ret = uwsgi_get_mime_type(key, keylen, &mime_type_len);
+		ret = uwsgi_get_mime_type(var_value, var_vallen, &mime_type_len);
 		if (ret) *vallen = mime_type_len;
         }
         return ret;
@@ -1741,6 +1820,8 @@ void uwsgi_register_embedded_routers() {
 	uwsgi_register_router("continue", uwsgi_router_continue);
         uwsgi_register_router("last", uwsgi_router_continue);
         uwsgi_register_router("break", uwsgi_router_break);
+	uwsgi_register_router("return", uwsgi_router_return);
+	uwsgi_register_router("break-with-status", uwsgi_router_return);
         uwsgi_register_router("log", uwsgi_router_log);
         uwsgi_register_router("donotlog", uwsgi_router_donotlog);
         uwsgi_register_router("logvar", uwsgi_router_logvar);
@@ -1763,11 +1844,15 @@ void uwsgi_register_embedded_routers() {
         uwsgi_register_router("setscriptname", uwsgi_router_setscriptname);
         uwsgi_register_router("setmethod", uwsgi_router_setmethod);
         uwsgi_register_router("seturi", uwsgi_router_seturi);
+        uwsgi_register_router("setremoteaddr", uwsgi_router_setremoteaddr);
         uwsgi_register_router("setpathinfo", uwsgi_router_setpathinfo);
         uwsgi_register_router("setdocroot", uwsgi_router_setdocroot);
         uwsgi_register_router("setscheme", uwsgi_router_setscheme);
         uwsgi_register_router("setprocname", uwsgi_router_setprocname);
         uwsgi_register_router("alarm", uwsgi_router_alarm);
+
+        uwsgi_register_router("setmodifier1", uwsgi_router_setmodifier1);
+        uwsgi_register_router("setmodifier2", uwsgi_router_setmodifier2);
 
         uwsgi_register_router("+", uwsgi_router_simple_math_plus);
         uwsgi_register_router("-", uwsgi_router_simple_math_minus);

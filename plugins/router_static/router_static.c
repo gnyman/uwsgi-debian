@@ -18,6 +18,8 @@ struct uwsgi_router_file_conf {
 	char *mime;
 
 	char *no_cl;
+
+	char *no_headers;
 };
 
 int uwsgi_routing_func_static(struct wsgi_request *wsgi_req, struct uwsgi_route *ur) {
@@ -38,6 +40,7 @@ int uwsgi_routing_func_file(struct wsgi_request *wsgi_req, struct uwsgi_route *u
 	char buf[32768];
 	struct stat st;
 	int ret = UWSGI_ROUTE_BREAK;
+	size_t remains = 0;
 
 	struct uwsgi_router_file_conf *urfc = (struct uwsgi_router_file_conf *) ur->data2;
 
@@ -61,6 +64,11 @@ int uwsgi_routing_func_file(struct wsgi_request *wsgi_req, struct uwsgi_route *u
 	struct uwsgi_buffer *ub_s = uwsgi_routing_translate(wsgi_req, ur, *subject, *subject_len, urfc->status, urfc->status_len);
         if (!ub_s) goto end2;
 
+	// static file - don't update avg_rt after request
+	wsgi_req->do_not_account_avg_rt = 1;
+
+	if (urfc->no_headers) goto send;
+
 	if (uwsgi_response_prepare_headers(wsgi_req, ub_s->buf, ub_s->pos)) {
 		uwsgi_buffer_destroy(ub_s);
 		goto end2;
@@ -82,8 +90,10 @@ int uwsgi_routing_func_file(struct wsgi_request *wsgi_req, struct uwsgi_route *u
 	else {
 		if (uwsgi_response_add_content_type(wsgi_req, urfc->content_type, urfc->content_type_len)) goto end2;
 	}
+
+send:
 	
-	size_t remains = st.st_size;
+	remains = st.st_size;
 	while(remains) {
 		ssize_t rlen = read(fd, buf, UMIN(32768, remains));
 		if (rlen <= 0) goto end2;
@@ -125,6 +135,11 @@ int uwsgi_routing_func_sendfile(struct wsgi_request *wsgi_req, struct uwsgi_rout
         struct uwsgi_buffer *ub_s = uwsgi_routing_translate(wsgi_req, ur, *subject, *subject_len, urfc->status, urfc->status_len);
         if (!ub_s) goto end2;
 
+        // static file - don't update avg_rt after request
+        wsgi_req->do_not_account_avg_rt = 1;
+
+	if (urfc->no_headers) goto send;
+
         if (uwsgi_response_prepare_headers(wsgi_req, ub_s->buf, ub_s->pos)) {
                 uwsgi_buffer_destroy(ub_s);
                 goto end2;
@@ -144,6 +159,8 @@ int uwsgi_routing_func_sendfile(struct wsgi_request *wsgi_req, struct uwsgi_rout
         else {
                 if (uwsgi_response_add_content_type(wsgi_req, urfc->content_type, urfc->content_type_len)) goto end2;
         }
+
+send:
 
 	if (!wsgi_req->headers_sent) {
                 if (uwsgi_response_write_headers_do(wsgi_req)) goto end2;
@@ -188,6 +205,11 @@ int uwsgi_routing_func_fastfile(struct wsgi_request *wsgi_req, struct uwsgi_rout
         struct uwsgi_buffer *ub_s = uwsgi_routing_translate(wsgi_req, ur, *subject, *subject_len, urfc->status, urfc->status_len);
         if (!ub_s) goto end2;
 
+        // static file - don't update avg_rt after request
+        wsgi_req->do_not_account_avg_rt = 1;
+
+	if (urfc->no_headers) goto send;
+
         if (uwsgi_response_prepare_headers(wsgi_req, ub_s->buf, ub_s->pos)) {
                 uwsgi_buffer_destroy(ub_s);
                 goto end2;
@@ -207,6 +229,8 @@ int uwsgi_routing_func_fastfile(struct wsgi_request *wsgi_req, struct uwsgi_rout
         else {
                 if (uwsgi_response_add_content_type(wsgi_req, urfc->content_type, urfc->content_type_len)) goto end2;
         }
+
+send:
 
 	if (!wsgi_req->headers_sent) {
                 if (uwsgi_response_write_headers_do(wsgi_req)) goto end2;
@@ -256,6 +280,7 @@ static int uwsgi_router_file(struct uwsgi_route *ur, char *args) {
                         "no_cl", &urfc->no_cl,
                         "no_content_length", &urfc->no_cl,
                         "mime", &urfc->mime,
+                        "no_headers", &urfc->no_headers,
                         NULL)) {
                         uwsgi_log("invalid file route syntax: %s\n", args);
 			return -1;

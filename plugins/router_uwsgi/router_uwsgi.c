@@ -35,7 +35,13 @@ static int uwsgi_routing_func_uwsgi_remote(struct wsgi_request *wsgi_req, struct
 
 	struct uwsgi_header *uh = (struct uwsgi_header *) ur->data;
 	char *addr = ur->data + sizeof(struct uwsgi_header);
-	
+
+	char **subject = (char **) (((char *)(wsgi_req))+ur->subject);
+        uint16_t *subject_len = (uint16_t *)  (((char *)(wsgi_req))+ur->subject_len);
+
+        struct uwsgi_buffer *ub_addr = uwsgi_routing_translate(wsgi_req, ur, *subject, *subject_len, addr, strlen(addr));
+        if (!ub_addr) return UWSGI_ROUTE_BREAK;
+
 	// mark a route request
         wsgi_req->via = UWSGI_VIA_ROUTE;
 
@@ -54,6 +60,7 @@ static int uwsgi_routing_func_uwsgi_remote(struct wsgi_request *wsgi_req, struct
                 if (uwsgi_buffer_append(ub, wsgi_req->proto_parser_remains_buf, wsgi_req->proto_parser_remains)) {
 			goto end;
                 }
+		wsgi_req->post_pos += wsgi_req->proto_parser_remains;
                 wsgi_req->proto_parser_remains = 0;
         }
 
@@ -65,18 +72,20 @@ static int uwsgi_routing_func_uwsgi_remote(struct wsgi_request *wsgi_req, struct
 				goto end;
 			}
 		}
-                if (!uwsgi_offload_request_net_do(wsgi_req, addr, ub)) {
+                if (!uwsgi_offload_request_net_do(wsgi_req, ub_addr->buf, ub)) {
                        	wsgi_req->via = UWSGI_VIA_OFFLOAD;
 			wsgi_req->status = 202;
+			uwsgi_buffer_destroy(ub_addr);
                        	return UWSGI_ROUTE_BREAK;
 		}
         }
 
-	if (uwsgi_proxy_nb(wsgi_req, addr, ub, remains, uwsgi.socket_timeout)) {
-                uwsgi_log("error routing request to uwsgi server %s\n", addr);
+	if (uwsgi_proxy_nb(wsgi_req, ub_addr->buf, ub, remains, uwsgi.socket_timeout)) {
+                uwsgi_log("error routing request to uwsgi server %s\n", ub_addr->buf);
         }
 end:
 	uwsgi_buffer_destroy(ub);
+	uwsgi_buffer_destroy(ub_addr);
 	return UWSGI_ROUTE_BREAK;
 
 }

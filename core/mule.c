@@ -43,7 +43,7 @@ void uwsgi_mule(int id) {
 #endif
 
 		signal(SIGALRM, SIG_IGN);
-                signal(SIGHUP, SIG_IGN);
+                signal(SIGHUP, end_me);
                 signal(SIGINT, end_me);
                 signal(SIGTERM, end_me);
                 signal(SIGUSR1, SIG_IGN);
@@ -329,11 +329,13 @@ next:
 		}
 	}
 
-	int ret = poll(mulepoll, count + farms_count, timeout);
-	if (ret <= 0) {
-		uwsgi_error("poll");
+	int ret = -1;
+retry:
+	ret = poll(mulepoll, count + farms_count, timeout);
+	if (ret < 0) {
+		uwsgi_error("uwsgi_mule_get_msg()/poll()");
 	}
-	else {
+	else if (ret > 0 ) {
 		if (mulepoll[0].revents & POLLIN) {
 			len = read(uwsgi.mules[uwsgi.muleid - 1].queue_pipe[1], message, buffer_size);
 		}
@@ -353,7 +355,7 @@ next:
 				if (interesting_fd > -1) {
 					len = read(interesting_fd, &uwsgi_signal, 1);
 					if (len <= 0) {
-						if (len < 0 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)) goto clear;
+						if (uwsgi_is_again()) goto retry;
 						uwsgi_log_verbose("uWSGI mule %d braying: my master died, i will follow him...\n", uwsgi.muleid);
 						end_me(0);
 					}
@@ -380,6 +382,7 @@ next:
 	}
 
 	if (len < 0) {
+		if (uwsgi_is_again()) goto retry;
 		uwsgi_error("read()");
 		goto clear;
 	}

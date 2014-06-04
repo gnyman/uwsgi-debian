@@ -321,6 +321,7 @@ struct uwsgi_metric *uwsgi_register_keyval_metric(char *arg) {
 	char *m_initial_value = NULL;
 	char *m_children = NULL;
 	char *m_alias = NULL;
+	char *m_reset_after_push = NULL;
 
 	if (!strchr(arg, '=')) {
 		m_name = uwsgi_str(arg);
@@ -340,6 +341,7 @@ struct uwsgi_metric *uwsgi_register_keyval_metric(char *arg) {
 		"arg3n", &m_arg3n,
 		"children", &m_children,
 		"alias", &m_alias,
+		"reset_after_push", &m_reset_after_push,
 		NULL)) {
 		uwsgi_log("invalid metric keyval syntax: %s\n", arg);
 		exit(1);
@@ -380,6 +382,10 @@ struct uwsgi_metric *uwsgi_register_keyval_metric(char *arg) {
 
 	struct uwsgi_metric* um =  uwsgi_register_metric(m_name, m_oid, type, collector, NULL, freq, NULL);
 	um->initial_value = initial_value;
+
+	if (m_reset_after_push){
+		um->reset_after_push = 1;
+	}
 
 	if (m_children) {
 		char *p, *ctx = NULL;
@@ -427,6 +433,7 @@ struct uwsgi_metric *uwsgi_register_keyval_metric(char *arg) {
 	if (m_initial_value) free(m_initial_value);
 	if (m_children) free(m_children);
 	if (m_alias) free(m_alias);
+	if (m_reset_after_push) free(m_reset_after_push);
 	return um;
 }
 
@@ -613,7 +620,7 @@ struct uwsgi_metric *uwsgi_metric_find_by_asn(char *asn, size_t len) {
         }\
         if (!um) return -1;\
 	if (um->collector || um->type == UWSGI_METRIC_ALIAS) return -1;\
-	uwsgi_rlock(uwsgi.metrics_lock)
+	uwsgi_wlock(uwsgi.metrics_lock)
 
 int uwsgi_metric_set(char *name, char *oid, int64_t value) {
 	um_op;
@@ -694,6 +701,22 @@ int64_t uwsgi_metric_getn(char *name, size_t nlen, char *oid, size_t olen) {
         return ret;
 }
 
+int uwsgi_metric_set_max(char *name, char *oid, int64_t value) {
+	um_op;
+    if (value > *um->value)
+        *um->value = value;
+	uwsgi_rwunlock(uwsgi.metrics_lock);
+	return 0;
+}
+
+int uwsgi_metric_set_min(char *name, char *oid, int64_t value) {
+	um_op;
+    if ((value > um->initial_value || 0) && value < *um->value)
+        *um->value = value;
+	uwsgi_rwunlock(uwsgi.metrics_lock);
+	return 0;
+}
+
 #define uwsgi_metric_name(f, n) ret = snprintf(buf, 4096, f, n); if (ret <= 1 || ret >= 4096) { uwsgi_log("unable to register metric name %s\n", f); exit(1);}
 #define uwsgi_metric_name2(f, n, n2) ret = snprintf(buf, 4096, f, n, n2); if (ret <= 1 || ret >= 4096) { uwsgi_log("unable to register metric name %s\n", f); exit(1);}
 
@@ -768,8 +791,10 @@ void uwsgi_setup_metrics() {
                 struct uwsgi_metric *vsz = uwsgi_register_metric(buf, buf2, UWSGI_METRIC_GAUGE, "ptr", &uwsgi.workers[i].vsz_size, 0, NULL);
                 if (i > 0) uwsgi_metric_add_child(total_vsz, vsz);
 
-		// skip core metrics for core 0
+		// skip core metrics for worker 0
 		if (i == 0) continue;
+
+		if (uwsgi.metrics_no_cores) continue;
 
 		int j;
 		for(j=0;j<uwsgi.cores;j++) {

@@ -1733,13 +1733,6 @@ void uwsgi_bind_sockets() {
 		uwsgi_sock = uwsgi_sock->next;
 	}
 
-
-	if (uwsgi.chown_socket) {
-		if (!uwsgi.master_as_root) {
-			uwsgi_as_root();
-		}
-	}
-
 	int zero_used = 0;
 	uwsgi_sock = uwsgi.sockets;
 	while (uwsgi_sock) {
@@ -1760,6 +1753,24 @@ void uwsgi_bind_sockets() {
 				uwsgi_sock->fd = 0;
 				uwsgi_sock->bound = 1;
 				uwsgi_log("uwsgi socket %d inherited UNIX address %s fd 0\n", uwsgi_get_socket_num(uwsgi_sock), uwsgi_sock->name);
+				if (!uwsgi.is_a_reload) {
+					if (uwsgi.chown_socket) {
+                                        	uwsgi_chown(uwsgi_sock->name, uwsgi.chown_socket);
+                                	}
+					if (uwsgi.chmod_socket) {
+                				if (uwsgi.chmod_socket_value) {
+                        				if (chmod(uwsgi_sock->name, uwsgi.chmod_socket_value) != 0) {
+                                				uwsgi_error("inherit fd0: chmod()");
+                        				}
+                				}
+                				else {
+                        				uwsgi_log("chmod() fd0 socket to 666 for lazy and brave users\n");
+                        				if (chmod(uwsgi_sock->name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) != 0) {
+                                				uwsgi_error("inherit fd0: chmod()");
+                        				}
+						}
+                			}
+				}
 			}
 			else {
 				uwsgi_sock = uwsgi_new_socket(uwsgi_getsockname(0));
@@ -1793,6 +1804,13 @@ void uwsgi_bind_sockets() {
 	}
 
 stdin_done:
+
+	if (uwsgi.chown_socket) {
+		if (!uwsgi.master_as_root) {
+			uwsgi_as_root();
+		}
+	}
+
 
 	// check for auto_port socket
 	uwsgi_sock = uwsgi.sockets;

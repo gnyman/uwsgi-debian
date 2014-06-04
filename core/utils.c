@@ -1051,10 +1051,11 @@ void uwsgi_close_request(struct wsgi_request *wsgi_req) {
 	uint64_t end_of_request = uwsgi_micros();
 	wsgi_req->end_of_request = end_of_request;
 
-	tmp_rt = wsgi_req->end_of_request - wsgi_req->start_of_request;
-
-	uwsgi.workers[uwsgi.mywid].running_time += tmp_rt;
-	uwsgi.workers[uwsgi.mywid].avg_response_time = (uwsgi.workers[uwsgi.mywid].avg_response_time + tmp_rt) / 2;
+	if (!wsgi_req->do_not_account_avg_rt) {
+		tmp_rt = wsgi_req->end_of_request - wsgi_req->start_of_request;
+		uwsgi.workers[uwsgi.mywid].running_time += tmp_rt;
+		uwsgi.workers[uwsgi.mywid].avg_response_time = (uwsgi.workers[uwsgi.mywid].avg_response_time + tmp_rt) / 2;
+	}
 
 	// get memory usage
 	if (uwsgi.logging_options.memory_report == 1 || uwsgi.force_get_memusage) {
@@ -3155,6 +3156,10 @@ void escape_json(char *src, size_t len, char *dst) {
 			*ptr++ = '\\';
 			*ptr++ = '"';
 		}
+		else if (src[i] == '\\') {
+			*ptr++ = '\\';
+			*ptr++ = '\\';
+		}
 		else {
 			*ptr++ = src[i];
 		}
@@ -3752,7 +3757,7 @@ static void *uwsgi_thread_run(void *arg) {
 	return NULL;
 }
 
-struct uwsgi_thread *uwsgi_thread_new(void (*func) (struct uwsgi_thread *)) {
+struct uwsgi_thread *uwsgi_thread_new_with_data(void (*func) (struct uwsgi_thread *), void *data) {
 
 	struct uwsgi_thread *ut = uwsgi_calloc(sizeof(struct uwsgi_thread));
 
@@ -3769,6 +3774,7 @@ struct uwsgi_thread *uwsgi_thread_new(void (*func) (struct uwsgi_thread *)) {
 	uwsgi_socket_nb(ut->pipe[1]);
 
 	ut->func = func;
+	ut->data = data;
 
 	pthread_attr_init(&ut->tattr);
 	pthread_attr_setdetachstate(&ut->tattr, PTHREAD_CREATE_DETACHED);
@@ -3786,6 +3792,10 @@ error:
 	close(ut->pipe[1]);
 	free(ut);
 	return NULL;
+}
+
+struct uwsgi_thread *uwsgi_thread_new(void (*func) (struct uwsgi_thread *)) {
+	return uwsgi_thread_new_with_data(func, NULL);
 }
 
 int uwsgi_kvlist_parse(char *src, size_t len, char list_separator, char kv_separator, ...) {
