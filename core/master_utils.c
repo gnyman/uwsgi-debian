@@ -24,6 +24,15 @@ void uwsgi_curse(int wid, int sig) {
 	}
 }
 
+void uwsgi_curse_mule(int mid, int sig) {
+	uwsgi.mules[mid].cursed_at = uwsgi_now();
+	uwsgi.mules[mid].no_mercy_at = uwsgi.mules[mid].cursed_at + uwsgi.mule_reload_mercy;
+
+	if (sig) {
+		(void) kill(uwsgi.mules[mid].pid, sig);
+	}
+}
+
 static void uwsgi_signal_spoolers(int signum) {
 
         struct uwsgi_spooler *uspool = uwsgi.spoolers;
@@ -50,15 +59,6 @@ void uwsgi_destroy_processes() {
                         kill(ushared->gateways[i].pid, SIGKILL);
 			waitpid(ushared->gateways[i].pid, &waitpid_status, 0);
 			uwsgi_log("gateway \"%s %d\" has been buried (pid: %d)\n", ushared->gateways[i].name, ushared->gateways[i].num, (int) ushared->gateways[i].pid);
-		}
-        }
-
-	// TODO mules can be programmed to be gracefully reloaded
-        for (i = 0; i < uwsgi.mules_cnt; i++) {
-                if (uwsgi.mules[i].pid > 0) {
-                        kill(uwsgi.mules[i].pid, SIGKILL);
-			waitpid(uwsgi.mules[i].pid, &waitpid_status, 0);
-			uwsgi_log("mule %d has been buried (pid: %d)\n", i, (int) uwsgi.mules[i].pid);
 		}
         }
 
@@ -796,7 +796,7 @@ struct uwsgi_stats *uwsgi_master_generate_stats() {
 
 			// allocate 2x the size of original command
 			// in case we need to escape all chars
-			char *cmd = uwsgi_malloc(strlen(ud->command)*2);
+			char *cmd = uwsgi_malloc((strlen(ud->command)*2)+1);
 			escape_json(ud->command, strlen(ud->command), cmd);
 			if (uwsgi_stats_keyval_comma(us, "cmd", cmd)) {
 				free(cmd);
@@ -913,7 +913,7 @@ struct uwsgi_stats *uwsgi_master_generate_stats() {
 		goto end;
 	}
 
-	if (uwsgi.has_metrics) {
+	if (uwsgi.has_metrics && !uwsgi.stats_no_metrics) {
 		if (uwsgi_stats_key(us, "metrics"))
                 	goto end;
 
@@ -1145,6 +1145,8 @@ struct uwsgi_stats *uwsgi_master_generate_stats() {
 		if (uwsgi_stats_list_close(us))
 			goto end;
 
+		if (uwsgi.stats_no_cores) goto nocores;
+
 		if (uwsgi_stats_comma(us))
 			goto end;
 
@@ -1206,8 +1208,11 @@ struct uwsgi_stats *uwsgi_master_generate_stats() {
 		if (uwsgi_stats_list_close(us))
 			goto end;
 
+nocores:
+
 		if (uwsgi_stats_object_close(us))
 			goto end;
+
 
 		if (i < uwsgi.numproc - 1) {
 			if (uwsgi_stats_comma(us))
@@ -1284,7 +1289,7 @@ struct uwsgi_stats *uwsgi_master_generate_stats() {
 			if (uwsgi_stats_keyslong_comma(us, "week", (long long) ucron->week))
 				goto end;
 
-			char *cmd = uwsgi_malloc(strlen(ucron->command)*2);
+			char *cmd = uwsgi_malloc((strlen(ucron->command)*2)+1);
 			escape_json(ucron->command, strlen(ucron->command), cmd);
 			if (uwsgi_stats_keyval_comma(us, "command", cmd)) {
 				free(cmd);

@@ -3,9 +3,9 @@
 extern struct uwsgi_server uwsgi;
 
 struct http_status_codes {
-        const char key[3];
-        const char *message;
-        int message_size;
+        const char      key[3];
+        const char      *message;
+        int             message_size;
 };
 
 /* statistically ordered */
@@ -73,7 +73,7 @@ void uwsgi_init_default() {
 
 	uwsgi.stats_pusher_default_freq = 3;
 
-	uwsgi.original_log_fd = -1;
+	uwsgi.original_log_fd = 2;
 
 	uwsgi.emperor_fd_config = -1;
 	uwsgi.emperor_fd_proxy = -1;
@@ -113,6 +113,7 @@ void uwsgi_init_default() {
 	uwsgi.log_master_bufsize = 8192;
 
 	uwsgi.worker_reload_mercy = 60;
+	uwsgi.mule_reload_mercy = 60;
 
 	uwsgi.max_vars = MAX_VARS;
 	uwsgi.vec_size = 4 + 1 + (4 * MAX_VARS);

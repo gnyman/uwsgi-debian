@@ -301,19 +301,27 @@ void logto(char *logfile) {
 	}
 
 
-	/* stdout */
-	if (fd != 1) {
-		if (dup2(fd, 1) < 0) {
+	// if the log-master is already active, just re-set the original_log_fd
+	if (uwsgi.shared->worker_log_pipe[0] == -1) {
+		/* stdout */
+		if (fd != 1) {
+			if (dup2(fd, 1) < 0) {
+				uwsgi_error("dup2()");
+				exit(1);
+			}
+			close(fd);
+		}
+
+		/* stderr */
+		if (dup2(1, 2) < 0) {
 			uwsgi_error("dup2()");
 			exit(1);
 		}
-		close(fd);
-	}
 
-	/* stderr */
-	if (dup2(1, 2) < 0) {
-		uwsgi_error("dup2()");
-		exit(1);
+		 uwsgi.original_log_fd = 2;
+	}
+	else {
+		uwsgi.original_log_fd = fd;
 	}
 }
 
@@ -477,13 +485,19 @@ void uwsgi_check_logrotate(void) {
 
 	int need_rotation = 0;
 	int need_reopen = 0;
+	off_t logsize;
 
 	if (uwsgi.log_master) {
-		uwsgi.shared->logsize = lseek(uwsgi.original_log_fd, 0, SEEK_CUR);
+		logsize = lseek(uwsgi.original_log_fd, 0, SEEK_CUR);
 	}
 	else {
-		uwsgi.shared->logsize = lseek(2, 0, SEEK_CUR);
+		logsize = lseek(2, 0, SEEK_CUR);
 	}
+	if (logsize < 0) {
+		uwsgi_error("uwsgi_check_logrotate()/lseek()");
+		return;
+	}
+	uwsgi.shared->logsize = logsize;
 
 	if (uwsgi.log_maxsize > 0 && (uint64_t) uwsgi.shared->logsize > uwsgi.log_maxsize) {
 		need_rotation = 1;
@@ -917,7 +931,7 @@ struct uwsgi_logger *uwsgi_get_logger_from_id(char *id) {
 	struct uwsgi_logger *ul = uwsgi.choosen_logger;
 
 	while (ul) {
-		if (!strcmp(ul->id, id)) {
+		if (ul->id && !strcmp(ul->id, id)) {
 			return ul;
 		}
 		ul = ul->next;
@@ -1839,7 +1853,7 @@ static char *uwsgi_log_encoder_json(struct uwsgi_log_encoder *ule, char *msg, si
                         if (!uwsgi_strncmp(usl->value, usl->len, "msg", 3)) {
 				size_t msg_len = len;
                                 if (msg[len-1] == '\n') msg_len--;
-				char *e_json = uwsgi_malloc(msg_len * 2);
+				char *e_json = uwsgi_malloc((msg_len * 2)+1);
 				escape_json(msg, msg_len, e_json);
 				if (uwsgi_buffer_append(ub, e_json, strlen(e_json))){
                                 	free(e_json);
@@ -1848,7 +1862,7 @@ static char *uwsgi_log_encoder_json(struct uwsgi_log_encoder *ule, char *msg, si
                                 free(e_json);
                         }
                         else if (!uwsgi_strncmp(usl->value, usl->len, "msgnl", 5)) {
-				char *e_json = uwsgi_malloc(len * 2);
+				char *e_json = uwsgi_malloc((len * 2)+1);
                                 escape_json(msg, len, e_json);
                                 if (uwsgi_buffer_append(ub, e_json, strlen(e_json))){
                                         free(e_json);
@@ -1869,7 +1883,7 @@ static char *uwsgi_log_encoder_json(struct uwsgi_log_encoder *ule, char *msg, si
                                 int strftime_len = strftime(sftime, 64, buf, localtime(&now));
                                 free(buf);
                                 if (strftime_len > 0) {
-					char *e_json = uwsgi_malloc(strftime_len * 2);
+					char *e_json = uwsgi_malloc((strftime_len * 2)+1);
 					escape_json(sftime, strftime_len, e_json);
                                         if (uwsgi_buffer_append(ub, e_json, strlen(e_json))){
 						free(e_json);

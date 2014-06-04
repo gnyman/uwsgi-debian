@@ -135,6 +135,15 @@ void uwsgi_master_check_mercy() {
 			}
 		}
 	}
+
+	for (i = 0; i < uwsgi.mules_cnt; i++) {
+		if (uwsgi.mules[i].pid > 0 && uwsgi.mules[i].cursed_at) {
+			if (uwsgi_now() > uwsgi.mules[i].no_mercy_at) {
+				uwsgi_log_verbose("mule %d (pid: %d) is taking too much time to die...NO MERCY !!!\n", i + 1, uwsgi.mules[i].pid);
+				uwsgi_curse_mule(i, SIGKILL);
+			}
+		}
+	}
 }
 
 
@@ -907,6 +916,7 @@ int master_loop(char **argv, char **environ) {
 			for (i = 0; i < uwsgi.mules_cnt; i++) {
 				if (uwsgi.mules[i].pid == diedpid) {
 					uwsgi_log("mule %d (pid: %d) annihilated\n", i + 1, (int) diedpid);
+					uwsgi.mules[i].pid = 0;
 					goto next;
 				}
 			}
@@ -954,6 +964,11 @@ next:
 
 		if (WIFEXITED(waitpid_status) && WEXITSTATUS(waitpid_status) == UWSGI_FAILED_APP_CODE) {
 			uwsgi_log("OOPS ! failed loading app in worker %d (pid %d) :( trying again...\n", thewid, (int) diedpid);
+			if (uwsgi.lazy_apps && uwsgi.need_app) {
+				uwsgi_log_verbose("need-app requested, destroying the instance...\n");
+				kill_them_all(0);
+				continue;
+			}
 		}
 		else if (WIFEXITED(waitpid_status) && WEXITSTATUS(waitpid_status) == UWSGI_DE_HIJACKED_CODE) {
 			uwsgi_log("...restoring worker %d (pid: %d)...\n", thewid, (int) diedpid);
@@ -968,6 +983,10 @@ next:
 			uwsgi_log("!!! inconsistent state reported by worker %d (pid: %d) !!!\n", thewid, (int) diedpid);
 			reap_them_all(0);
 			continue;
+		}
+		else if (WIFEXITED(waitpid_status) && WEXITSTATUS(waitpid_status) == UWSGI_GO_CHEAP_CODE) {
+			uwsgi_log("worker %d asked for cheap mode (pid: %d)...\n", thewid, (int) diedpid);
+			uwsgi.workers[thewid].cheaped = 1;
 		}
 		else if (uwsgi.workers[thewid].manage_next_request) {
 			if (WIFSIGNALED(waitpid_status)) {

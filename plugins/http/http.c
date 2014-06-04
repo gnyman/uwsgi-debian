@@ -60,42 +60,58 @@ struct uwsgi_option http_options[] = {
 	{"http-buffer-size", required_argument, 0, "set internal buffer size (default: page size)", uwsgi_opt_set_64bit, &uhttp.cr.buffer_size, 0},
 
 	{"http-server-name-as-http-host", required_argument, 0, "force SERVER_NAME to HTTP_HOST", uwsgi_opt_true, &uhttp.server_name_as_http_host, 0},
+	{"http-headers-timeout", required_argument, 0, "set internal http socket timeout for headers", uwsgi_opt_set_int, &uhttp.headers_timeout, 0},
+	{"http-connect-timeout", required_argument, 0, "set internal http socket timeout for backend connections", uwsgi_opt_set_int, &uhttp.connect_timeout, 0},
+
+	{"http-manage-source", no_argument, 0, "manage the SOURCE HTTP method placing the session in raw mode", uwsgi_opt_true, &uhttp.manage_source, 0},
+	{"http-enable-proxy-protocol", optional_argument, 0, "manage PROXY protocol requests", uwsgi_opt_true, &uhttp.enable_proxy_protocol, 0},
 	{0, 0, 0, 0, 0, 0, 0},
 };
 
-int http_add_uwsgi_header(struct corerouter_peer *peer, char *hh, uint16_t hhlen) {
+static void http_set_timeout(struct corerouter_peer *peer, int timeout) {
+	if (peer->current_timeout == timeout) return;
+	peer->current_timeout = timeout;
+	peer->timeout = corerouter_reset_timeout(peer->session->corerouter, peer);
+}
+
+static char * http_header_to_cgi(char *hh, size_t hhlen, size_t *keylen, size_t *vallen, int *has_prefix) {
+	size_t i;
+	char *val = hh;
+	int status = 0;
+	for (i = 0; i < hhlen; i++) {
+                if (!status) {
+                        hh[i] = toupper((int) hh[i]);
+                        if (hh[i] == '-')
+                                hh[i] = '_';
+                        if (hh[i] == ':') {
+                                status = 1;
+                                *keylen = i;
+                        }
+                }
+                else if (status == 1 && hh[i] != ' ') {
+                        status = 2;
+                        val += i;
+                        *vallen+=1;
+                }
+                else if (status == 2) {
+                        *vallen+=1;
+                }
+        }
+
+	if (!(*keylen))
+                return NULL;
+
+	if (uwsgi_strncmp("CONTENT_LENGTH", 14, hh, *keylen) && uwsgi_strncmp("CONTENT_TYPE", 12, hh, *keylen)) {
+		*has_prefix = 0x02;
+        }
+
+	return val;
+}
+
+static int http_add_uwsgi_header(struct corerouter_peer *peer, char *hh, size_t keylen, char *val, size_t vallen, int prefix) {
 
 	struct uwsgi_buffer *out = peer->out;
 	struct http_session *hr = (struct http_session *) peer->session;
-
-	int i;
-	int status = 0;
-	char *val = hh;
-	uint16_t keylen = 0, vallen = 0;
-	int prefix = 0;
-
-	for (i = 0; i < hhlen; i++) {
-		if (!status) {
-			hh[i] = toupper((int) hh[i]);
-			if (hh[i] == '-')
-				hh[i] = '_';
-			if (hh[i] == ':') {
-				status = 1;
-				keylen = i;
-			}
-		}
-		else if (status == 1 && hh[i] != ' ') {
-			status = 2;
-			val += i;
-			vallen++;
-		}
-		else if (status == 2) {
-			vallen++;
-		}
-	}
-
-	if (!keylen)
-		return -1;
 
 	if (hr->websockets) {
 		if (!uwsgi_strncmp("UPGRADE", 7, hh, keylen)) {
@@ -137,9 +153,13 @@ int http_add_uwsgi_header(struct corerouter_peer *peer, char *hh, uint16_t hhlen
 	}
 
 	else if (!uwsgi_strncmp("CONNECTION", 10, hh, keylen)) {
-		if (!uwsgi_strnicmp(val, vallen, "close", 5)) {
+		if (!uwsgi_strnicmp(val, vallen, "close", 5) || !uwsgi_strnicmp(val, vallen, "upgrade", 7)) {
 			hr->session.can_keepalive = 0;
 		}
+	}
+	else if (peer->key == uwsgi.hostname && hr->raw_body && !uwsgi_strncmp("ICE_URL", 7, hh, keylen)) {
+		peer->key = val;
+		peer->key_len = vallen;
 	}
 
 #ifdef UWSGI_ZLIB
@@ -151,11 +171,7 @@ int http_add_uwsgi_header(struct corerouter_peer *peer, char *hh, uint16_t hhlen
 #endif
 
 done:
-
-	if (uwsgi_strncmp("CONTENT_TYPE", 12, hh, keylen) && uwsgi_strncmp("CONTENT_LENGTH", 14, hh, keylen)) {
-		keylen += 5;
-		prefix = 1;
-	}
+	if (prefix) keylen += 5;
 
 	if (uwsgi_buffer_u16le(out, keylen)) return -1;
 
@@ -163,7 +179,7 @@ done:
 		if (uwsgi_buffer_append(out, "HTTP_", 5)) return -1;
 	}
 
-	if (uwsgi_buffer_append(out, hh, keylen - (prefix * 5))) return -1;
+	if (uwsgi_buffer_append(out, hh, keylen - (prefix ? 5 : 0))) return -1;
 
 	if (uwsgi_buffer_u16le(out, vallen)) return -1;
 	if (uwsgi_buffer_append(out, val, vallen)) return -1;
@@ -180,6 +196,14 @@ int http_headers_parse(struct corerouter_peer *peer) {
 	char *watermark = ptr + hr->headers_size;
 	char *base = ptr;
 	char *query_string = NULL;
+	char *proxy_src = NULL;
+	char *proxy_dst = NULL;
+	char *proxy_src_port = NULL;
+	char *proxy_dst_port = NULL;
+	uint16_t proxy_src_len = 0;
+	uint16_t proxy_dst_len = 0;
+	uint16_t proxy_src_port_len = 0;
+	uint16_t proxy_dst_port_len = 0;
 
 	peer->out = uwsgi_buffer_new(uwsgi.page_size);
 	// force this buffer to be destroyed as soon as possibile
@@ -192,10 +216,19 @@ int http_headers_parse(struct corerouter_peer *peer) {
 	struct uwsgi_buffer *out = peer->out;
 	int found = 0;
 
+        if (uwsgi.enable_proxy_protocol || uhttp.enable_proxy_protocol) {
+		ptr = proxy1_parse(ptr, watermark, &proxy_src, &proxy_src_len, &proxy_dst, &proxy_dst_len, &proxy_src_port, &proxy_src_port_len, &proxy_dst_port, &proxy_dst_port_len);
+		base = ptr;
+        }
+
 	// REQUEST_METHOD 
 	while (ptr < watermark) {
 		if (*ptr == ' ') {
 			if (uwsgi_buffer_append_keyval(out, "REQUEST_METHOD", 14, base, ptr - base)) return -1;
+			// on SOURCE METHOD, force raw body
+			if (uhttp.manage_source && !uwsgi_strncmp(base, ptr - base, "SOURCE", 6)) {
+				hr->raw_body = 1;
+			}
 			ptr++;
 			found = 1;
 			break;
@@ -315,15 +348,26 @@ int http_headers_parse(struct corerouter_peer *peer) {
 	}
 
 #ifdef UWSGI_SSL
-	if (hr_https_add_vars(hr, out)) return -1;
+	if (hr_https_add_vars(hr, peer, out)) return -1;
 #endif
 
 	// REMOTE_ADDR
-	if (uwsgi_buffer_append_keyval(out, "REMOTE_ADDR", 11, peer->session->client_address, strlen(peer->session->client_address))) return -1;
-	if (uwsgi_buffer_append_keyval(out, "REMOTE_PORT", 11, peer->session->client_port, strlen(peer->session->client_port))) return -1;
+        if (proxy_src) {
+		if (uwsgi_buffer_append_keyval(out, "REMOTE_ADDR", 11, proxy_src, proxy_src_len)) return -1;
+		if (proxy_src_port) {
+			if (uwsgi_buffer_append_keyval(out, "REMOTE_PORT", 11, proxy_src_port, proxy_src_port_len)) return -1;
+		}
+	}
+	else
+	{
+		if (uwsgi_buffer_append_keyval(out, "REMOTE_ADDR", 11, peer->session->client_address, strlen(peer->session->client_address))) return -1;
+		if (uwsgi_buffer_append_keyval(out, "REMOTE_PORT", 11, peer->session->client_port, strlen(peer->session->client_port))) return -1;
+	}
 
 	//HEADERS
 	base = ptr;
+
+	struct uwsgi_string_list *headers = NULL, *usl = NULL;
 
 	while (ptr < watermark) {
 		if (*ptr == '\r') {
@@ -345,12 +389,52 @@ int http_headers_parse(struct corerouter_peer *peer) {
 					hr->send_expect_100 = 1;
 				}
 			}
-			if (http_add_uwsgi_header(peer, base, ptr - base)) return -1;
+
+			size_t key_len = 0, value_len = 0;
+			int has_prefix = 0;
+			// last line, do not waste time
+			if (ptr - base == 0) break;
+			char *value = http_header_to_cgi(base, ptr - base, &key_len, &value_len, &has_prefix);
+			if (!value) goto clear;
+			usl = uwsgi_string_list_has_item(headers, base, key_len);
+			// there is already a HTTP header with the same name, let's merge them
+			if (usl) {	
+				char *old_value = usl->custom_ptr;
+				usl->custom_ptr = uwsgi_concat3n(old_value, (size_t) usl->custom, ", ", 2, value, value_len);
+				usl->custom += 2 + value_len;
+				if (usl->custom2 & 0x01) free(old_value);
+				usl->custom2 |= 0x01;
+			}
+			else {
+			// add an entry
+				usl = uwsgi_string_new_list(&headers, NULL);
+				usl->value = base;
+				usl->len = key_len;
+				usl->custom_ptr = value;
+				usl->custom = value_len;
+				usl->custom2 = has_prefix;
+			}	
 			ptr++;
 			base = ptr + 1;
 		}
 		ptr++;
 	}
+
+	usl = headers;
+	int broken = 0;
+	while(usl) {
+		if (!broken) {
+			if (http_add_uwsgi_header(peer, usl->value, usl->len, usl->custom_ptr, (size_t) usl->custom, usl->custom2 & 0x02)) broken = 1;
+		}
+		if (usl->custom2 & 0x01) {
+			free(usl->custom_ptr);
+		}
+		struct uwsgi_string_list *tmp_usl = usl;
+		usl = usl->next;
+		free(tmp_usl);
+	}	
+
+	if (broken) return -1;
 
 	struct uwsgi_string_list *hv = uhttp.http_vars;
 	while (hv) {
@@ -362,6 +446,18 @@ int http_headers_parse(struct corerouter_peer *peer) {
 	}
 
 	return 0;
+
+clear:
+	usl = headers;
+        while(usl) {
+		if (usl->custom2 & 0x01) {
+			free(usl->custom_ptr);
+		}
+		struct uwsgi_string_list *tmp_usl = usl;
+                usl = usl->next;
+                free(tmp_usl);
+	}
+	return -1;
 
 }
 
@@ -446,6 +542,7 @@ ssize_t hr_write(struct corerouter_peer *main_peer) {
 			return 0;
 		}
 		if (main_peer->session->connect_peer_after_write) {
+			http_set_timeout(main_peer->session->connect_peer_after_write, uhttp.connect_timeout);
 			cr_connect(main_peer->session->connect_peer_after_write, hr_instance_connected);
 			main_peer->session->connect_peer_after_write = NULL;
 			return len;
@@ -459,6 +556,9 @@ ssize_t hr_write(struct corerouter_peer *main_peer) {
 ssize_t hr_instance_connected(struct corerouter_peer* peer) {
 
 	cr_peer_connected(peer, "hr_instance_connected()");
+	
+	// set the default timeout
+	http_set_timeout(peer, uhttp.cr.socket_timeout);
 
 	// we are connected, we cannot retry anymore
         peer->can_retry = 0;
@@ -523,10 +623,7 @@ ssize_t hr_instance_read(struct corerouter_peer *peer) {
 			hr->has_gzip = 0;
 #endif
 			if (uhttp.keepalive > 1) {
-				int orig_timeout = peer->session->corerouter->socket_timeout;
-				peer->session->corerouter->socket_timeout = uhttp.keepalive;
-				peer->session->main_peer->timeout = corerouter_reset_timeout(peer->session->corerouter, peer->session->main_peer);
-				peer->session->corerouter->socket_timeout = orig_timeout;
+				http_set_timeout(peer->session->main_peer, uhttp.keepalive);
 			}
 		}
 #ifdef UWSGI_ZLIB
@@ -655,6 +752,9 @@ ssize_t http_parse(struct corerouter_peer *main_peer) {
 		return 1;
 	}
 
+	// ensure the headers timeout is honoured
+	http_set_timeout(main_peer, uhttp.headers_timeout);
+
 	// read until \r\n\r\n is found
 	size_t j;
 	size_t len = main_peer->in->pos;
@@ -729,6 +829,13 @@ ssize_t http_parse(struct corerouter_peer *main_peer) {
 				if (uwsgi_buffer_append(new_peer->out, main_peer->in->buf + hr->headers_size + 1, hr->remains)) return -1;
 			}
 
+			if (hr->websockets > 2 && hr->websocket_key_len > 0) {
+				hr->raw_body = 1;
+			}
+
+			// on raw body, ensure keepalive is disabled
+			if (hr->raw_body) hr->session.can_keepalive = 0;
+
 			if (hr->session.can_keepalive && hr->content_length == 0) {
 				main_peer->disabled = 1;
 				// stop reading from the client
@@ -740,10 +847,12 @@ ssize_t http_parse(struct corerouter_peer *main_peer) {
 				break;
         		}
 
-			if (hr->websockets > 2 && hr->websocket_key_len > 0) {
-				hr->raw_body = 1;
-			}
+
 			new_peer->can_retry = 1;
+			// reset main timeout
+			http_set_timeout(main_peer, uhttp.cr.socket_timeout);
+			// set peer timeout
+			http_set_timeout(new_peer, uhttp.connect_timeout);
                 	cr_connect(new_peer, hr_instance_connected);
 			break;
 		}
@@ -830,12 +939,17 @@ static int hr_retry(struct corerouter_peer *peer) {
 
 retry:
         // start async connect (again)
+	http_set_timeout(peer, uhttp.connect_timeout);
         cr_connect(peer, hr_instance_connected);
         return 0;
 }
 
 
 int http_alloc_session(struct uwsgi_corerouter *ucr, struct uwsgi_gateway_socket *ugs, struct corerouter_session *cs, struct sockaddr *sa, socklen_t s_len) {
+
+	if (!uhttp.headers_timeout) uhttp.headers_timeout = uhttp.cr.socket_timeout;
+	if (!uhttp.connect_timeout) uhttp.connect_timeout = uhttp.cr.socket_timeout;
+
 	// set the retry hook
         cs->retry = hr_retry;
 	struct http_session *hr = (struct http_session *) cs;
@@ -844,6 +958,9 @@ int http_alloc_session(struct uwsgi_corerouter *ucr, struct uwsgi_gateway_socket
 	cs->main_peer->modifier2 = uhttp.modifier2;
 	// default hook
 	cs->main_peer->last_hook_read = hr_read;
+
+	// headers timeout
+	cs->main_peer->current_timeout = uhttp.headers_timeout;
 
 	if (uhttp.raw_body) {
 		hr->raw_body = 1;
@@ -906,7 +1023,6 @@ int http_init() {
 		uhttp.cr.socket_num = 0;
 	}
 	uwsgi_corerouter_init((struct uwsgi_corerouter *) &uhttp);
-
 	return 0;
 }
 
