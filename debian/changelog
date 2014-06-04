@@ -1,5 +1,9 @@
-uwsgi (2.0.3+dfsg-1) UNRELEASED; urgency=medium
+uwsgi (2.0.5~dfsg-1) UNRELEASED; urgency=medium
 
+  [ upstream ]
+  * New release.
+
+  [ Jonas Smedegaard ]
   * Repackage upstream tarball to exclude binary example file without
     source.
   * Update copyright file:
