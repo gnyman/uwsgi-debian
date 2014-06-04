@@ -1,4 +1,4 @@
-uwsgi (2.0.5~dfsg-1) UNRELEASED; urgency=medium
+uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
 
   [ upstream ]
   * New release.
