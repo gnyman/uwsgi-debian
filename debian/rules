@@ -145,6 +145,12 @@ plugin_stem = $(strip $(or \
 	$(plugin_is_lang),\
 	$(foreach kind,$(UWSGI_KINDS_$(plugin_has_lang)),\
 		$(patsubst %-$(kind),%,$(filter %-$(kind),$*)))))
+plugin_kind = $(strip $(or \
+	$(if $(plugin_is_lang),\
+		$*),\
+	$(foreach kind,$(UWSGI_KINDS_$(plugin_has_lang)),\
+		$(if $(filter %-$(kind),$*),\
+			$(kind)))))
 
 module_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 module_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
