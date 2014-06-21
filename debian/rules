@@ -114,6 +114,8 @@ files_instantiated_in_debian_dir = $(addprefix \
 
 pkg_name = $(cdbs_curpkg)
 
+module_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
+
 # CDBS-specific variables
 # =======================
 
@@ -632,10 +634,8 @@ $(patsubst %,debian/stamp-libapache2-mod-%,$(UWSGI_MODULES_apache)): \
 $(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
  install/libapache2-mod-%:
 	$(eval MODULE_NAME = $(call libapache2mod_to_orig, $(subst libapache2-mod-,,$(notdir $@))))
-	# Remove the R from Ruwsgi_module
-	$(eval APACHE_MODULE_NAME = $(subst R,,$(MODULE_NAME)))
 	sed -e 's/@@module_name@@/$(MODULE_NAME)/g' \
-		-e 's/@@apache_module_name@@/$(APACHE_MODULE_NAME)/g' \
+		-e 's/@@module_apachename@@/$(module_apachename)/g' \
 		< $(CURDIR)/debian/uwsgi.load.in \
 		> $(CURDIR)/debian/$(MODULE_NAME).load
 	for TEMPLATE_TYPE in $(LIBAPACHE2_MOD_PKG_TEMPLATES); do \
