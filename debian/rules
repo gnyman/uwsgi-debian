@@ -364,7 +364,7 @@ install/uwsgi-core::
 		--section 1 \
 		--no-info \
 		$(CURDIR)/uwsgi-core \
-		> $(CURDIR)/debian/uwsgi-core.1; \
+		> $(CURDIR)/debian/uwsgi-core.1
 
 # uwsgi-plugin-% packages
 # -----------------------
@@ -486,7 +486,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
 		--section 1 \
 		--no-info \
 		$(CURDIR)/uwsgi_$(plugin_name) \
-		> $(CURDIR)/debian/uwsgi_$(plugin_name).1; \
+		> $(CURDIR)/debian/uwsgi_$(plugin_name).1
 
 $(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_KINDS_java)):: \
  install/uwsgi-plugin-%:
@@ -502,7 +502,7 @@ $(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_KINDS_java)):: \
 		--section 1 \
 		--no-info \
 		$(CURDIR)/uwsgi_$(plugin_name) \
-		> $(CURDIR)/debian/uwsgi_$(plugin_name).1; \
+		> $(CURDIR)/debian/uwsgi_$(plugin_name).1
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
  install/uwsgi-plugin-%:
