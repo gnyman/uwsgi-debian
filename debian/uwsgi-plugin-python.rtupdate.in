@@ -29,7 +29,7 @@ if [ "x$1" = "xrtupdate" ]; then
         update-alternatives --quiet \
           --install \
             /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
-            uwsgi-plugin-@@python_kind@@ \
+            @@plugin_alternatives_name@@ \
             /usr/lib/uwsgi/plugins/python${PYVER_DOTLESS}_plugin.so \
             $ALT_PLUGIN_ALTERNATIVE_PRIORITY \
           --slave \
@@ -43,7 +43,7 @@ if [ "x$1" = "xrtupdate" ]; then
       update-alternatives --quiet \
         --install \
           /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
-          uwsgi-plugin-@@python_kind@@ \
+          @@plugin_alternatives_name@@ \
           /usr/lib/uwsgi/plugins/${NEW_RTNAME_DOTLESS}_plugin.so \
           $DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY \
         --slave \

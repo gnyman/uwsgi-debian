@@ -21,7 +21,7 @@ case "$1" in
       for PYVER_DOTLESS in @@available_python_versions_dotless@@; do
         update-alternatives --quiet \
           --remove \
-            uwsgi-plugin-greenlet-python \
+            @@plugin_alternatives_name@@ \
             /usr/lib/uwsgi/plugins/@@plugin_stem@@_python${PYVER_DOTLESS}_plugin.so
       done
     ;;

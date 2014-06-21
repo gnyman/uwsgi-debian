@@ -30,7 +30,7 @@ case "$1" in
         update-alternatives --quiet \
           --install \
             /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
-            uwsgi-plugin-@@python_kind@@ \
+            @@plugin_alternatives_name@@ \
             /usr/lib/uwsgi/plugins/python${PYVER_DOTLESS}_plugin.so \
             $ALTERNATIVE_PRIORITY \
           --slave \

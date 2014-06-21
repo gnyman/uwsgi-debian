@@ -22,7 +22,7 @@ case "$1" in
       update-alternatives --quiet \
         --install \
           /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
-          uwsgi-plugin-rack \
+          @@plugin_alternatives_name@@ \
           /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so \
           @@plugin_alternatives_priority@@ \
         --slave \

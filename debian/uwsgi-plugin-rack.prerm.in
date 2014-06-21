@@ -20,7 +20,7 @@ case "$1" in
     remove)
       update-alternatives --quiet \
         --remove \
-          uwsgi-plugin-rack \
+          @@plugin_alternatives_name@@ \
           /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so
 
       update-alternatives --quiet \
@@ -29,7 +29,7 @@ case "$1" in
           /usr/bin/uwsgi_@@plugin_name@@
 
       RACK_PLUGIN_ALTERNATIVES_COUNT="$(\
-        update-alternatives --list uwsgi-plugin-rack 2>/dev/null \
+        update-alternatives --list @@plugin_alternatives_name@@ 2>/dev/null \
         | wc -l \
       )"
       if [ "$RACK_PLUGIN_ALTERNATIVES_COUNT" -eq 0 ]; then
