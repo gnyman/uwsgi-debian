@@ -129,6 +129,7 @@ pkg_name = $(cdbs_curpkg)
 
 plugin_name = $(call pkg_name_to_plugin_name,$*)
 # TODO: avoid exception for rbthreads or fiber
+# FIXME: exception for rbthreads or fiber breaks resolving plugin_interpreter
 plugin_is_lang = $(strip $(or \
 	$(filter rbthreads fiber,$*),\
 	$(foreach lang,$(UWSGI_PLUGINLANGS),\
@@ -161,6 +162,12 @@ plugin_lang_stem = $(strip \
 plugin_lang_kind = $(strip \
 	$(if $(filter java python,$(plugin_lang)),\
 		$(lastword $(subst -, ,$(plugin_kind)))))
+# TODO: avoid exception for rbthreads or fiber
+plugin_interpreter = $(strip $(or \
+	$(if $(filter rbthreads fiber,$*),\
+		/usr/bin/$(UWSGI_DEFAULTKIND_ruby)),\
+	$(if $(filter ruby,$(plugin_lang)),\
+		/usr/bin/$(plugin_kind))))
 plugin_alternatives_name = uwsgi-plugin-$(strip $(or \
 	$(if $(filter python,$(plugin_is_lang)),\
 		$(plugin_lang_kind)),\
@@ -429,7 +436,7 @@ debian/stamp-plugin-greenlet-python: \
 # Build rbthreads plugin
 debian/stamp-plugin-rbthreads: \
  debian/stamp-plugin-%:
-	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_DEFAULTKIND_ruby) \
+	UWSGICONFIG_RUBYPATH=$(plugin_interpreter) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
@@ -439,7 +446,7 @@ debian/stamp-plugin-rbthreads: \
 # Build fiber plugin
 debian/stamp-plugin-fiber: \
  debian/stamp-plugin-%:
-	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_DEFAULTKIND_ruby) \
+	UWSGICONFIG_RUBYPATH=$(plugin_interpreter) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
@@ -459,7 +466,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_lua)): \
 # Build rack_ruby191_plugin.so
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_ruby)): \
  debian/stamp-plugin-%:
-	UWSGICONFIG_RUBYPATH=/usr/bin/$(call target_name_tail, $@) \
+	UWSGICONFIG_RUBYPATH=$(plugin_interpreter) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
