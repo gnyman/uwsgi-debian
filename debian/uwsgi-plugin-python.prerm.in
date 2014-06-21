@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for uwsgi-plugin-@@python_kind@@
+# prerm script for @@pkg_name@@
 #
 # see: dh_installdeb(1)
 

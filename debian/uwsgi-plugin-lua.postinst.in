@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for uwsgi-plugin-@@lua_kind@@
+# postinst script for @@pkg_name@@
 #
 # see: dh_installdeb(1)
 
