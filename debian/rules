@@ -151,6 +151,10 @@ plugin_kind = $(strip $(or \
 	$(foreach kind,$(UWSGI_KINDS_$(plugin_has_lang)),\
 		$(if $(filter %-$(kind),$*),\
 			$(kind)))))
+plugin_src = $(strip \
+	$(call pkg_name_to_plugin_name,$(or \
+		$(plugin_stem),\
+		$*)))
 
 module_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 module_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
@@ -356,7 +360,7 @@ uwsgi-core-local:
 $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
  debian/stamp-plugin-%:
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
@@ -366,11 +370,10 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_java)): \
  debian/stamp-plugin-%:
 	$(eval OPENJDK_VERSION = $(lastword $(subst -, ,$@)))
 	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(JAVA_ARCH))
-	$(eval PLUGIN_SRC_SUBDIR = $(firstword $(subst _, ,$(PLUGIN_NAME))))
 	UWSGICONFIG_JVM_INCPATH='$(JAVA_HOME)/include/' \
 	UWSGICONFIG_JVM_LIBPATH='$(JVM_SERVER_DIR)' \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(PLUGIN_SRC_SUBDIR) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
@@ -382,7 +385,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_python)): \
 	$(eval PYVERS = $(cdbs_python$(PYTHON_KIND:python%=%)_supported_versions))
 	$(foreach python_version,$(PYVERS), \
 		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
-			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/python \
+			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini\
 			         python$(subst .,,$(python_version)); \
 	)
@@ -396,7 +399,7 @@ debian/stamp-plugin-greenlet-python: \
  debian/stamp-plugin-%:
 	$(foreach python_version,$(cdbs_python_supported_versions), \
 		$(call cdbs_python_binary,python$(python_version)) $(UWSGI_BUILDER) \
-			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/greenlet \
+			--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 			         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 			         $(plugin_stem)_python$(subst .,,$(python_version)); \
 	)
@@ -407,7 +410,7 @@ debian/stamp-plugin-rbthreads: \
  debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_DEFAULTKIND_ruby) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
@@ -417,7 +420,7 @@ debian/stamp-plugin-fiber: \
  debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(UWSGI_DEFAULTKIND_ruby) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_name) \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
@@ -427,7 +430,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_lua)): \
  debian/stamp-plugin-%:
 	UWSGICONFIG_LUA_IMPLEMENTATION=$(call target_name_tail, $@) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/lua \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
@@ -437,7 +440,7 @@ $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_ruby)): \
  debian/stamp-plugin-%:
 	UWSGICONFIG_RUBYPATH=/usr/bin/$(call target_name_tail, $@) \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
-		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/rack \
+		--plugin $(CURDIR)/$(UWSGI_PLUGINS_SRC_DIR)/$(plugin_src) \
 		         $(CURDIR)/debian/buildconf/uwsgi-plugin.ini \
 		         $(plugin_name)
 	touch $@
