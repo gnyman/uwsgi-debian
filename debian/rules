@@ -172,6 +172,10 @@ plugin_alternatives_stem = $(strip $(or \
 	$(if $(filter python,$(plugin_is_lang)),\
 		$(plugin_lang_kind)),\
 	$(plugin_stem)))
+plugin_alternatives_priority = $(strip \
+	$(if $(filter $(plugin_kind),$(UWSGI_DEFAULTKIND_$(plugin_lang))),\
+		75,\
+		35))
 
 module_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 module_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
@@ -472,6 +476,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
+			-e 's/@@plugin_alternatives_priority@@/$(plugin_alternatives_priority)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
@@ -570,7 +575,6 @@ install/uwsgi-plugin-fiber:: \
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_lua)):: \
  install/uwsgi-plugin-%:
-	$(eval PLUGIN_PRIORITY = $(if $(findstring uwsgi-plugin-$(UWSGI_DEFAULTKIND_lua), $@),75,35))
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
 			-e 's/@@pkg_name@@/$(pkg_name)/g' \
@@ -579,7 +583,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_lua)):: \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
-			-e 's/@@plugin_alternatives_priority@@/$(PLUGIN_PRIORITY)/g' \
+			-e 's/@@plugin_alternatives_priority@@/$(plugin_alternatives_priority)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-lua.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
@@ -599,9 +603,6 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_lua)):: \
 
 $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_ruby)):: \
  install/uwsgi-plugin-%:
-	$(eval PLUGIN_PRIORITY = $(if \
-		$(findstring uwsgi-plugin-rack-$(UWSGI_DEFAULTKIND_ruby), $@),75,35) \
-	)
 	for TEMPLATE_TYPE in postinst prerm; do \
 		sed \
 			-e 's/@@pkg_name@@/$(pkg_name)/g' \
@@ -610,7 +611,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_ruby)):: \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
-			-e 's/@@plugin_alternatives_priority@@/$(PLUGIN_PRIORITY)/g' \
+			-e 's/@@plugin_alternatives_priority@@/$(plugin_alternatives_priority)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-rack.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
