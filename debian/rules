@@ -103,11 +103,9 @@ PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS = \
 ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS := $(filter-out \
 	$(PARTICULARLY_BUILT_UWSGI_PLUGIN_PKGS), $(UWSGI_PLUGIN_PKGS_NAMES))
 
-UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
+UWSGI_MODULE_INFILES := $(wildcard debian/*__MODULE__*.in)
 
-# List of templates to instantiate for each libapache2-mod-X package
-# There is special-case template, not listed here: uwsgi.load
-LIBAPACHE2_MOD_PKG_TEMPLATES = install postinst prerm
+UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
 
 # Discards directory-part of target and returns substring after last '-'
 # character
@@ -669,16 +667,15 @@ $(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
 		< $(CURDIR)/debian/uwsgi.load.in \
 		> $(CURDIR)/debian/$(module_name).load
 	set -e; \
-	$(foreach TEMPLATE_TYPE,$(LIBAPACHE2_MOD_PKG_TEMPLATES),sed \
+	$(foreach infile,$(UWSGI_MODULE_INFILES),sed \
 		-e 's/@@pkg_name@@/$(pkg_name)/g' \
 		-e 's/@@module_name@@/$(module_name)/g' \
-		< $(CURDIR)/debian/libapache2-mod.$(TEMPLATE_TYPE).in \
-		> $(CURDIR)/debian/$(cdbs_curpkg).$(TEMPLATE_TYPE);)
+		< $(infile) \
+		> $(subst __MODULE__,$*,$(basename $(infile)));)
 	touch $@
 clean::
 	rm -f $(foreach module,$(UWSGI_MODULES_apache),\
-		$(patsubst %,debian/libapache2-mod-$(module).%,\
-			$(LIBAPACHE2_MOD_PKG_TEMPLATES)))
+		$(subst __MODULE__,$(module),$(basename $(UWSGI_MODULE_INFILES))))
 	rm -f debian/*.load
 
 # Python module packages
