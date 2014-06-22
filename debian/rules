@@ -108,6 +108,12 @@ UWSGI_MODULE_INFILES := $(wildcard debian/*__MODULE__*.in)
 
 UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
 
+# types of packaging scripts to use (tried from left to right)
+# * pri: binary and library
+# * sec: only binary
+# * aux: only library
+UWSGI_PKGSCRIPTS_DEFAULT = sec
+
 # Discards directory-part of target and returns substring after last '-'
 # character
 target_name_tail = $(lastword $(subst -, ,$(notdir $(1))))
@@ -181,6 +187,19 @@ plugin_alternatives_priority = $(strip \
 	$(if $(filter $(plugin_kind),$(UWSGI_DEFAULTKIND_$(plugin_lang))),\
 		75,\
 		35))
+
+# per-infile variables, relying on $(infile) and optional $(plugin_src)
+plugin_pkgtypes = $(or $(UWSGI_PKGSCRIPTS_$(plugin_src)),$(UWSGI_PKGSCRIPTS_DEFAULT))
+plugin_has_binary = $(filter pri sec,$(plugin_pkgtypes))
+# plugin_infile picks first existing infile variant:
+# 1. $(infile).$(UWSGI_PKGSCRIPTS_$(plugin_src))
+# 2. $(infile).$(UWSGI_PKGSCRIPTS_DEFAULT)
+# 3. $(infile)
+plugin_infile = $(firstword $(wildcard \
+	$(foreach suffix,$(plugin_pkgtypes),\
+		$(addsuffix .$(suffix),$(infile))) \
+	$(infile) \
+	))
 
 module_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 module_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
@@ -446,7 +465,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
  install/uwsgi-plugin-%:
 	set -e; \
 	$(foreach infile,$(UWSGI_PLUGIN_INFILES),\
-		$(if $(shell test -s "$(infile)" && echo "not empty"),\
+		$(if $(shell test -s "$(plugin_infile)" && echo "not empty"),\
 			sed \
 				-e 's/@@pkg_name@@/$(pkg_name)/g' \
 				-e 's/@@plugin_name@@/$(plugin_name)/g' \
@@ -454,7 +473,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
 				-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
 				-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 				-e 's/@@plugin_alternatives_priority@@/$(plugin_alternatives_priority)/g' \
-				< $(infile) \
+				< $(plugin_infile) \
 				> $(subst __PLUGIN__,$*,$(basename $(infile)));))\
 	ln -sf uwsgi-core-local uwsgi_$(plugin_name);\
 	help2man \
