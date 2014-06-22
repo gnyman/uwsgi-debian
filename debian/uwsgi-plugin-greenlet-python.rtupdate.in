@@ -24,11 +24,11 @@ if [ "x$1" = "xrtupdate" ]; then
     then
 
       # Reset prorities of all packaged alternatives of
-      # @@plugin_stem@@_@@python_kind@@_plugin.so to lower value.
+      # @@plugin_stem@@_@@plugin_lang_kind@@_plugin.so to lower value.
       for PYVER_DOTLESS in $KNOWN_PYVERS_DOTLESS; do
         update-alternatives --quiet \
           --install \
-            /usr/lib/uwsgi/plugins/@@plugin_stem@@_python_plugin.so \
+            /usr/lib/uwsgi/plugins/@@plugin_stem@@_@@plugin_lang_kind@@_plugin.so \
             uwsgi-plugin-greenlet-python \
             /usr/lib/uwsgi/plugins/@@plugin_stem@@_python${PYVER_DOTLESS}_plugin.so \
             $ALT_PLUGIN_ALTERNATIVE_PRIORITY
@@ -38,7 +38,7 @@ if [ "x$1" = "xrtupdate" ]; then
       # a new default Python version).
       update-alternatives --quiet \
         --install \
-          /usr/lib/uwsgi/plugins/@@plugin_stem@@_python_plugin.so \
+          /usr/lib/uwsgi/plugins/@@plugin_stem@@_@@plugin_lang_kind@@_plugin.so \
           uwsgi-plugin-greenlet-python \
           /usr/lib/uwsgi/plugins/@@plugin_stem@@_${NEW_RTNAME_DOTLESS}_plugin.so \
           $DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY

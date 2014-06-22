@@ -155,6 +155,12 @@ plugin_src = $(strip \
 	$(call pkg_name_to_plugin_name,$(or \
 		$(plugin_stem),\
 		$*)))
+plugin_lang_stem = $(strip \
+	$(if $(filter java,$(plugin_lang)),\
+		$(firstword $(subst -, ,$(plugin_kind)))))
+plugin_lang_kind = $(strip \
+	$(if $(filter java python,$(plugin_lang)),\
+		$(lastword $(subst -, ,$(plugin_kind)))))
 
 module_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 module_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
@@ -366,10 +372,10 @@ $(patsubst %,debian/stamp-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)): \
 	touch $@
 
 # Build Java plugins
+#  * eval'ing JAVA_HOME needed to resolve JVM_SERVER_DIR
 $(patsubst %,debian/stamp-plugin-%,$(UWSGI_PLUGINS_java)): \
  debian/stamp-plugin-%:
-	$(eval OPENJDK_VERSION = $(lastword $(subst -, ,$@)))
-	$(eval JAVA_HOME = /usr/lib/jvm/java-$(OPENJDK_VERSION)-openjdk-$(JAVA_ARCH))
+	$(eval JAVA_HOME = /usr/lib/jvm/java-$(plugin_lang_kind)-$(plugin_lang_stem)-$(JAVA_ARCH))
 	UWSGICONFIG_JVM_INCPATH='$(JAVA_HOME)/include/' \
 	UWSGICONFIG_JVM_LIBPATH='$(JVM_SERVER_DIR)' \
 	$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
@@ -519,6 +525,7 @@ install/uwsgi-plugin-greenlet-python:: \
 		sed \
 			-e 's/@@pkg_name@@/$(pkg_name)/g' \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
+			-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
 			-e 's/@@available_python_versions_dotless@@/$(PYTHON_VERS)/g' \
 			-e 's/@@default_python_version_dotless@@/$(PYTHON_DEFAULT)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.$${TEMPLATE_TYPE}.in \
@@ -623,6 +630,7 @@ binary-post-install/uwsgi-plugin-greenlet-python:: \
 	)
 	sed \
 		-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
+		-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
 		-e 's/@@available_python_versions_dotless@@/$(PYTHON_VERS)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)

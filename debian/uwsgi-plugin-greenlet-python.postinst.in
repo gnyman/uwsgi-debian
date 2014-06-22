@@ -28,7 +28,7 @@ case "$1" in
         fi
         update-alternatives --quiet \
           --install \
-            /usr/lib/uwsgi/plugins/@@plugin_stem@@_python_plugin.so \
+            /usr/lib/uwsgi/plugins/@@plugin_stem@@_@@plugin_lang_kind@@_plugin.so \
             uwsgi-plugin-greenlet-python \
             /usr/lib/uwsgi/plugins/@@plugin_stem@@_python${PYVER_DOTLESS}_plugin.so \
             $ALTERNATIVE_PRIORITY
