@@ -475,13 +475,14 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
 				-e 's/@@plugin_alternatives_priority@@/$(plugin_alternatives_priority)/g' \
 				< $(plugin_infile) \
 				> $(subst __PLUGIN__,$*,$(basename $(infile)));))\
-	ln -sf uwsgi-core-local uwsgi_$(plugin_name);\
-	help2man \
-		--name 'fast (pure C)$(comma) self-healing$(comma) developer-friendly WSGI server' \
-		--section 1 \
-		--no-info \
-		./uwsgi_$(plugin_name) \
-		> debian/uwsgi_$(plugin_name).1
+	$(if $(plugin_has_binary),\
+		ln -sf uwsgi-core-local uwsgi_$(plugin_name);\
+		help2man \
+			--name 'fast (pure C)$(comma) self-healing$(comma) developer-friendly WSGI server' \
+			--section 1 \
+			--no-info \
+			./uwsgi_$(plugin_name) \
+			> debian/uwsgi_$(plugin_name).1)
 
 $(patsubst %,install/uwsgi-plugin-jvm-%,$(UWSGI_KINDS_java)):: \
  install/uwsgi-plugin-%:
