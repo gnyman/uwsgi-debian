@@ -662,10 +662,8 @@ clean::
 
 $(patsubst %,install/libapache2-mod-%,$(UWSGI_MODULES_apache)):: \
  install/libapache2-mod-%:
-	sed -e 's/@@module_name@@/$(module_name)/g' \
-		-e 's/@@module_apachename@@/$(module_apachename)/g' \
-		< $(CURDIR)/debian/uwsgi.load.in \
-		> $(CURDIR)/debian/$(module_name).load
+	echo 'LoadModule $(module_apachename)_module /usr/lib/apache2/modules/mod_$(module_name).so' \
+		> debian/$(module_name).load
 	set -e; \
 	$(foreach infile,$(UWSGI_MODULE_INFILES),sed \
 		-e 's/@@pkg_name@@/$(pkg_name)/g' \
