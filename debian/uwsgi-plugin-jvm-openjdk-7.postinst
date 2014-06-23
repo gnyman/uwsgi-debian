@@ -45,12 +45,12 @@ case "$1" in
           uwsgi.1.gz \
           /usr/share/man/man1/uwsgi_jvm_openjdk7.1.gz
 
-      UWSGI_JVM_BINARY_IS_UWSGI_ALTERNATIVE="$(\
+      BINARY_IS_UWSGI_ALTERNATIVE="$(\
         update-alternatives --list uwsgi 2>/dev/null \
         | grep '/uwsgi_jvm$' \
         | wc -l \
       )"
-      if [ "$UWSGI_JVM_BINARY_IS_UWSGI_ALTERNATIVE" -eq 0 ]; then
+      if [ "$BINARY_IS_UWSGI_ALTERNATIVE" -eq 0 ]; then
         update-alternatives --quiet \
           --install \
             /usr/bin/uwsgi \
