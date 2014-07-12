@@ -206,6 +206,10 @@ plugin_alternatives_priority = $(strip \
 	$(if $(filter $(plugin_kind),$(UWSGI_DEFAULTKIND_$(plugin_lang))),\
 		75,\
 		35))
+plugin_flavor_prefix = $(strip \
+	$(if $(filter python,$(plugin_is_lang)),\
+		,\
+		$(plugin_stem)_))
 
 # per-infile variables, relying on $(infile) and optional $(plugin_src)
 plugin_pkgtypes = $(or $(UWSGI_PKGSCRIPTS_$(plugin_src)),$(UWSGI_PKGSCRIPTS_DEFAULT))
@@ -360,7 +364,7 @@ $(patsubst %,debian/stamp-%,$(UWSGI_PLUGIN_PACKAGES)): \
 			$(call cdbs_python_binary,$(flavor)) $(UWSGI_BUILDER) \
 				--plugin plugins/$(plugin_src) \
 				debian/buildconf/uwsgi-plugin.ini \
-				$(plugin_stem:=_)$(subst .,,$(flavor));),\
+				$(plugin_flavor_prefix)$(subst .,,$(flavor));),\
 		$(cdbs_curpythonindepbinary) $(UWSGI_BUILDER) \
 			--plugin plugins/$(plugin_src) \
 			debian/buildconf/uwsgi-plugin.ini \
@@ -390,7 +394,7 @@ $(patsubst %,debian/expand-files/%,$(UWSGI_PLUGIN_PACKAGES)): \
 	$(if $(filter python,$(plugin_lang)),\
 		$(foreach flavor,$(plugin_flavors),\
 			$(foreach infile,install $(if $(plugin_has_binary),links manpages),sed \
-				-e "s/@@plugin_name@@/$(plugin_stem:=_)$(subst .,,$(flavor))/g" \
+				-e "s/@@plugin_name@@/$(plugin_flavor_prefix)$(subst .,,$(flavor))/g" \
 				< debian/uwsgi-plugin-__PLUGIN__.$(infile).in \
 				>> debian/$(cdbs_curpkg).$(infile);))\
 		chmod 755 debian/$(cdbs_curpkg).rtupdate;\
@@ -403,13 +407,13 @@ $(patsubst %,install/%,$(UWSGI_PLUGIN_PACKAGES)):: \
 	set -e; \
 	$(if $(plugin_has_binary),$(if $(filter python,$(plugin_lang)),\
 		$(foreach flavor,$(plugin_flavors), \
-			ln -sf uwsgi-core-local uwsgi_$(plugin_stem:=_)$(subst .,,$(flavor));\
+			ln -sf uwsgi-core-local uwsgi_$(plugin_flavor_prefix)$(subst .,,$(flavor));\
 			help2man \
 				--name 'fast (pure C)$(comma) self-healing$(comma) developer-friendly WSGI server' \
 				--section 1 \
 				--no-info \
-				./uwsgi_$(plugin_stem:=_)$(subst .,,$(flavor)) \
-				> debian/uwsgi_$(plugin_stem:=_)$(subst .,,$(flavor)).1;),\
+				./uwsgi_$(plugin_flavor_prefix)$(subst .,,$(flavor)) \
+				> debian/uwsgi_$(plugin_flavor_prefix)$(subst .,,$(flavor)).1;),\
 		ln -sf uwsgi-core-local uwsgi_$(plugin_name);\
 		help2man \
 			--name 'fast (pure C)$(comma) self-healing$(comma) developer-friendly WSGI server' \
