@@ -36,7 +36,7 @@ case "$1" in
         update-alternatives --quiet \
           --remove \
             uwsgi \
-            /usr/bin/uwsgi_@@plugin_stem@@
+            /usr/bin/uwsgi_@@plugin_alternatives_stem@@
       fi
     ;;
 

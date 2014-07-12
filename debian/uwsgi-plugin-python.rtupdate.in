@@ -23,18 +23,18 @@ if [ "x$1" = "xrtupdate" ]; then
     if [ "x$NEW_RTNAME_DOTLESS" = "xpython$MAYBE_NEW_DEFAULT_PYVER_DOTLESS" ]
     then
 
-      # Reset prorities of all packaged alternatives of @@plugin_stem@@_plugin.so
+      # Reset prorities of all packaged alternatives of @@plugin_alternatives_stem@@_plugin.so
       # to lower value.
       for PYVER_DOTLESS in $KNOWN_PYVERS_DOTLESS; do
         update-alternatives --quiet \
           --install \
-            /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
+            /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_plugin.so \
             @@plugin_alternatives_name@@ \
             /usr/lib/uwsgi/plugins/python${PYVER_DOTLESS}_plugin.so \
             $ALT_PLUGIN_ALTERNATIVE_PRIORITY \
           --slave \
-            /usr/share/man/man1/uwsgi_@@plugin_stem@@.1.gz \
-            uwsgi_@@plugin_stem@@.1.gz \
+            /usr/share/man/man1/uwsgi_@@plugin_alternatives_stem@@.1.gz \
+            uwsgi_@@plugin_alternatives_stem@@.1.gz \
             /usr/share/man/man1/uwsgi_python${PYVER_DOTLESS}.1.gz
       done
 
@@ -42,13 +42,13 @@ if [ "x$1" = "xrtupdate" ]; then
       # new default Python version).
       update-alternatives --quiet \
         --install \
-          /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
+          /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_plugin.so \
           @@plugin_alternatives_name@@ \
           /usr/lib/uwsgi/plugins/${NEW_RTNAME_DOTLESS}_plugin.so \
           $DEFAULT_PLUGIN_ALTERNATIVE_PRIORITY \
         --slave \
-          /usr/share/man/man1/uwsgi_@@plugin_stem@@.1.gz \
-          uwsgi_@@plugin_stem@@.1.gz \
+          /usr/share/man/man1/uwsgi_@@plugin_alternatives_stem@@.1.gz \
+          uwsgi_@@plugin_alternatives_stem@@.1.gz \
           /usr/share/man/man1/uwsgi_${NEW_RTNAME_DOTLESS}.1.gz
 
       break # for MAYBE_NEW_DEFAULT_PYVER_DOTLESS ...

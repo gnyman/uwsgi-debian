@@ -168,6 +168,10 @@ plugin_alternatives_name = uwsgi-plugin-$(strip $(or \
 		$(plugin_stem)-$(plugin_lang_kind)),\
 	$(plugin_stem),\
 	$(plugin_name)))
+plugin_alternatives_stem = $(strip $(or \
+	$(if $(filter python,$(plugin_is_lang)),\
+		$(plugin_lang_kind)),\
+	$(plugin_stem)))
 
 module_name = $(subst -,_,$(subst ruwsgi,Ruwsgi,$*))
 module_apachename = $(subst -,_,$(subst ruwsgi,uwsgi,$*))
@@ -467,6 +471,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(ORDINARILY_BUILT_UWSGI_PLUGIN_PKGS)):: \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
+			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
 	done
@@ -505,6 +510,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 			-e 's/@@pkg_name@@/$(pkg_name)/g' \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
+			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 			-e 's/@@available_python_versions_dotless@@/$(PYVERS)/g' \
 			-e 's/@@default_python_version_dotless@@/$(PYDEFAULT)/g' \
 			-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
@@ -536,6 +542,7 @@ install/uwsgi-plugin-greenlet-python:: \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
+			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 			-e 's/@@available_python_versions_dotless@@/$(PYTHON_VERS)/g' \
 			-e 's/@@default_python_version_dotless@@/$(PYTHON_DEFAULT)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.$${TEMPLATE_TYPE}.in \
@@ -571,6 +578,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_lua)):: \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
+			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 			-e 's/@@plugin_alternatives_priority@@/$(PLUGIN_PRIORITY)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-lua.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
@@ -601,6 +609,7 @@ $(patsubst %,install/uwsgi-plugin-%,$(UWSGI_PLUGINS_ruby)):: \
 			-e 's/@@plugin_name@@/$(plugin_name)/g' \
 			-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 			-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
+			-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 			-e 's/@@plugin_alternatives_priority@@/$(PLUGIN_PRIORITY)/g' \
 				< $(CURDIR)/debian/uwsgi-plugin-rack.$${TEMPLATE_TYPE}.in \
 				> $(CURDIR)/debian/$(cdbs_curpkg).$${TEMPLATE_TYPE}; \
@@ -630,6 +639,7 @@ $(patsubst %,binary-post-install/uwsgi-plugin-%,$(UWSGI_PLUGINS_python)):: \
 	sed \
 		-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 		-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
+		-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 		-e 's/@@available_python_versions_dotless@@/$(PYVERS)/g' \
 		-e 's/@@python_kind@@/$(PYTHON_KIND)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-python.rtupdate.in \
@@ -645,6 +655,7 @@ binary-post-install/uwsgi-plugin-greenlet-python:: \
 		-e 's/@@plugin_stem@@/$(plugin_stem)/g' \
 		-e 's/@@plugin_lang_kind@@/$(plugin_lang_kind)/g' \
 		-e 's/@@plugin_alternatives_name@@/$(plugin_alternatives_name)/g' \
+		-e 's/@@plugin_alternatives_stem@@/$(plugin_alternatives_stem)/g' \
 		-e 's/@@available_python_versions_dotless@@/$(PYTHON_VERS)/g' \
 			< $(CURDIR)/debian/uwsgi-plugin-greenlet-python.rtupdate.in \
 			> $(PYTHON_RTUPDATE_SCRIPT)

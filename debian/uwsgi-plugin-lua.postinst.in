@@ -21,17 +21,17 @@ case "$1" in
     configure)
       update-alternatives --quiet \
         --install \
-          /usr/lib/uwsgi/plugins/@@plugin_stem@@_plugin.so \
+          /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_plugin.so \
           @@plugin_alternatives_name@@ \
           /usr/lib/uwsgi/plugins/@@plugin_name@@_plugin.so \
           @@plugin_alternatives_priority@@ \
         --slave \
-          /usr/bin/uwsgi_@@plugin_stem@@ \
-          uwsgi_@@plugin_stem@@ \
+          /usr/bin/uwsgi_@@plugin_alternatives_stem@@ \
+          uwsgi_@@plugin_alternatives_stem@@ \
           /usr/bin/uwsgi-core \
         --slave \
-          /usr/share/man/man1/uwsgi_@@plugin_stem@@.1.gz \
-          uwsgi_@@plugin_stem@@.1.gz \
+          /usr/share/man/man1/uwsgi_@@plugin_alternatives_stem@@.1.gz \
+          uwsgi_@@plugin_alternatives_stem@@.1.gz \
           /usr/share/man/man1/uwsgi_@@plugin_name@@.1.gz
 
       update-alternatives --quiet \
@@ -47,7 +47,7 @@ case "$1" in
 
       UWSGI_LUA_BINARY_IS_UWSGI_ALTERNATIVE="$(\
         update-alternatives --list uwsgi 2>/dev/null \
-        | grep '/uwsgi_@@plugin_stem@@$' \
+        | grep '/uwsgi_@@plugin_alternatives_stem@@$' \
         | wc -l \
       )"
       if [ "$UWSGI_LUA_BINARY_IS_UWSGI_ALTERNATIVE" -eq 0 ]; then
@@ -55,12 +55,12 @@ case "$1" in
           --install \
             /usr/bin/uwsgi \
             uwsgi \
-            /usr/bin/uwsgi_@@plugin_stem@@ \
+            /usr/bin/uwsgi_@@plugin_alternatives_stem@@ \
             35 \
           --slave \
             /usr/share/man/man1/uwsgi.1.gz \
             uwsgi.1.gz \
-            /usr/share/man/man1/uwsgi_@@plugin_stem@@.1.gz
+            /usr/share/man/man1/uwsgi_@@plugin_alternatives_stem@@.1.gz
       fi
     ;;
 

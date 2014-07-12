@@ -22,7 +22,7 @@ case "$1" in
         update-alternatives --quiet \
           --remove \
             @@plugin_alternatives_name@@ \
-            /usr/lib/uwsgi/plugins/@@plugin_stem@@_python${PYVER_DOTLESS}_plugin.so
+            /usr/lib/uwsgi/plugins/@@plugin_alternatives_stem@@_python${PYVER_DOTLESS}_plugin.so
       done
     ;;
 
