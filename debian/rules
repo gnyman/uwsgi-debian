@@ -25,6 +25,7 @@ debian/control::
 		-e 's/@greenlet_archs@/$(GREENLET_ARCHS)/g' \
 		-e 's/@openjdk7_archs@/$(OPENJDK7_ARCHS)/g' \
 		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
+		-e 's/@ruby_kind@/$(UWSGI_KIND_ruby)/g' \
 		debian/control
 endif
 
@@ -82,8 +83,17 @@ UWSGI_KINDS_lua = lua5.1 lua5.2
 UWSGI_DEFAULTKIND_lua = lua5.1
 UWSGI_SRCPLUGINS_LANG_SELF += lua
 
-UWSGI_KINDS_ruby = ruby1.9.1
-UWSGI_DEFAULTKIND_ruby = ruby1.9.1
+UWSGI_KINDS_ruby := $(shell ruby -rruby_debian_dev \
+	-e 'include RubyDebianDev;' \
+	-e 'SUPPORTED_RUBY_VERSIONS.select! do |version, binary|;' \
+		-e 'puts version;' \
+	-e 'end')
+# TODO: support multiple Ruby kinds (requires dynamic control file sections)
+UWSGI_KIND_ruby := $(UWSGI_KINDS_ruby)$(strip $(if $(strip \
+	$(filter 1,$(words $(UWSGI_KINDS_ruby)))),\
+		,\
+		$(error ERROR: multiple Ruby kinds not supported)))
+UWSGI_DEFAULTKIND_ruby := $(shell find /usr/bin/ruby -printf '%l')
 UWSGI_SRCPLUGINS_ruby = rack
 
 UWSGI_PLUGIN_PACKAGES = $(filter uwsgi-plugin-%,$(DEB_PACKAGES))
@@ -305,6 +315,9 @@ uwsgi-core: uwsgi-core-local
 	done
 install/uwsgi-core::
 	echo 'uwsgi:corepluginlist=$(uwsgi-corepluginlist)' >> debian/$(cdbs_curpkg).substvars
+	echo 'uwsgi:RubyKinds=$(UWSGI_KINDS_ruby)' >> debian/$(cdbs_curpkg).substvars
+	echo 'uwsgi:RubyKind=$(UWSGI_KIND_ruby)' >> debian/$(cdbs_curpkg).substvars
+	echo 'uwsgi:RubyDefaultkind=$(UWSGI_DEFAULTKIND_ruby)' >> debian/$(cdbs_curpkg).substvars
 clean::
 	rm -f uwsgi-core
 	find -type l -name 'uwsgi_*' -delete

@@ -45,8 +45,7 @@ Build-Depends:
  python-greenlet-dev [@greenlet_archs@],
  python3-all-dev,
  openjdk-7-jdk [@openjdk7_archs@],
- ruby1.9.1,
- ruby1.9.1-dev,
+ ruby-all-dev,
  uuid-dev
 Standards-Version: 3.9.5
 Homepage: http://projects.unbit.it/uwsgi/
@@ -206,7 +205,7 @@ Description: all available plugins for uWSGI
     - PSGI, Rack, WSGI, etc.
   * coroutines
     - Coro::AnyEvent
-    - Fiber (Ruby 1.9.1)
+    - Fiber (${uwsgi:RubyDefaultkind})
     - greenlet (Python 2)
 
 Package: uwsgi-infrastructure-plugins
@@ -252,7 +251,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
  uwsgi-plugin-python3 (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version}),
+ uwsgi-plugin-rack-${uwsgi:RubyKind} (= ${binary:Version}),
  uwsgi-plugin-v8 (= ${binary:Version}) [@v8_archs@]
 Description: plugins for integration of uWSGI and application
  uWSGI presents a complete stack for networked/clustered web applications,
@@ -269,7 +268,7 @@ Description: plugins for integration of uWSGI and application
   * PHP
   * Perl PSGI
   * Python WSGI (Python 2 and 3)
-  * Rack (Ruby 1.9.1)
+  * Rack (${uwsgi:RubyKinds})
   * V8
 
 Package: uwsgi-plugin-alarm-curl
@@ -323,20 +322,20 @@ Description: Emperor PostgreSQL plugin for uWSGI
 Package: uwsgi-plugin-rbthreads
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
-Description: Ruby native threads plugin for uWSGI
+ uwsgi-plugin-rack-${uwsgi:RubyDefaultkind} (= ${binary:Version})
+Description: Ruby native threads plugin for uWSGI (${uwsgi:RubyDefaultkind})
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
  used in order to add compatibility with tons of different technology on top of
  the same core.
  .
- This package provides Ruby 1.9 native threads plugin for uWSGI.
+ This package provides Ruby (${uwsgi:RubyDefaultkind}) native threads plugin for uWSGI.
 
 Package: uwsgi-plugin-fiber
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- uwsgi-plugin-rack-ruby1.9.1 (= ${binary:Version})
+ uwsgi-plugin-rack-${uwsgi:RubyDefaultkind} (= ${binary:Version})
 Description: Fiber plugin for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -345,7 +344,7 @@ Description: Fiber plugin for uWSGI
  the same core.
  .
  This package provides Fiber plugin for uWSGI
- with Ruby 1.9.1.
+ with Ruby (${uwsgi:RubyDefaultkind}).
  .
  Fibers are a form of coroutine, useful for implementing cooperative
  multitasking.
@@ -497,10 +496,10 @@ Description: WSGI plugin for uWSGI (Python 3)
  This package provides Python 3 WSGI plugin for uWSGI
  (linked with Python 3 runtime).
 
-Package: uwsgi-plugin-rack-ruby1.9.1
+Package: uwsgi-plugin-rack-@ruby_kind@
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
-Description: Rack plugin for uWSGI (Ruby 1.9.1)
+Description: Rack plugin for uWSGI (${uwsgi:RubyKind})
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
  It is designed to be fully modular. This means that different plugins can be
@@ -508,7 +507,7 @@ Description: Rack plugin for uWSGI (Ruby 1.9.1)
  the same core.
  .
  This package provides Rack plugin for uWSGI
- (linked with Ruby 1.9.1 runtime).
+ (linked with ${uwsgi:RubyKind} runtime).
 
 Package: uwsgi-plugin-router-access
 Architecture: any
