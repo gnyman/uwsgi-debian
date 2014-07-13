@@ -38,7 +38,7 @@ esac
 echo >&2 "INFO: Resolving architectures for package \"$pkg\" through rmadison Internet request."
 rmadison -s "$suite" "$pkg" \
 	| awk -F'|' '{ print $4 }' \
-	| sed 's/ //g;s/,/\n/g' \
+	| sed 's/source,//;s/ //g;s/,/\n/g' \
 	| LANG=C sort \
 	| tr '\n' ' ' \
 	| sed 's/ $/\n/'
