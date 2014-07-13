@@ -20,12 +20,14 @@ ifneq (,$(DEB_MAINTAINER_MODE))
 GREENLET_ARCHS := $(shell sh debian/pkgarchs.sh python-greenlet-dev)
 OPENJDK7_ARCHS := $(shell sh debian/pkgarchs.sh openjdk-7-jdk)
 V8_ARCHS := $(shell sh debian/pkgarchs.sh libv8-dev)
+LUAJIT_ARCHS := $(shell sh debian/pkgarchs.sh luajit)
 RADOS_ARCHS := $(shell sh debian/pkgarchs.sh librados-dev)
 debian/control::
 	sed -i \
 		-e 's/@greenlet_archs@/$(GREENLET_ARCHS)/g' \
 		-e 's/@openjdk7_archs@/$(OPENJDK7_ARCHS)/g' \
 		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
+		-e 's/@luajit_archs@/$(LUAJIT_ARCHS)/g' \
 		-e 's/@rados_archs@/$(RADOS_ARCHS)/g' \
 		-e 's/@ruby_kind@/$(UWSGI_KIND_ruby)/g' \
 		debian/control
@@ -81,7 +83,7 @@ UWSGI_KINDS_java = openjdk-7
 UWSGI_DEFAULTKIND_java = openjdk-7
 UWSGI_SRCPLUGINS_java = jvm jwsgi
 
-UWSGI_KINDS_lua = lua5.1 lua5.2
+UWSGI_KINDS_lua = lua5.1 lua5.2 luajit
 UWSGI_DEFAULTKIND_lua = lua5.1
 UWSGI_SRCPLUGINS_LANG_SELF += lua
 
