@@ -319,12 +319,17 @@ uwsgi-core: uwsgi-core-local
 	done
 install/uwsgi-core::
 	echo 'uwsgi:corepluginlist=$(uwsgi-corepluginlist)' >> debian/$(cdbs_curpkg).substvars
-	echo 'uwsgi:RubyKinds=$(UWSGI_KINDS_ruby)' >> debian/$(cdbs_curpkg).substvars
-	echo 'uwsgi:RubyKind=$(UWSGI_KIND_ruby)' >> debian/$(cdbs_curpkg).substvars
-	echo 'uwsgi:RubyDefaultkind=$(UWSGI_DEFAULTKIND_ruby)' >> debian/$(cdbs_curpkg).substvars
 clean::
 	rm -f uwsgi-core
 	find -type l -name 'uwsgi_*' -delete
+
+uwsgi-rubyplugins = $(UWSGI_SRCPLUGINS_ruby) rbthreads fiber
+uwsgi-rubypkghint = $(filter $(uwsgi-rubyplugins),$(UWSGI_PLUGIN_PACKAGES))
+uwsgi-rubypkghint += uwsgi-plugins-all uwsgi-app-integration-plugins
+$(patsubst %,install/%,$(uwsgi-rubypkghint))::
+	echo 'uwsgi:RubyKinds=$(UWSGI_KINDS_ruby)' >> debian/$(cdbs_curpkg).substvars
+	echo 'uwsgi:RubyKind=$(UWSGI_KIND_ruby)' >> debian/$(cdbs_curpkg).substvars
+	echo 'uwsgi:RubyDefaultkind=$(UWSGI_DEFAULTKIND_ruby)' >> debian/$(cdbs_curpkg).substvars
 
 DEB_INSTALL_DOCS_uwsgi-core += tests
 
