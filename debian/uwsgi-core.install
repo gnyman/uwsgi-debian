@@ -1,5 +1,4 @@
 uwsgi-core usr/bin
-alarm_speech_plugin.so usr/lib/uwsgi/plugins
 cache_plugin.so usr/lib/uwsgi/plugins
 carbon_plugin.so usr/lib/uwsgi/plugins
 cgi_plugin.so usr/lib/uwsgi/plugins
