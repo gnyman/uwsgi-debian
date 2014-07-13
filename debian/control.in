@@ -40,6 +40,7 @@ Build-Depends:
  libmatheval-dev,
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
+ libssl-dev,
  pkg-config,
  python-all-dev,
  python-greenlet-dev [@greenlet_archs@],
