@@ -1,7 +1,60 @@
 uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
 
   [ upstream ]
-  * New release.
+  * New release 2.0.4.
+    Bugfixes:
+    + Fix mime routing var.
+    + Allow duplicate headers in http parsers.
+    + Faster on_demand Emperor management.
+    + Fix UWSGI_ADDITIONAL_SOURCES build option.
+    + Merge duplicated headers when SPDY is enabled.
+    + Fix segfault for unnamed loggers.
+    + –need-app works in lazy-apps mode.
+    + Fix fatal hooks management.
+    New features:
+    + Experimental asyncio loop engine (CPython >= 3.4).
+    + httprouter advanced timeout management.
+    + Allow disabling cache warnings in –cache2.
+    + Purge LRU cache feature.
+    + Support embedded config on FreeBSD.
+    + RPC hook.
+    + setmodifier1 and setmodifier2 routing actions.
+    + no_headers option for static router.
+    <https://uwsgi-docs.readthedocs.org/en/latest/Changelog-2.0.4.html>
+  * New release 2.0.5.
+    Bugfixes:
+    + Fix support for repeated headers in lua plugin.
+    + Fix support for embedding config in OpenBSD and NetBSD.
+    + various fixes in the curl-based plugins.
+    + Fix milliseconds-based waits.
+    + Fix sharedarea poller.
+    + Fix stats server json escaper.
+    + Fix fastcgi parser and implemented eof management.
+    + Improve fast on-demand mode.
+    + Exclude avg_rt computation for static files.
+    + Fix variables support in uwsgi internal router.
+    + Fix websockets + keepalive ordering.
+    + Disable SIGPIPE management in corutines-based loop-engines.
+    + Fix 64bit sharedarea management in 32bit systems.
+    + Honour chmod/chown-socket in fd0 mode.
+    + Hack to avoid Safari iOS making mess with keepalive.
+    + Fix log setup when both –logto and –log2.
+    + Fix mule_get_msg EAGAIN.
+    + Return correct signal_pidfile error code.
+    + Fix asyncio on OSX.
+    New features:
+    + Graceful reload of mule processes.
+    + Return routing action.
+    + –emperor-no-blacklist.
+    + Icecast2 protocol helpers.
+    + –metrics-no-cores, –stats-no-cores, –stats-no-metrics.
+    + sharedarea improvements.
+    + UWSGI_GO_CHEAP_CODE.
+    + PROXY1 support for the http router.
+    + reset_after_push for metrics.
+    + setremoteaddr.
+    + resolve option.
+    <https://uwsgi-docs.readthedocs.org/en/latest/Changelog-2.0.5.html>
 
   [ Jonas Smedegaard ]
   * Repackage upstream tarball to exclude binary example file without
@@ -17,6 +70,8 @@ uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
     + Fix build-depend on python3: Needed since 1.2.3+dfsg-1 for
       dh_python3 call (and for compiling as well).
     + Build-depend on devscripts: Needed for copyright check.
+    + Build-depend on libssl-dev.
+    + Build-depend on librados-dev: Needed for Rados plugin.
   * Document use of CDBS and git-buildpackage in README.source.
   * Fix install tests as example files (was dropped since 1.9.17-1).
   * Refactor packaging files:
@@ -46,8 +101,9 @@ uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
     (not Ruby 1.9.1).
     Closes: bug#743994. Thanks to Christian Hofstaedtler, Antonio
     Terceiro and Neil Williams.
+  * Enable rados plugin.
 
- -- Jonas Smedegaard <dr@jones.dk>  Tue, 08 Apr 2014 09:59:45 +0200
+ -- Jonas Smedegaard <dr@jones.dk>  Sun, 13 Jul 2014 11:15:11 +0200
 
 uwsgi (2.0.3-1) unstable; urgency=medium
 
