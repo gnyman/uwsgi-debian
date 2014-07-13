@@ -20,11 +20,13 @@ ifneq (,$(DEB_MAINTAINER_MODE))
 GREENLET_ARCHS := $(shell sh debian/pkgarchs.sh python-greenlet-dev)
 OPENJDK7_ARCHS := $(shell sh debian/pkgarchs.sh openjdk-7-jdk)
 V8_ARCHS := $(shell sh debian/pkgarchs.sh libv8-dev)
+RADOS_ARCHS := $(shell sh debian/pkgarchs.sh librados-dev)
 debian/control::
 	sed -i \
 		-e 's/@greenlet_archs@/$(GREENLET_ARCHS)/g' \
 		-e 's/@openjdk7_archs@/$(OPENJDK7_ARCHS)/g' \
 		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
+		-e 's/@rados_archs@/$(RADOS_ARCHS)/g' \
 		-e 's/@ruby_kind@/$(UWSGI_KIND_ruby)/g' \
 		debian/control
 endif
@@ -103,7 +105,7 @@ UWSGI_SRCPLUGINS_EXCLUDE = airbrake cplusplus dumbloop dummy \
 	emperor_mongodb example exception_log forkptyrouter gccgo \
 	gevent glusterfs gridfs legion_cache_fetch libffi libtcc \
 	logcrypto logpipe logzmq matheval mongodb mongodblog mongrel2 \
-	mono msgpack objc_gc pty pypy pyuwsgi rados ring \
+	mono msgpack objc_gc pty pypy pyuwsgi ring \
 	router_expires router_hash router_metrics router_radius \
 	router_redis router_spnego router_xmldir ruby19 servlet \
 	stackless stats_pusher_file stats_pusher_mongodb \

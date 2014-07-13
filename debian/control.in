@@ -40,6 +40,7 @@ Build-Depends:
  libmatheval-dev,
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
+ librados-dev [@rados_archs@],
  libssl-dev,
  pkg-config,
  python-all-dev,
