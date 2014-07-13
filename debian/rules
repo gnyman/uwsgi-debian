@@ -157,21 +157,20 @@ UWSGI_PKGSCRIPTS_greenlet = python aux-py aux
 pkg_name = $(cdbs_curpkg)
 
 plugin_name = $(call pkg_name_to_plugin_name,$*)
-# TODO: avoid exception for rbthreads or fiber
-# FIXME: exception for rbthreads or fiber breaks resolving plugin_interpreter
 plugin_is_lang = $(strip $(or \
-	$(filter rbthreads fiber,$*),\
 	$(foreach lang,$(UWSGI_PLUGINLANGS),\
 		$(if $(filter $(UWSGI_KINDS_$(lang)),$*),$(lang)))))
+plugin_implies_lang = $(strip $(or \
+	$(if $(filter rbthreads fiber,$*),\
+		ruby)))
 plugin_has_lang = $(strip $(foreach lang,$(UWSGI_PLUGINLANGS),\
 	$(foreach srcplugin,$(UWSGI_SRCPLUGINS_$(lang)),\
 		$(foreach kind,$(UWSGI_KINDS_$(lang)),\
 			$(if $(filter $(srcplugin)-$(kind),$*),\
 				$(lang))))))
-# TODO: avoid exception for rbthreads or fiber
 plugin_lang = $(strip $(or \
-	$(filter rbthreads fiber,$*),\
 	$(plugin_is_lang),\
+	$(plugin_implies_lang),\
 	$(plugin_has_lang)))
 plugin_stem = $(strip $(or \
 	$(plugin_is_lang),\
@@ -199,12 +198,11 @@ plugin_flavors = $(strip \
 plugin_defaultflavor = $(strip \
 	$(if $(filter python,$(plugin_lang)),\
 		python$(cdbs_$(plugin_lang_kind)_current_version)))
-# TODO: avoid exception for rbthreads or fiber
 plugin_interpreter = $(strip $(or \
-	$(if $(filter rbthreads fiber,$*),\
-		/usr/bin/$(UWSGI_DEFAULTKIND_ruby)),\
 	$(if $(filter ruby,$(plugin_lang)),\
-		/usr/bin/$(plugin_kind))))
+		/usr/bin/$(strip $(or \
+			$(plugin_kind),\
+			$(UWSGI_DEFAULTKIND_ruby))))))
 plugin_alternatives_name = uwsgi-plugin-$(strip $(or \
 	$(if $(filter python,$(plugin_is_lang)),\
 		$(plugin_lang_kind)),\
