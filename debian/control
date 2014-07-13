@@ -36,8 +36,6 @@ Build-Depends:
  libqdbm-dev,
  libbz2-dev,
  libwrap0-dev,
- libgnustep-gui-dev,
- libgnustep-base-dev,
  libcoro-perl,
  libgeoip-dev,
  libv8-dev [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel],

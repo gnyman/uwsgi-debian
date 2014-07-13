@@ -173,7 +173,6 @@ Files: CONTRIBUTORS
  debian/patches/1003_remove-php-libs.patch
  debian/patches/1004_fix-php-ldflags.patch
  debian/patches/1005_emperor-pg-fix-cflags.patch
- debian/patches/1006_alarm_speech-libs.patch
  debian/patches/README
  debian/patches/series
  debian/rules
