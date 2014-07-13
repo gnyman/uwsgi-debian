@@ -1,4 +1,4 @@
-uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
+uwsgi (2.0.6~dfsg-1) unstable; urgency=medium
 
   [ upstream ]
   * New release 2.0.4.
@@ -55,6 +55,25 @@ uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
     + setremoteaddr.
     + resolve option.
     <https://uwsgi-docs.readthedocs.org/en/latest/Changelog-2.0.5.html>
+  * New release 2.0.6.
+    Bugfixes:
+    + Fix a memory leak with subscription system.
+    + Fix shortcut for ssl-socket.
+    + Fix apache2 mod_proxy_uwsgi (now considered stable with all mpm
+      engines).
+    + Fix SCRIPT_NAME and PATH_TRANSLATED generation in php plugin.
+    + Remove old FIFO socket from the event queue when recreating it.
+    New features:
+    + Rados plugins improved and stabilized.
+    + –if-hostname to include options only on specified hostname match.
+    + Apache2 mod_proxy_uwsgi stabilized.
+    + uwsgi[rsize] routing var.
+    + callint scheme.
+    + –fastrouter-fallback-on-no-key.
+    + php 5.5 opcode caching via –php-sapi-name.
+    + Improved chain-reloading.
+    + added ‘chdir’ keyval to –attach-daemon2.
+    <https://uwsgi-docs.readthedocs.org/en/latest/Changelog-2.0.6.html>
 
   [ Jonas Smedegaard ]
   * Repackage upstream tarball to exclude binary example file without
@@ -72,6 +91,8 @@ uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
     + Build-depend on devscripts: Needed for copyright check.
     + Build-depend on libssl-dev.
     + Build-depend on librados-dev: Needed for Rados plugin.
+    + Build-depend on libluajit-5.1-dev: Needed for Lua plugin linked
+      with LuaJIT.
   * Document use of CDBS and git-buildpackage in README.source.
   * Fix install tests as example files (was dropped since 1.9.17-1).
   * Refactor packaging files:
@@ -102,8 +123,9 @@ uwsgi (2.0.5.1~dfsg-1) UNRELEASED; urgency=medium
     Closes: bug#743994. Thanks to Christian Hofstaedtler, Antonio
     Terceiro and Neil Williams.
   * Enable rados plugin.
+  * Build Lua plugin linked with LuaJIT (where available).
 
- -- Jonas Smedegaard <dr@jones.dk>  Sun, 13 Jul 2014 11:15:11 +0200
+ -- Jonas Smedegaard <dr@jones.dk>  Sun, 13 Jul 2014 13:44:04 +0200
 
 uwsgi (2.0.3-1) unstable; urgency=medium
 

@@ -19,6 +19,7 @@ Build-Depends:
  libldap2-dev,
  liblua5.1-0-dev,
  liblua5.2-dev,
+ libluajit-5.1-dev [amd64 armel armhf i386 kfreebsd-i386 mips mipsel powerpc],
  libperl-dev,
  libpq-dev,
  libcurl4-openssl-dev,
@@ -162,7 +163,8 @@ Description: fast, self-healing application container server (core)
  .
  ${uwsgi:corepluginlist}
  .
- Plugin emperor_zeromq is provided only on supported architectures.
+ Plugins emperor_zeromq and rados are provided only on supported
+ architectures.
 
 Package: uwsgi-emperor
 Architecture: any
@@ -254,6 +256,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
  uwsgi-plugin-lua5.2 (= ${binary:Version}),
+ uwsgi-plugin-luajit (= ${binary:Version}),
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
@@ -271,7 +274,7 @@ Description: plugins for integration of uWSGI and application
  application:
   * Java (OpenJDK 7)
   * JWSGI (OpenJDK 7)
-  * Lua WSAPI (Lua 5.1 and 5.2)
+  * Lua WSAPI (Lua 5.1, 5.2 and LuaJIT)
   * PHP
   * Perl PSGI
   * Python WSGI (Python 2 and 3)
@@ -459,6 +462,19 @@ Description: Lua WSAPI plugin for uWSGI (Lua 5.2)
  .
  This package provides Lua WSAPI plugin for uWSGI
  (linked with Lua 5.2 runtime).
+
+Package: uwsgi-plugin-luajit
+Architecture: amd64 armel armhf i386 kfreebsd-i386 mips mipsel powerpc
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Lua WSAPI plugin for uWSGI (LuaJIT)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Lua WSAPI plugin for uWSGI
+ (linked with LuaJIT runtime).
 
 Package: uwsgi-plugin-psgi
 Architecture: any
