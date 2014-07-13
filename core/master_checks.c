@@ -40,26 +40,44 @@ int uwsgi_master_check_reload(char **argv) {
 // check for chain reload
 void uwsgi_master_check_chain() {
 	if (!uwsgi.status.chain_reloading) return;
-	int i;
-	int needed_procs = 0;
-	for(i=1;i<=uwsgi.numproc;i++) {
-                if (uwsgi.workers[i].pid > 0 && uwsgi.workers[i].cheaped == 0) {
-			needed_procs++;
-                }
-        }
-	if (uwsgi.status.chain_reloading > needed_procs) {
-		uwsgi.status.chain_reloading = 0;
-                uwsgi_log_verbose("chain reloading complete\n");
-	}
-	uwsgi_block_signal(SIGHUP);
-	for(i=1;i<=uwsgi.numproc;i++) {
-		// do not curse a worker until the old one is ready
-		if (uwsgi.workers[i].accepting == 0) break;
-		if (uwsgi.workers[i].pid > 0 && uwsgi.workers[i].cheaped == 0 && uwsgi.workers[i].cursed_at == 0 && i == uwsgi.status.chain_reloading) {
-			uwsgi_curse(i, SIGHUP);
-			break;
+
+	// we need to ensure the previous worker (if alive) is accepting new requests
+	// before going on
+	if (uwsgi.status.chain_reloading > 1) {
+		struct uwsgi_worker *previous_worker = &uwsgi.workers[uwsgi.status.chain_reloading-1];
+		// is the previous worker alive ?
+		if (previous_worker->pid > 0 && !previous_worker->cheaped) {
+			// the worker has been respawned but it is still not ready
+			if (previous_worker->accepting == 0) {
+				uwsgi_log_verbose("chain is still waiting for worker %d...\n", uwsgi.status.chain_reloading-1);
+				return;
+			}
 		}
 	}
+
+	// if all the processes are recycled, the chain is over
+	if (uwsgi.status.chain_reloading > uwsgi.numproc) {
+		uwsgi.status.chain_reloading = 0;
+                uwsgi_log_verbose("chain reloading complete\n");
+		return;
+	}
+
+	uwsgi_block_signal(SIGHUP);
+	int i;
+	for(i=uwsgi.status.chain_reloading;i<=uwsgi.numproc;i++) {
+		struct uwsgi_worker *uw = &uwsgi.workers[i];
+		if (uw->pid > 0 && !uw->cheaped && uw->accepting) {
+			// the worker could have been already cursed
+			if (uw->cursed_at == 0) {
+				uwsgi_log_verbose("chain next victim is worker %d\n", i);
+				uwsgi_curse(i, SIGHUP);
+			}
+			break;
+		}
+		else {
+			uwsgi.status.chain_reloading++;
+		}
+        }
 	uwsgi_unblock_signal(SIGHUP);
 }
 

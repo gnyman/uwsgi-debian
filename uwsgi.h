@@ -604,6 +604,8 @@ struct uwsgi_daemon {
 
 	int ns_pid;
 	int throttle;
+
+	char *chdir;
 };
 
 struct uwsgi_logger {
@@ -3014,6 +3016,7 @@ void uwsgi_xml_config(char *, struct wsgi_request *, char *[]);
 void uwsgi_500(struct wsgi_request *);
 void uwsgi_403(struct wsgi_request *);
 void uwsgi_404(struct wsgi_request *);
+void uwsgi_405(struct wsgi_request *);
 void uwsgi_redirect_to_slash(struct wsgi_request *);
 
 void manage_snmp(int, uint8_t *, int, struct sockaddr_in *);
@@ -3790,6 +3793,8 @@ int uwsgi_logic_opt_if_reload(char *, char *);
 int uwsgi_logic_opt_if_not_reload(char *, char *);
 int uwsgi_logic_opt_if_plugin(char *, char *);
 int uwsgi_logic_opt_if_not_plugin(char *, char *);
+int uwsgi_logic_opt_if_hostname(char *, char *);
+int uwsgi_logic_opt_if_not_hostname(char *, char *);
 
 
 void uwsgi_opt_resolve(char *, char *, void *);
