@@ -125,10 +125,15 @@ UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
 	router_access sqlite3 v8 php xslt
 # ZeroMQ is unavailable on the Hurd
 UWSGI_SRCPLUGINS_SKIP = $(if $(filter hurd-%,$(DEB_HOST_ARCH)),emperor_zeromq)
+# coroae is installed with psgi package
+UWSGI_SRCPLUGINS_SKIPINSTALL = coroae
 UWSGI_SRCPLUGINS_CORE = $(filter-out \
 	$(UWSGI_SRCPLUGINS_ADDON_LANG) $(UWSGI_SRCPLUGINS_ADDON_MISC) \
 	$(UWSGI_SRCPLUGINS_SKIP),\
 	$(UWSGI_SRCPLUGINS_WANTED))
+UWSGI_SRCPLUGINS_CORE_INSTALL = $(filter-out \
+	$(UWSGI_SRCPLUGINS_SKIPINSTALL),\
+	$(UWSGI_SRCPLUGINS_CORE))
 
 UWSGI_MODULE_INFILES := $(wildcard debian/*__MODULE__*.in)
 
@@ -300,6 +305,15 @@ clean::
 
 # uwsgi-core package
 # ------------------
+
+debian/expand-files/uwsgi-core:
+	set -e; \
+	echo "uwsgi-core usr/bin" > debian/$(cdbs_curpkg).install; \
+	for PLUGIN_NAME in $(UWSGI_SRCPLUGINS_CORE_INSTALL); do \
+		echo "$${PLUGIN_NAME}_plugin.so usr/lib/uwsgi/plugins" \
+			>> debian/$(cdbs_curpkg).install; \
+	done
+	touch $@
 
 substvars-list-encode = perl -0 -F'/\s+/' -ane 'print " * ", join("\$${Newline} * ",@F)'
 uwsgi-coreplugins := $(call pkg_name_to_plugin_name,$(UWSGI_SRCPLUGINS_CORE))
