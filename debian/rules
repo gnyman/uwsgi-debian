@@ -120,7 +120,7 @@ UWSGI_SRCPLUGINS_ADDON_LANG = $(call pkg_name_to_plugin_name,\
 	$(UWSGI_SRCPLUGINS_LANG_SELF) \
 	$(foreach lang,$(UWSGI_PLUGINLANGS),$(UWSGI_SRCPLUGINS_$(lang))))
 UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
-	emperor_pg fiber geoip graylog2 ldap psgi rbthreads \
+	emperor_pg fiber geoip graylog2 ldap psgi rados rbthreads \
 	router_access sqlite3 v8 php xslt
 # ZeroMQ is unavailable on the Hurd
 UWSGI_SRCPLUGINS_SKIP = $(if $(filter hurd-%,$(DEB_HOST_ARCH)),emperor_zeromq)
