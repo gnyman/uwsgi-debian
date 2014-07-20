@@ -103,7 +103,8 @@ UWSGI_SRCPLUGINS_ruby = rack
 UWSGI_PLUGIN_PACKAGES = $(filter uwsgi-plugin-%,$(DEB_PACKAGES))
 
 UWSGI_SRCPLUGINS_AVAILABLE := $(sort $(notdir $(wildcard plugins/*)))
-UWSGI_SRCPLUGINS_EXCLUDE = airbrake alarm_speech cplusplus dumbloop dummy \
+UWSGI_SRCPLUGINS_EXCLUDE = airbrake alarm_speech asyncio cplusplus \
+	dumbloop dummy \
 	emperor_mongodb example exception_log forkptyrouter gccgo \
 	gevent glusterfs gridfs legion_cache_fetch libffi libtcc \
 	logcrypto logpipe logzmq matheval mongodb mongodblog mongrel2 \
