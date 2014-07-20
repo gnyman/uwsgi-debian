@@ -1,3 +1,16 @@
+uwsgi (2.0.6~dfsg-3) unstable; urgency=medium
+
+  * Fix build Ceph/RADOS storage plugin only on supported archs, and
+    package it separately.
+  * Fix avoid building plugin asyncio: Documented as experimental (and
+    was accidentally not included in uwsgi-core anyway).
+  * Resolve dynamically the plugins to install into uwsgi-core package.
+  * Fix enable TLS support.
+  * Fix enable XML support.
+  * Fix use libyaml (not embedded YAML parser).
+
+ -- Jonas Smedegaard <dr@jones.dk>  Sun, 20 Jul 2014 23:08:26 +0200
+
 uwsgi (2.0.6~dfsg-2) unstable; urgency=medium
 
   * Stop build plugin alarm_speech: Pulls in Xorg and OpenGL, and is

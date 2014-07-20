@@ -182,7 +182,6 @@ Files: CONTRIBUTORS
  debian/uwsgi-core.docs
  debian/uwsgi-core.examples
  debian/uwsgi-core.init.d.custom
- debian/uwsgi-core.install
  debian/uwsgi-core.manpages
  debian/uwsgi-core.postinst
  debian/uwsgi-core.prerm
