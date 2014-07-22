@@ -39,6 +39,9 @@ Build-Depends:
  libmatheval-dev,
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
+ mongodb-dev [@mongodb_archs@],
+ libboost-thread-dev [@mongodb_archs@],
+ libboost-filesystem-dev [@mongodb_archs@],
  librados-dev [@rados_archs@],
  libssl-dev,
  pkg-config,
@@ -215,6 +218,7 @@ Description: all available plugins for uWSGI
 Package: uwsgi-infrastructure-plugins
 Architecture: any
 Depends: ${misc:Depends},
+ uwsgi-mongodb-plugins (= ${binary:Version}) [@mongodb_archs@],
  uwsgi-plugin-alarm-curl (= ${binary:Version}),
  uwsgi-plugin-alarm-xmpp (= ${binary:Version}),
  uwsgi-plugin-curl-cron (= ${binary:Version}),
@@ -245,8 +249,11 @@ Description: infrastructure plugins for uWSGI
   * SQLite 3
   * XSLT request
   * Ceph/RADOS storage
+  * MongoDB storage (GridFS), logger, Stats pusher and Emperor config
+    backend
  .
- Ceph/RADOS plugin is provided only on supported architectures.
+ Ceph/RADOS and MongoDB plugins are provided only on supported
+ architectures.
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -281,6 +288,23 @@ Description: plugins for integration of uWSGI and application
   * V8
  .
  Java and V8 plugins are provided only on supported architectures.
+
+Package: uwsgi-mongodb-plugins
+Architecture: @mongodb_archs@
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Recommends: mongodb-server
+Description: MongoDB/GridFS plugins for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides plugins for using MongoDB as uWSGI backend:
+  * emperor_mongodb (Emperor configuration)
+  * gridfs (content storage)
+  * mongodblog (logging)
+  * stats_pusher_mongodb (statistics)
 
 Package: uwsgi-plugin-alarm-curl
 Architecture: any
