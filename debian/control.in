@@ -157,7 +157,7 @@ Description: fast, self-healing application container server (core)
  .
  ${uwsgi:corepluginlist}
  .
- Plugin emperor_zeromq is provided only on supported architectures.
+ ØMQ (ZeroMQ) plugins are provided only on supported architectures.
 
 Package: uwsgi-emperor
 Architecture: any
