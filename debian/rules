@@ -400,7 +400,7 @@ clean::
 $(patsubst %,debian/stamp-%,$(UWSGI_PLUGIN_SELFPACKAGES)): \
  debian/stamp-uwsgi-plugin-%:
 	$(if $(filter java,$(plugin_lang)),\
-		$(eval JAVA_HOME = /usr/lib/jvm/java-$(plugin_lang_kind)-$(plugin_lang_stem)-$(JAVA_ARCH)))
+		$(eval JAVA_HOME = /usr/lib/jvm/java-$(plugin_lang_kind)-$(plugin_lang_stem)-$(DEB_HOST_ARCH)))
 	$(if $(filter java,$(plugin_lang)),UWSGICONFIG_JVM_INCPATH='$(JAVA_HOME)/include/') \
 	$(if $(filter java,$(plugin_lang)),UWSGICONFIG_JVM_LIBPATH='$(JVM_SERVER_DIR)') \
 	$(if $(filter lua,$(plugin_lang)),UWSGICONFIG_LUA_IMPLEMENTATION=$(plugin_kind)) \
