@@ -23,6 +23,7 @@ OPENJDK7_ARCHS := $(shell sh debian/pkgarchs.sh openjdk-7-jdk)
 V8_ARCHS := $(shell sh debian/pkgarchs.sh libv8-dev)
 LUAJIT_ARCHS := $(shell sh debian/pkgarchs.sh luajit)
 MONGODB_ARCHS := $(shell sh debian/pkgarchs.sh mongodb-dev)
+MONO_ARCHS := $(shell sh debian/pkgarchs.sh libmono-2.0-dev)
 RADOS_ARCHS := $(shell sh debian/pkgarchs.sh librados-dev)
 debian/control::
 	sed -i \
@@ -32,6 +33,7 @@ debian/control::
 		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
 		-e 's/@luajit_archs@/$(LUAJIT_ARCHS)/g' \
 		-e 's/@mongodb_archs@/$(MONGODB_ARCHS)/g' \
+		-e 's/@mono_archs@/$(MONO_ARCHS)/g' \
 		-e 's/@rados_archs@/$(RADOS_ARCHS)/g' \
 		-e 's/@ruby_kind@/$(UWSGI_KIND_ruby)/g' \
 		debian/control
@@ -117,7 +119,7 @@ UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 # TODO: enable these plugins
-UWSGI_SRCPLUGINS_MISC = gccgo gevent mono pypy ring \
+UWSGI_SRCPLUGINS_MISC = gccgo gevent pypy ring \
 	servlet stackless systemd_logger tornado
 # plugins not yet ready for production use
 UWSGI_SRCPLUGINS_EXPERIMENTAL = asyncio libffi libtcc \
@@ -135,7 +137,7 @@ UWSGI_SRCPLUGINS_ADDON_LANG = $(call pkg_name_to_plugin_name,\
 	$(UWSGI_SRCPLUGINS_LANG_SELF) \
 	$(foreach lang,$(UWSGI_PLUGINLANGS),$(UWSGI_SRCPLUGINS_$(lang))))
 UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
-	emperor_pg fiber geoip glusterfs graylog2 ldap psgi rados \
+	emperor_pg fiber geoip glusterfs graylog2 ldap mono psgi rados \
 	rbthreads router_access sqlite3 v8 php xslt
 # ZeroMQ is unavailable on the Hurd
 UWSGI_SRCPLUGINS_SKIP = \
@@ -167,6 +169,7 @@ UWSGI_PKGSCRIPTS_DEFAULT = sec
 UWSGI_PKGSCRIPTS_jvm = openjdk pri
 UWSGI_PKGSCRIPTS_jwsgi = openjdk aux
 UWSGI_PKGSCRIPTS_lua = pri
+UWSGI_PKGSCRIPTS_mono = pri
 UWSGI_PKGSCRIPTS_rack = pri
 UWSGI_PKGSCRIPTS_rbthreads = single aux
 UWSGI_PKGSCRIPTS_fiber = single aux
@@ -302,6 +305,7 @@ clean::
 	find -type f -name '*.pyc' -delete
 	find -type d -name __pycache__ -delete
 	find -type f \( -name '*.class' -or -name '*.jar' \) -delete
+	rm -f plugins/mono/uwsgi.dll plugins/mono/uwsgi.key
 	rm -f *_plugin.so
 	find debian \
 		-regextype posix-egrep -regex \
@@ -479,6 +483,17 @@ $(patsubst %,install/%,$(UWSGI_PLUGIN_PACKAGES)):: \
 			--no-info \
 			./uwsgi_$(plugin_name) \
 			> debian/uwsgi_$(plugin_name).1))
+
+# custom handling of Mono package.
+binary-strip/uwsgi-plugin-mono::
+	dh_clistrip -p$(cdbs_curpkg) --dbg-package=uwsgi-dbg
+binary-fixup/uwsgi-plugin-mono::
+	dh_clifixperms -p$(cdbs_curpkg)
+binary-predeb/uwsgi-plugin-mono::
+	dh_shlibdeps -p$(cdbs_curpkg)
+	dh_makeclilibs -p$(cdbs_curpkg) -V
+	dh_installcligac -p$(cdbs_curpkg)
+	dh_clideps -p$(cdbs_curpkg)
 
 # libapache2-mod-% packages
 # -------------------------
