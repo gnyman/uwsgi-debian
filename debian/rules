@@ -21,14 +21,12 @@ GREENLET_ARCHS := $(shell sh debian/pkgarchs.sh python-greenlet-dev)
 OPENJDK7_ARCHS := $(shell sh debian/pkgarchs.sh openjdk-7-jdk)
 V8_ARCHS := $(shell sh debian/pkgarchs.sh libv8-dev)
 LUAJIT_ARCHS := $(shell sh debian/pkgarchs.sh luajit)
-RADOS_ARCHS := $(shell sh debian/pkgarchs.sh librados-dev)
 debian/control::
 	sed -i \
 		-e 's/@greenlet_archs@/$(GREENLET_ARCHS)/g' \
 		-e 's/@openjdk7_archs@/$(OPENJDK7_ARCHS)/g' \
 		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
 		-e 's/@luajit_archs@/$(LUAJIT_ARCHS)/g' \
-		-e 's/@rados_archs@/$(RADOS_ARCHS)/g' \
 		-e 's/@ruby_kind@/$(UWSGI_KIND_ruby)/g' \
 		debian/control
 endif
@@ -108,7 +106,7 @@ UWSGI_SRCPLUGINS_ZEROMQ = logzmq mongrel2
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 UWSGI_SRCPLUGINS_MISC = forkptyrouter gccgo gevent glusterfs \
-	libtcc logcrypto logpipe matheval mono msgpack pty pypy ring \
+	libtcc logcrypto logpipe matheval mono msgpack pty pypy rados ring \
 	router_expires router_hash router_metrics router_redis \
 	router_xmldir servlet  stats_pusher_file stats_pusher_socket \
 	stackless systemd_logger tornado transformation_chunked \
@@ -131,7 +129,7 @@ UWSGI_SRCPLUGINS_ADDON_LANG = $(call pkg_name_to_plugin_name,\
 	$(UWSGI_SRCPLUGINS_LANG_SELF) \
 	$(foreach lang,$(UWSGI_PLUGINLANGS),$(UWSGI_SRCPLUGINS_$(lang))))
 UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
-	emperor_pg fiber geoip graylog2 ldap psgi rados rbthreads \
+	emperor_pg fiber geoip graylog2 ldap psgi rbthreads \
 	router_access sqlite3 v8 php xslt
 # ZeroMQ is unavailable on the Hurd
 UWSGI_SRCPLUGINS_SKIP = $(if $(filter hurd-%,$(DEB_HOST_ARCH)),emperor_zeromq)
