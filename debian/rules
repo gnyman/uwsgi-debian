@@ -99,6 +99,9 @@ UWSGI_DEFAULTKIND_ruby := $(shell find /usr/bin/ruby -printf '%l')
 UWSGI_SRCPLUGINS_ruby = rack
 
 UWSGI_PLUGIN_PACKAGES = $(filter uwsgi-plugin-%,$(DEB_PACKAGES))
+UWSGI_PLUGIN_BUNDLEPACKAGES = 
+UWSGI_PLUGIN_SELFPACKAGES = $(strip \
+	$(filter-out $(UWSGI_PLUGIN_BUNDLEPACKAGES),$(UWSGI_PLUGIN_PACKAGES)))
 
 UWSGI_SRCPLUGINS_AVAILABLE := $(sort $(notdir $(wildcard plugins/*)))
 # TODO: enable these plugins
@@ -383,7 +386,7 @@ install/uwsgi-core::
 # -----------------------
 
 # setup hook for building plugins
-$(patsubst %,build/%,$(UWSGI_PLUGIN_PACKAGES)):: \
+$(patsubst %,build/%,$(UWSGI_PLUGIN_SELFPACKAGES)):: \
  build/uwsgi-plugin-%: \
  uwsgi-core-local debian/stamp-uwsgi-plugin-%
 
@@ -394,7 +397,7 @@ clean::
 	rm -f uwsgi-core-local
 
 #  * eval'ing JAVA_HOME needed to resolve JVM_SERVER_DIR
-$(patsubst %,debian/stamp-%,$(UWSGI_PLUGIN_PACKAGES)): \
+$(patsubst %,debian/stamp-%,$(UWSGI_PLUGIN_SELFPACKAGES)): \
  debian/stamp-uwsgi-plugin-%:
 	$(if $(filter java,$(plugin_lang)),\
 		$(eval JAVA_HOME = /usr/lib/jvm/java-$(plugin_lang_kind)-$(plugin_lang_stem)-$(JAVA_ARCH)))
