@@ -1,3 +1,10 @@
+uwsgi (2.0.6~dfsg-4) unstable; urgency=medium
+
+  * Drop Ceph/RADOS plugin package (temporarily, to possibly enter
+    testing faster than waiting in NEW queue may require).
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 22 Jul 2014 12:31:26 +0200
+
 uwsgi (2.0.6~dfsg-3) unstable; urgency=medium
 
   * Fix build Ceph/RADOS storage plugin only on supported archs, and
