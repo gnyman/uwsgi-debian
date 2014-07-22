@@ -110,7 +110,7 @@ UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 # TODO: enable these plugins
 UWSGI_SRCPLUGINS_MISC = forkptyrouter gccgo gevent glusterfs \
-	logcrypto logpipe matheval mono msgpack pty pypy ring \
+	logcrypto logpipe mono msgpack pty pypy ring \
 	router_expires router_hash router_metrics router_redis \
 	router_xmldir servlet  stats_pusher_file stats_pusher_socket \
 	stackless systemd_logger tornado transformation_chunked \
