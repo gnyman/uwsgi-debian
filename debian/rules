@@ -21,6 +21,7 @@ GREENLET_ARCHS := $(shell sh debian/pkgarchs.sh python-greenlet-dev)
 OPENJDK7_ARCHS := $(shell sh debian/pkgarchs.sh openjdk-7-jdk)
 V8_ARCHS := $(shell sh debian/pkgarchs.sh libv8-dev)
 LUAJIT_ARCHS := $(shell sh debian/pkgarchs.sh luajit)
+MONGODB_ARCHS := $(shell sh debian/pkgarchs.sh mongodb-dev)
 RADOS_ARCHS := $(shell sh debian/pkgarchs.sh librados-dev)
 debian/control::
 	sed -i \
@@ -28,6 +29,7 @@ debian/control::
 		-e 's/@openjdk7_archs@/$(OPENJDK7_ARCHS)/g' \
 		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
 		-e 's/@luajit_archs@/$(LUAJIT_ARCHS)/g' \
+		-e 's/@mongodb_archs@/$(MONGODB_ARCHS)/g' \
 		-e 's/@rados_archs@/$(RADOS_ARCHS)/g' \
 		-e 's/@ruby_kind@/$(UWSGI_KIND_ruby)/g' \
 		debian/control
@@ -110,9 +112,9 @@ UWSGI_PLUGIN_PACKAGES = $(filter uwsgi-plugin-%,$(DEB_PACKAGES))
 
 UWSGI_SRCPLUGINS_AVAILABLE := $(sort $(notdir $(wildcard plugins/*)))
 UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
-# TODO: enable these plugins
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
+# TODO: enable these plugins
 UWSGI_SRCPLUGINS_MISC = forkptyrouter gccgo gevent glusterfs \
 	logcrypto logpipe mono msgpack pty pypy ring \
 	router_expires router_hash router_metrics router_redis \
@@ -129,7 +131,6 @@ UWSGI_SRCPLUGINS_DEMO = cplusplus dumbloop dummy example exception_log
 UWSGI_SRCPLUGINS_UNKNOWN = legion_cache_fetch objc_gc pyuwsgi ruby19
 UWSGI_SRCPLUGINS_EXCLUDE = $(UWSGI_SRCPLUGINS_ALIEN) \
 	$(UWSGI_SRCPLUGINS_DEMO) $(UWSGI_SRCPLUGINS_EXPERIMENTAL) \
-	$(UWSGI_SRCPLUGINS_MONGODB) \
 	$(UWSGI_SRCPLUGINS_MISC) $(UWSGI_SRCPLUGINS_UNKNOWN)
 UWSGI_SRCPLUGINS_WANTED = $(filter-out $(UWSGI_SRCPLUGINS_EXCLUDE),\
 	$(UWSGI_SRCPLUGINS_AVAILABLE))
@@ -144,7 +145,7 @@ UWSGI_SRCPLUGINS_SKIP = \
 	$(if $(filter hurd-%,$(DEB_HOST_ARCH)),\
 		$(UWSGI_SRCPLUGINS_ZEROMQ))
 # coroae is installed with psgi package
-UWSGI_SRCPLUGINS_SKIPINSTALL = coroae
+UWSGI_SRCPLUGINS_SKIPINSTALL = coroae $(UWSGI_SRCPLUGINS_MONGODB)
 UWSGI_SRCPLUGINS_CORE = $(filter-out \
 	$(UWSGI_SRCPLUGINS_ADDON_LANG) $(UWSGI_SRCPLUGINS_ADDON_MISC) \
 	$(UWSGI_SRCPLUGINS_SKIP),\
@@ -276,6 +277,9 @@ $(foreach pkg, $(UWSGI_PLUGIN_PACKAGES), $(eval \
 
 DEB_INSTALL_DOCS_ALL += $(DEB_SRCDIR)/CONTRIBUTORS
 
+DEB_DH_INSTALL_ARGS_uwsgi-mongodb-plugins = $(strip \
+	$(patsubst %,%_plugin.so,$(UWSGI_SRCPLUGINS_MONGODB)) \
+	usr/lib/uwsgi/plugins)
 DEB_DH_INSTALL_ARGS_uwsgi-plugin-psgi = coroae_plugin.so usr/lib/uwsgi/plugins
 DEB_DH_INSTALL_ARGS_python-uwsgidecorators = uwsgidecorators.py $(python_installdir)
 DEB_DH_INSTALL_ARGS_python3-uwsgidecorators = 2to3/uwsgidecorators.py $(python_installdir)
