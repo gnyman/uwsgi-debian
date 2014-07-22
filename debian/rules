@@ -115,13 +115,8 @@ UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 # TODO: enable these plugins
-UWSGI_SRCPLUGINS_MISC = forkptyrouter gccgo gevent glusterfs \
-	logcrypto logpipe mono msgpack pty pypy ring \
-	router_expires router_hash router_metrics router_redis \
-	router_xmldir servlet  stats_pusher_file stats_pusher_socket \
-	stackless systemd_logger tornado transformation_chunked \
-	transformation_offload transformation_template tuntap webdav \
-	xattr zabbix
+UWSGI_SRCPLUGINS_MISC = gccgo gevent glusterfs mono pypy ring \
+	servlet stackless systemd_logger tornado
 # plugins not yet ready for production use
 UWSGI_SRCPLUGINS_EXPERIMENTAL = asyncio libffi libtcc \
 	router_radius router_spnego
