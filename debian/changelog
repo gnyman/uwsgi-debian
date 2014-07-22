@@ -1,3 +1,11 @@
+uwsgi (2.0.6~dfsg-5) unstable; urgency=medium
+
+  * Add patch 1006 to fix emperor-zeromq linkage against libzmq.
+  * Fix resolve Java include path (use $DEB_HOST_ARCH for outer part,
+    and $JAVA_ARCH only for inner part of libdir).
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 22 Jul 2014 16:39:28 +0200
+
 uwsgi (2.0.6~dfsg-4) unstable; urgency=medium
 
   * Drop Ceph/RADOS plugin package (temporarily, to possibly enter
