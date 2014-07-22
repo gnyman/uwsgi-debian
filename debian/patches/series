@@ -3,3 +3,4 @@
 1003_remove-php-libs.patch
 1004_fix-php-ldflags.patch
 1005_emperor-pg-fix-cflags.patch
+1006_emperor-zeromq-libs.patch
