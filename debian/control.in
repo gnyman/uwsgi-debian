@@ -209,6 +209,8 @@ Description: all available plugins for uWSGI
     - Coro::AnyEvent
     - Fiber (${uwsgi:RubyDefaultkind})
     - greenlet (Python 2)
+ .
+ Greenlet plugin is provided only on supported architectures.
 
 Package: uwsgi-infrastructure-plugins
 Architecture: any
@@ -243,6 +245,8 @@ Description: infrastructure plugins for uWSGI
   * SQLite 3
   * XSLT request
   * Ceph/RADOS storage
+ .
+ Ceph/RADOS plugin is provided only on supported architectures.
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -275,6 +279,8 @@ Description: plugins for integration of uWSGI and application
   * Python WSGI (Python 2 and 3)
   * Rack (${uwsgi:RubyKinds})
   * V8
+ .
+ Java and V8 plugins are provided only on supported architectures.
 
 Package: uwsgi-plugin-alarm-curl
 Architecture: any
