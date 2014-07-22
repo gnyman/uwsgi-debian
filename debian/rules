@@ -325,6 +325,8 @@ debian/expand-files/uwsgi-core:
 			>> debian/$(cdbs_curpkg).install; \
 	done
 	touch $@
+clean::
+	rm -f debian/uwsgi-core.install
 
 substvars-list-encode = perl -0 -F'/\s+/' -ane 'print " * ", join("\$${Newline} * ",@F)'
 uwsgi-coreplugins := $(call pkg_name_to_plugin_name,$(UWSGI_SRCPLUGINS_CORE))
