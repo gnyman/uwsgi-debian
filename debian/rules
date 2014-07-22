@@ -112,8 +112,8 @@ UWSGI_PLUGIN_SELFPACKAGES = $(strip \
 	$(filter-out $(UWSGI_PLUGIN_BUNDLEPACKAGES),$(UWSGI_PLUGIN_PACKAGES)))
 
 UWSGI_SRCPLUGINS_AVAILABLE := $(sort $(notdir $(wildcard plugins/*)))
+UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
 # TODO: enable these plugins
-UWSGI_SRCPLUGINS_ZEROMQ = logzmq mongrel2
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 UWSGI_SRCPLUGINS_MISC = forkptyrouter gccgo gevent glusterfs \
@@ -132,7 +132,7 @@ UWSGI_SRCPLUGINS_DEMO = cplusplus dumbloop dummy example exception_log
 UWSGI_SRCPLUGINS_UNKNOWN = legion_cache_fetch objc_gc pyuwsgi ruby19
 UWSGI_SRCPLUGINS_EXCLUDE = $(UWSGI_SRCPLUGINS_ALIEN) \
 	$(UWSGI_SRCPLUGINS_DEMO) $(UWSGI_SRCPLUGINS_EXPERIMENTAL) \
-	$(UWSGI_SRCPLUGINS_ZEROMQ) $(UWSGI_SRCPLUGINS_MONGODB) \
+	$(UWSGI_SRCPLUGINS_MONGODB) \
 	$(UWSGI_SRCPLUGINS_MISC) $(UWSGI_SRCPLUGINS_UNKNOWN)
 UWSGI_SRCPLUGINS_WANTED = $(filter-out $(UWSGI_SRCPLUGINS_EXCLUDE),\
 	$(UWSGI_SRCPLUGINS_AVAILABLE))
@@ -143,7 +143,9 @@ UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
 	emperor_pg fiber geoip graylog2 ldap psgi rados rbthreads \
 	router_access sqlite3 v8 php xslt
 # ZeroMQ is unavailable on the Hurd
-UWSGI_SRCPLUGINS_SKIP = $(if $(filter hurd-%,$(DEB_HOST_ARCH)),emperor_zeromq)
+UWSGI_SRCPLUGINS_SKIP = \
+	$(if $(filter hurd-%,$(DEB_HOST_ARCH)),\
+		$(UWSGI_SRCPLUGINS_ZEROMQ))
 # coroae is installed with psgi package
 UWSGI_SRCPLUGINS_SKIPINSTALL = coroae
 UWSGI_SRCPLUGINS_CORE = $(filter-out \
