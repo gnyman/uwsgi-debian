@@ -40,6 +40,7 @@ Build-Depends:
  libmatheval-dev,
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
+ glusterfs-common [@glusterfs_archs@],
  mongodb-dev [@mongodb_archs@],
  libboost-thread-dev [@mongodb_archs@],
  libboost-filesystem-dev [@mongodb_archs@],
@@ -227,6 +228,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-graylog2 (= ${binary:Version}),
  uwsgi-plugin-geoip (= ${binary:Version}),
  uwsgi-plugin-ldap (= ${binary:Version}),
+ uwsgi-plugin-glusterfs (= ${binary:Version}) [@glusterfs_archs@],
  uwsgi-plugin-rados (= ${binary:Version}) [@rados_archs@],
  uwsgi-plugin-router-access (= ${binary:Version}),
  uwsgi-plugin-sqlite3 (= ${binary:Version}),
@@ -249,12 +251,13 @@ Description: infrastructure plugins for uWSGI
   * router access
   * SQLite 3
   * XSLT request
+  * GlusterFS storage
   * Ceph/RADOS storage
   * MongoDB storage (GridFS), logger, Stats pusher and Emperor config
     backend
  .
- Ceph/RADOS and MongoDB plugins are provided only on supported
- architectures.
+ GlusterFS, Ceph/RADOS and MongoDB plugins are provided only on
+ supported architectures.
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
@@ -354,6 +357,18 @@ Description: Emperor PostgreSQL plugin for uWSGI
  the same core.
  .
  This package provides emperor_pg plugin for uWSGI.
+
+Package: uwsgi-plugin-glusterfs
+Architecture: @glusterfs_archs@
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: GlusterFS storage plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides GlusterfS storage plugin for uWSGI.
 
 Package: uwsgi-plugin-rados
 Architecture: @rados_archs@
