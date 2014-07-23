@@ -95,7 +95,7 @@ UWSGI_KIND_ruby := $(UWSGI_KINDS_ruby)$(strip $(if $(strip \
 	$(filter 1,$(words $(UWSGI_KINDS_ruby)))),\
 		,\
 		$(error ERROR: multiple Ruby kinds not supported)))
-UWSGI_DEFAULTKIND_ruby := $(shell find /usr/bin/ruby -printf '%l')
+UWSGI_DEFAULTKIND_ruby = $(UWSGI_KIND_ruby)
 UWSGI_SRCPLUGINS_ruby = rack
 
 UWSGI_PLUGIN_PACKAGES = $(filter uwsgi-plugin-%,$(DEB_PACKAGES))
@@ -349,8 +349,10 @@ clean::
 	rm -f uwsgi-core
 	find -type l -name 'uwsgi_*' -delete
 
-uwsgi-rubyplugins = $(UWSGI_SRCPLUGINS_ruby) rbthreads fiber
-uwsgi-rubypkghint = $(filter $(uwsgi-rubyplugins),$(UWSGI_PLUGIN_PACKAGES))
+uwsgi-rubyplugins = $(foreach kind,$(UWSGI_KINDS_ruby),\
+	$(patsubst %,%-$(kind),$(UWSGI_SRCPLUGINS_ruby)))
+uwsgi-rubyplugins += rbthreads fiber
+uwsgi-rubypkghint = $(patsubst %,uwsgi-plugin-%,$(uwsgi-rubyplugins))
 uwsgi-rubypkghint += uwsgi-plugins-all uwsgi-app-integration-plugins
 $(patsubst %,install/%,$(uwsgi-rubypkghint))::
 	echo 'uwsgi:RubyKinds=$(UWSGI_KINDS_ruby)' >> debian/$(cdbs_curpkg).substvars
