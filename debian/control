@@ -50,7 +50,8 @@ Build-Depends:
  python-greenlet-dev [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  python3-all-dev,
  openjdk-7-jdk [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
- ruby-all-dev,
+ ruby-all-dev | ruby1.9.1,
+ ruby-all-dev | ruby1.9.1-dev,
  uuid-dev
 Standards-Version: 3.9.5
 Homepage: http://projects.unbit.it/uwsgi/
@@ -252,7 +253,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
  uwsgi-plugin-lua5.2 (= ${binary:Version}),
- uwsgi-plugin-luajit (= ${binary:Version}),
+ uwsgi-plugin-luajit (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-i386 mips mipsel powerpc],
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
