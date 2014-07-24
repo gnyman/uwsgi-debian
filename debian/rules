@@ -83,7 +83,7 @@ UWSGI_PLUGINLANGS = python java lua ruby
 
 UWSGI_KINDS_python = python python3
 UWSGI_SRCPLUGINS_LANG_SELF += python
-UWSGI_SRCPLUGINS_python = greenlet
+UWSGI_SRCPLUGINS_python = gevent greenlet tornado
 
 UWSGI_KINDS_java = openjdk-7
 UWSGI_DEFAULTKIND_java = openjdk-7
@@ -113,8 +113,8 @@ UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 # TODO: enable these plugins
-UWSGI_SRCPLUGINS_MISC = gccgo gevent pypy ring \
-	servlet stackless systemd_logger tornado
+UWSGI_SRCPLUGINS_MISC = gccgo pypy ring \
+	servlet stackless systemd_logger
 # plugins not yet ready for production use
 UWSGI_SRCPLUGINS_EXPERIMENTAL = asyncio libffi libtcc \
 	router_radius router_spnego
@@ -168,7 +168,9 @@ UWSGI_PKGSCRIPTS_rack = pri
 UWSGI_PKGSCRIPTS_rbthreads = single aux
 UWSGI_PKGSCRIPTS_fiber = single aux
 UWSGI_PKGSCRIPTS_python = python pri-py pri
+UWSGI_PKGSCRIPTS_gevent = python aux-py aux
 UWSGI_PKGSCRIPTS_greenlet = python aux-py aux
+UWSGI_PKGSCRIPTS_tornado = python aux-py aux
 
 # Stem-based variables
 # ====================
