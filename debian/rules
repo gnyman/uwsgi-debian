@@ -337,7 +337,7 @@ clean::
 	rm -f debian/uwsgi-core.install
 
 substvars-list-encode = perl -0 -F'/\s+/' -ane 'print " * ", join("\$${Newline} * ",@F)'
-uwsgi-coreplugins := $(call pkg_name_to_plugin_name,$(UWSGI_SRCPLUGINS_CORE))
+uwsgi-coreplugins := $(call pkg_name_to_plugin_name,$(UWSGI_SRCPLUGINS_CORE_INSTALL))
 uwsgi-corepluginlist := $(shell echo $(uwsgi-coreplugins) | $(substvars-list-encode))
 build/uwsgi-core:: uwsgi-core
 uwsgi-core: uwsgi-core-local
