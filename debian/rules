@@ -119,7 +119,7 @@ UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 # TODO: enable these plugins
-UWSGI_SRCPLUGINS_MISC = gccgo pypy \
+UWSGI_SRCPLUGINS_MISC = pypy \
 	stackless systemd_logger
 # plugins not yet ready for production use
 UWSGI_SRCPLUGINS_EXPERIMENTAL = asyncio libffi libtcc \
@@ -137,12 +137,15 @@ UWSGI_SRCPLUGINS_ADDON_LANG = $(call pkg_name_to_plugin_name,\
 	$(UWSGI_SRCPLUGINS_LANG_SELF) \
 	$(foreach lang,$(UWSGI_PLUGINLANGS),$(UWSGI_SRCPLUGINS_$(lang))))
 UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
-	emperor_pg fiber geoip glusterfs graylog2 ldap mono psgi rados \
-	rbthreads router_access sqlite3 v8 php xslt
+	emperor_pg fiber gccgo geoip glusterfs graylog2 ldap mono psgi \
+	rados rbthreads router_access sqlite3 v8 php xslt
 # ZeroMQ is unavailable on the Hurd
+# GNU Go is available only on linux
 UWSGI_SRCPLUGINS_SKIP = \
 	$(if $(filter hurd-%,$(DEB_HOST_ARCH)),\
-		$(UWSGI_SRCPLUGINS_ZEROMQ))
+		$(UWSGI_SRCPLUGINS_ZEROMQ)) \
+	$(if $(filter hurd-% kfreebsd-%,$(DEB_HOST_ARCH)),\
+		gccgo)
 # coroae is installed with psgi package
 UWSGI_SRCPLUGINS_SKIPINSTALL = coroae $(UWSGI_SRCPLUGINS_MONGODB)
 UWSGI_SRCPLUGINS_CORE = $(filter-out \
