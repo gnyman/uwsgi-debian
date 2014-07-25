@@ -208,6 +208,7 @@ Description: all available plugins for uWSGI
     - Coro::AnyEvent
     - Fiber (${uwsgi:RubyDefaultkind})
     - greenlet (Python 2)
+    - Ruby native threads (${uwsgi:RubyDefaultkind})
  .
  Greenlet plugin is provided only on supported architectures.
 
