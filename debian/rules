@@ -112,18 +112,18 @@ UWSGI_SRCPLUGINS_AVAILABLE := $(sort $(notdir $(wildcard plugins/*)))
 UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
-# TODO: enable these plugins
-UWSGI_SRCPLUGINS_MISC = pypy stackless
+# TODO: enable PyPy when supported by CDBS
+UWSGI_SRCPLUGINS_TODO = pypy
 # plugins not yet ready for production use
 UWSGI_SRCPLUGINS_EXPERIMENTAL = asyncio libffi libtcc \
 	router_radius router_spnego
-# plugins irrelevant/unusable in Linux/KFreeBSD/Hurd environments
-UWSGI_SRCPLUGINS_ALIEN = airbrake alarm_speech mongodb
+# plugins irrelevant/unusable for Debian
+UWSGI_SRCPLUGINS_ALIEN = airbrake alarm_speech mongodb stackless
 UWSGI_SRCPLUGINS_DEMO = cplusplus dumbloop dummy example exception_log
 UWSGI_SRCPLUGINS_UNKNOWN = legion_cache_fetch objc_gc pyuwsgi ruby19
 UWSGI_SRCPLUGINS_EXCLUDE = $(UWSGI_SRCPLUGINS_ALIEN) \
 	$(UWSGI_SRCPLUGINS_DEMO) $(UWSGI_SRCPLUGINS_EXPERIMENTAL) \
-	$(UWSGI_SRCPLUGINS_MISC) $(UWSGI_SRCPLUGINS_UNKNOWN)
+	$(UWSGI_SRCPLUGINS_TODO) $(UWSGI_SRCPLUGINS_UNKNOWN)
 UWSGI_SRCPLUGINS_WANTED = $(filter-out $(UWSGI_SRCPLUGINS_EXCLUDE),\
 	$(UWSGI_SRCPLUGINS_AVAILABLE))
 UWSGI_SRCPLUGINS_ADDON_LANG = $(call pkg_name_to_plugin_name,\
