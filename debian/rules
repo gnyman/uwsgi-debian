@@ -115,8 +115,7 @@ UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 # TODO: enable PyPy when supported by CDBS
 UWSGI_SRCPLUGINS_TODO = pypy
 # plugins not yet ready for production use
-UWSGI_SRCPLUGINS_EXPERIMENTAL = asyncio libffi libtcc \
-	router_radius router_spnego
+UWSGI_SRCPLUGINS_EXPERIMENTAL = asyncio libffi libtcc router_spnego
 # plugins irrelevant/unusable for Debian
 UWSGI_SRCPLUGINS_ALIEN = airbrake alarm_speech mongodb stackless
 UWSGI_SRCPLUGINS_DEMO = cplusplus dumbloop dummy example exception_log
