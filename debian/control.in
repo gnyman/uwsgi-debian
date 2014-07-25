@@ -219,6 +219,7 @@ Description: all available plugins for uWSGI
     - Fiber (${uwsgi:RubyDefaultkind})
     - gevent (Python 2)
     - greenlet (Python 2)
+    - Ruby native threads (${uwsgi:RubyDefaultkind})
     - tornado (Python 2)
  .
  Greenlet and gevent plugin is provided only on supported architectures.
