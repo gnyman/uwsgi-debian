@@ -192,7 +192,6 @@ Depends: ${misc:Depends},
  uwsgi-plugin-rbthreads (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version}) [@greenlet_archs@],
- uwsgi-plugin-php (= ${binary:Version})
 Description: all available plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
