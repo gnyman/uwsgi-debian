@@ -26,6 +26,7 @@ Build-Depends:
  libyaml-dev,
  libzmq3-dev [!hurd-any] | libzmq-dev [!kfreebsd-any !hurd-any],
  libphp5-embed,
+ gccgo [linux-any],
  php5-dev,
  libonig-dev,
  libdb-dev,
@@ -276,6 +277,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-lua5.2 (= ${binary:Version}),
  uwsgi-plugin-luajit (= ${binary:Version}) [@luajit_archs@],
  uwsgi-plugin-mono (= ${binary:Version}) [@mono_archs@],
+ uwsgi-plugin-gccgo (= ${binary:Version}) [linux-any],
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
@@ -291,6 +293,7 @@ Description: plugins for integration of uWSGI and application
  .
  This dependency package provides plugins for integration of uWSGI and
  application:
+  * GNU Go
   * Java (OpenJDK 7)
   * JWSGI (OpenJDK 7)
   * Lua WSAPI (Lua 5.1, 5.2 and LuaJIT)
@@ -490,6 +493,18 @@ Description: tornado plugin for uWSGI (Python 2)
  .
  This package provides tornado plugin for uWSGI
  with Python 2 WSGI interface.
+
+Package: uwsgi-plugin-gccgo
+Architecture: @openjdk7_archs@
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: GNU Go plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides gccgo (GNU Go) plugin for uWSGI.
 
 Package: uwsgi-plugin-jvm-openjdk-7
 Architecture: @openjdk7_archs@
