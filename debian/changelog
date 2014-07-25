@@ -1,3 +1,34 @@
+uwsgi (2.0.6~dfsg-8+exp1) experimental; urgency=medium
+
+  * Enable core plugins logcrypto logpipe msgpack pty router_expires
+    router_hash router_metrics router_radius router_redis router_xmldir
+    stats_pusher_file stats_pusher_socket transformation_chunked
+    transformation_offload transformation_template webdav xattr zabbix.
+  * Enable core plugins logzmq mongrel2 forkptyrouter (except on the
+    Hurd).
+  * Enable core plugin tuntap (except on kFreeBSD).
+  * Enable core plugin systemd_logger (only on linux archs).
+  * Enable plugins separately packaged:
+    + gevent
+    + tornado
+    + Closure/ring
+    + Servlet 2.5
+    + MongoDB and GridFS plugins (on supported archs)
+    + GlusterFS (on supported archs)
+    + Mono/ASP.NET (on supported archs)
+    + GNU Go (on supported archs)
+  * Update package relations:
+    + Build-depend on libattr-dev: Needed for xattr.
+    + Build-depend on mongodb-dev, libboost-thread-dev and
+      libboost-filesystem-dev: Needed for MongoDB.
+    + Build-depend on glusterfs-common: Needed for GlusterFS.
+    + Build-depend on mono-devel and cli-common-dev: Needed for mono.
+    + Build-depend on gccgo: Needed for GNU Go.
+    + Build-depend on libsystemd-journal-dev: Needed for systemd_logger.
+  * Adjust git-buildpackage config for experimental branch.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 19 Aug 2014 14:03:58 +0200
+
 uwsgi (2.0.6~dfsg-8) unstable; urgency=medium
 
   * Resolve Ruby kinds in backport-friendly manner (see bug#755779).

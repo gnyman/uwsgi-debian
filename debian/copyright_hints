@@ -157,6 +157,15 @@ Files: CONTRIBUTORS
  core/yaml.c
  core/zeus.c
  core/zlib.c
+ debian/ARCHS_gccgo
+ debian/ARCHS_glusterfs
+ debian/ARCHS_greenlet
+ debian/ARCHS_luajit
+ debian/ARCHS_mongodb
+ debian/ARCHS_mono
+ debian/ARCHS_openjdk7
+ debian/ARCHS_rados
+ debian/ARCHS_v8
  debian/README.source
  debian/TODO
  debian/buildconf/uwsgi-core.ini
@@ -165,6 +174,7 @@ Files: CONTRIBUTORS
  debian/control
  debian/control.in
  debian/gbp.conf
+ debian/installcligac
  debian/libapache2-mod-__MODULE__.install.in
  debian/libapache2-mod-__MODULE__.postinst.in
  debian/libapache2-mod-__MODULE__.prerm.in

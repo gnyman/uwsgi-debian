@@ -15,6 +15,7 @@ Build-Depends:
  javahelper,
  libapr1-dev,
  libaprutil1-dev,
+ libattr1-dev,
  libjansson-dev,
  libldap2-dev,
  liblua5.1-0-dev,
@@ -29,7 +30,9 @@ Build-Depends:
  libxml2-dev,
  libyaml-dev,
  libzmq3-dev [!hurd-any] | libzmq-dev [!kfreebsd-any !hurd-any],
+ libsystemd-journal-dev [!kfreebsd-any !hurd-any],
  libphp5-embed,
+ gccgo [amd64 arm64 armel armhf i386 mips mipsel powerpc ppc64el s390x],
  php5-dev,
  libonig-dev,
  libdb-dev,
@@ -44,6 +47,10 @@ Build-Depends:
  libmatheval-dev,
  libjail-dev [kfreebsd-any],
  libkvm-dev [kfreebsd-any],
+ glusterfs-common [amd64 armel armhf i386 mips mipsel powerpc s390x sparc],
+ mongodb-dev [amd64 armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386],
+ libboost-thread-dev [amd64 armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386],
+ libboost-filesystem-dev [amd64 armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386],
  librados-dev [amd64 armel armhf i386 mips mipsel powerpc s390x sparc],
  libssl-dev,
  pkg-config,
@@ -51,6 +58,8 @@ Build-Depends:
  python-greenlet-dev [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  python3-all-dev,
  openjdk-7-jdk [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
+ mono-devel [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel powerpc s390x],
+ cli-common-dev [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel powerpc s390x],
  ruby-all-dev | ruby-dev,
  ruby,
  uuid-dev
@@ -162,7 +171,8 @@ Description: fast, self-healing application container server (core)
  .
  ${uwsgi:corepluginlist}
  .
- Plugin emperor_zeromq is provided only on supported architectures.
+ ØMQ (ZeroMQ) plugins, forkptyrouter, systemd and tuntap are provided
+ only on supported architectures.
 
 Package: uwsgi-emperor
 Architecture: any
@@ -196,7 +206,9 @@ Depends: ${misc:Depends},
  uwsgi-app-integration-plugins (= ${binary:Version}),
  uwsgi-plugin-rbthreads (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
+ uwsgi-plugin-gevent-python (= ${binary:Version}) [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  uwsgi-plugin-greenlet-python (= ${binary:Version}) [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
+ uwsgi-plugin-tornado-python (= ${binary:Version})
 Description: all available plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -212,14 +224,17 @@ Description: all available plugins for uWSGI
   * coroutines
     - Coro::AnyEvent
     - Fiber (${uwsgi:RubyDefaultkind})
+    - gevent (Python 2)
     - greenlet (Python 2)
     - Ruby native threads (${uwsgi:RubyDefaultkind})
+    - tornado (Python 2)
  .
- Greenlet plugin is provided only on supported architectures.
+ Greenlet and gevent plugin is provided only on supported architectures.
 
 Package: uwsgi-infrastructure-plugins
 Architecture: any
 Depends: ${misc:Depends},
+ uwsgi-mongodb-plugins (= ${binary:Version}) [amd64 armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386],
  uwsgi-plugin-alarm-curl (= ${binary:Version}),
  uwsgi-plugin-alarm-xmpp (= ${binary:Version}),
  uwsgi-plugin-curl-cron (= ${binary:Version}),
@@ -227,6 +242,7 @@ Depends: ${misc:Depends},
  uwsgi-plugin-graylog2 (= ${binary:Version}),
  uwsgi-plugin-geoip (= ${binary:Version}),
  uwsgi-plugin-ldap (= ${binary:Version}),
+ uwsgi-plugin-glusterfs (= ${binary:Version}) [amd64 armel armhf i386 mips mipsel powerpc s390x sparc],
  uwsgi-plugin-rados (= ${binary:Version}) [amd64 armel armhf i386 mips mipsel powerpc s390x sparc],
  uwsgi-plugin-router-access (= ${binary:Version}),
  uwsgi-plugin-sqlite3 (= ${binary:Version}),
@@ -249,18 +265,26 @@ Description: infrastructure plugins for uWSGI
   * router access
   * SQLite 3
   * XSLT request
+  * GlusterFS storage
   * Ceph/RADOS storage
+  * MongoDB storage (GridFS), logger, Stats pusher and Emperor config
+    backend
  .
- Ceph/RADOS plugin is provided only on supported architectures.
+ GlusterFS, Ceph/RADOS and MongoDB plugins are provided only on
+ supported architectures.
 
 Package: uwsgi-app-integration-plugins
 Architecture: any
 Depends: ${misc:Depends},
  uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  uwsgi-plugin-jwsgi-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
+ uwsgi-plugin-ring-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
+ uwsgi-plugin-servlet-openjdk-7 (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  uwsgi-plugin-lua5.1 (= ${binary:Version}),
  uwsgi-plugin-lua5.2 (= ${binary:Version}),
  uwsgi-plugin-luajit (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-i386 mips mipsel powerpc],
+ uwsgi-plugin-mono (= ${binary:Version}) [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel powerpc s390x],
+ uwsgi-plugin-gccgo (= ${binary:Version}) [@gccgo-archs@],
  uwsgi-plugin-php (= ${binary:Version}),
  uwsgi-plugin-psgi (= ${binary:Version}),
  uwsgi-plugin-python (= ${binary:Version}),
@@ -276,16 +300,35 @@ Description: plugins for integration of uWSGI and application
  .
  This dependency package provides plugins for integration of uWSGI and
  application:
+  * GNU Go
   * Java (OpenJDK 7)
   * JWSGI (OpenJDK 7)
   * Lua WSAPI (Lua 5.1, 5.2 and LuaJIT)
+  * Mono/ASP.NET
   * PHP
   * Perl PSGI
   * Python WSGI (Python 2 and 3)
   * Rack (${uwsgi:RubyKinds})
   * V8
  .
- Java and V8 plugins are provided only on supported architectures.
+ Java, Mono and V8 plugins are provided only on supported architectures.
+
+Package: uwsgi-mongodb-plugins
+Architecture: amd64 armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Recommends: mongodb-server
+Description: MongoDB/GridFS plugins for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides plugins for using MongoDB as uWSGI backend:
+  * emperor_mongodb (Emperor configuration)
+  * gridfs (content storage)
+  * mongodblog (logging)
+  * stats_pusher_mongodb (statistics)
 
 Package: uwsgi-plugin-alarm-curl
 Architecture: any
@@ -334,6 +377,18 @@ Description: Emperor PostgreSQL plugin for uWSGI
  the same core.
  .
  This package provides emperor_pg plugin for uWSGI.
+
+Package: uwsgi-plugin-glusterfs
+Architecture: amd64 armel armhf i386 mips mipsel powerpc s390x sparc
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: GlusterFS storage plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides GlusterfS storage plugin for uWSGI.
 
 Package: uwsgi-plugin-rados
 Architecture: amd64 armel armhf i386 mips mipsel powerpc s390x sparc
@@ -401,6 +456,22 @@ Description: graylog2 plugin for uWSGI
  .
  This package provides graylog2 plugin for uWSGI.
 
+Package: uwsgi-plugin-gevent-python
+Architecture: amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ python-gevent (>= 1.0),
+ uwsgi-plugin-python (= ${binary:Version}),
+ uwsgi-plugin-greenlet-python (= ${binary:Version})
+Description: gevent plugin for uWSGI (Python 2)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides gevent plugin for uWSGI
+ with Python 2 WSGI interface.
+
 Package: uwsgi-plugin-greenlet-python
 Architecture: amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc
 Depends: ${shlibs:Depends}, ${misc:Depends}, python-greenlet,
@@ -414,6 +485,33 @@ Description: greenlet plugin for uWSGI (Python 2)
  .
  This package provides greenlet plugin for uWSGI
  with Python 2 WSGI interface.
+
+Package: uwsgi-plugin-tornado-python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ uwsgi-plugin-python (= ${binary:Version})
+Recommends: python-greenlet
+Description: tornado plugin for uWSGI (Python 2)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides tornado plugin for uWSGI
+ with Python 2 WSGI interface.
+
+Package: uwsgi-plugin-gccgo
+Architecture: amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: GNU Go plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides gccgo (GNU Go) plugin for uWSGI.
 
 Package: uwsgi-plugin-jvm-openjdk-7
 Architecture: amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc
@@ -441,6 +539,34 @@ Description: JWSGI plugin for uWSGI (OpenJDK 7)
  the same core.
  .
  This package provides JWSGI plugin for uWSGI
+ (linked with OpenJDK Java 7 runtime).
+
+Package: uwsgi-plugin-ring-openjdk-7
+Architecture: amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}), openjdk-7-jre-headless
+Description: Closure/Ring plugin for uWSGI (OpenJDK 7)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Closure/Ring plugin for uWSGI
+ (linked with OpenJDK Java 7 runtime).
+
+Package: uwsgi-plugin-servlet-openjdk-7
+Architecture: amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ uwsgi-plugin-jvm-openjdk-7 (= ${binary:Version}), openjdk-7-jre-headless
+Description: JWSGI plugin for uWSGI (OpenJDK 7)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Servlet 2.5 plugin for uWSGI
  (linked with OpenJDK Java 7 runtime).
 
 Package: uwsgi-plugin-ldap
@@ -493,6 +619,18 @@ Description: Lua WSAPI plugin for uWSGI (LuaJIT)
  .
  This package provides Lua WSAPI plugin for uWSGI
  (linked with LuaJIT runtime).
+
+Package: uwsgi-plugin-mono
+Architecture: amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel powerpc s390x
+Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version})
+Description: Mono/ASP.NET plugin for uWSGI
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides Mono/ASP.NET plugin for uWSGI.
 
 Package: uwsgi-plugin-psgi
 Architecture: any
