@@ -1,3 +1,41 @@
+uwsgi (2.0.6~dfsg-7+exp1) experimental; urgency=medium
+
+  * Fix enable core plugin matheval (as intended since 1.9.15-1).
+  * Enable core plugins forkptyrouter logcrypto logpipe msgpack pty
+    router_expires router_hash router_metrics router_radius router_redis
+    router_xmldir stats_pusher_file stats_pusher_socket
+    transformation_chunked transformation_offload
+    transformation_template tuntap webdav xattr zabbix.
+  * Enable core plugins logzmq mongrel2 (except on the Hurd).
+  * Enable core plugin systemd_logger (only on linux archs).
+  * Enable plugins separately packaged:
+    + gevent
+    + tornado
+    + Closure/ring
+    + Servlet 2.5
+    + MongoDB and GridFS plugins (on supported archs)
+    + GlusterFS (on supported archs)
+    + Mono/ASP.NET (on supported archs)
+    + GNU Go
+  * Update package relations:
+    + Build-depend on libattr-dev: Needed for xattr.
+    + Build-depend on mongodb-dev, libboost-thread-dev and
+      libboost-filesystem-dev: Needed for MongoDB.
+    + Build-depend on glusterfs-common: Needed for GlusterFS.
+    + Build-depend on mono-devel and cli-common-dev: Needed for mono.
+    + Build-depend on gccgo: Needed for GNU Go.
+    + Build-depend on libsystemd-journal-dev: Needed for systemd_logger.
+  * Adjust git-buildpackage config for experimental branch.
+  * Fix support experimental suite when auto-resolving dependencies.
+  * Fix skip ZeroMQ plugins on the Hurd.
+  * Fix stop uwsgi-plugins-all needlessly depending directly on
+    uwsgi-plugin-php: Pulled in via uwsgi-app-integration-plugins.
+  *  mention Ruby native threads in uwsgi-plugins-all long description.
+  * Fix exclude coroae and MongoDB plugins from plugin list in
+    uwsgi-core long description.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Fri, 25 Jul 2014 13:45:35 +0200
+
 uwsgi (2.0.6~dfsg-7) unstable; urgency=medium
 
   * Re-enable Ceph/RADOS plugin as separate binary package (to also fix

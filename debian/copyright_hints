@@ -165,6 +165,7 @@ Files: CONTRIBUTORS
  debian/control
  debian/control.in
  debian/gbp.conf
+ debian/installcligac
  debian/libapache2-mod-__MODULE__.install.in
  debian/libapache2-mod-__MODULE__.postinst.in
  debian/libapache2-mod-__MODULE__.prerm.in
@@ -173,6 +174,7 @@ Files: CONTRIBUTORS
  debian/patches/1003_remove-php-libs.patch
  debian/patches/1004_fix-php-ldflags.patch
  debian/patches/1005_emperor-pg-fix-cflags.patch
+ debian/patches/1006_emperor-zeromq-libs.patch
  debian/patches/README
  debian/patches/series
  debian/rules
