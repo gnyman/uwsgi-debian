@@ -25,6 +25,7 @@ Build-Depends:
  libxml2-dev,
  libyaml-dev,
  libzmq3-dev [!hurd-any] | libzmq-dev [!kfreebsd-any !hurd-any],
+ libsystemd-journal-dev [!kfreebsd-any !hurd-any],
  libphp5-embed,
  gccgo [linux-any],
  php5-dev,
@@ -165,7 +166,8 @@ Description: fast, self-healing application container server (core)
  .
  ${uwsgi:corepluginlist}
  .
- ØMQ (ZeroMQ) plugins are provided only on supported architectures.
+ ØMQ (ZeroMQ) and systemd plugins are provided only on supported
+ architectures.
 
 Package: uwsgi-emperor
 Architecture: any
