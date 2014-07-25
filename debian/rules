@@ -87,7 +87,7 @@ UWSGI_SRCPLUGINS_python = gevent greenlet tornado
 
 UWSGI_KINDS_java = openjdk-7
 UWSGI_DEFAULTKIND_java = openjdk-7
-UWSGI_SRCPLUGINS_java = jvm jwsgi
+UWSGI_SRCPLUGINS_java = jvm jwsgi ring servlet
 
 UWSGI_KINDS_lua = lua5.1 lua5.2 luajit
 UWSGI_DEFAULTKIND_lua = lua5.1
@@ -119,8 +119,8 @@ UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
 UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 # TODO: enable these plugins
-UWSGI_SRCPLUGINS_MISC = gccgo pypy ring \
-	servlet stackless systemd_logger
+UWSGI_SRCPLUGINS_MISC = gccgo pypy \
+	stackless systemd_logger
 # plugins not yet ready for production use
 UWSGI_SRCPLUGINS_EXPERIMENTAL = asyncio libffi libtcc \
 	router_radius router_spnego
@@ -168,6 +168,8 @@ UWSGI_MODULES_apache = uwsgi ruwsgi proxy-uwsgi
 UWSGI_PKGSCRIPTS_DEFAULT = sec
 UWSGI_PKGSCRIPTS_jvm = openjdk pri
 UWSGI_PKGSCRIPTS_jwsgi = openjdk aux
+UWSGI_PKGSCRIPTS_ring = openjdk aux
+UWSGI_PKGSCRIPTS_servlet = openjdk aux
 UWSGI_PKGSCRIPTS_lua = pri
 UWSGI_PKGSCRIPTS_mono = pri
 UWSGI_PKGSCRIPTS_rack = pri
