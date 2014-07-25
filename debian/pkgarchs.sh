@@ -29,6 +29,9 @@ pkg="$1"
 suite="${2:-$currentsuite}"
 
 case "$suite" in
+    experimental)
+	suite="unstable,experimental"
+	;;
     UNRELEASED|"")
 	echo >&2 "WARNING: bad suite \"$suite\", using \"$defaultsuite\" instead."
 	suite="$defaultsuite"
