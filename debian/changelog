@@ -1,3 +1,11 @@
+uwsgi (2.0.6~dfsg-7+exp2) experimental; urgency=medium
+
+  * Fix avoid compiling MongoDB plugins on unsupported archs.
+  * Fix auto-resolve supported archs for GNU Go (not all Linux archs are
+    supported).
+
+ -- Jonas Smedegaard <dr@jones.dk>  Thu, 31 Jul 2014 20:18:16 +0200
+
 uwsgi (2.0.6~dfsg-7+exp1) experimental; urgency=medium
 
   * Fix enable core plugin matheval (as intended since 1.9.15-1).
