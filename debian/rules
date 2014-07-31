@@ -116,7 +116,7 @@ UWSGI_PLUGIN_PACKAGES = $(filter uwsgi-plugin-%,$(DEB_PACKAGES))
 
 UWSGI_SRCPLUGINS_AVAILABLE := $(sort $(notdir $(wildcard plugins/*)))
 UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
-UWSGI_SRCPLUGINS_MONGODB = emperor_mongodb gridfs mongodblog \
+UWSGI_SRCPLUGINS_ARCH_mongodb = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
 # TODO: enable PyPy when supported by CDBS
 UWSGI_SRCPLUGINS_TODO = pypy
@@ -140,12 +140,15 @@ UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
 # ZeroMQ is unavailable on the Hurd
 # GNU Go and systemd is available only on linux
 UWSGI_SRCPLUGINS_SKIP = \
+	$(foreach list,$(UWSGI_ARCHLISTS),\
+		$(if $(filter-out $(UWSGI_ARCHS_$(list)),$(DEB_HOST_ARCH)),\
+			$(UWSGI_SRCPLUGINS_ARCH_$(list)))) \
 	$(if $(filter hurd-%,$(DEB_HOST_ARCH)),\
 		$(UWSGI_SRCPLUGINS_ZEROMQ)) \
 	$(if $(filter hurd-% kfreebsd-%,$(DEB_HOST_ARCH)),\
 		gccgo systemd_logger)
 # coroae is installed with psgi package
-UWSGI_SRCPLUGINS_SKIPINSTALL = coroae $(UWSGI_SRCPLUGINS_MONGODB)
+UWSGI_SRCPLUGINS_SKIPINSTALL = coroae $(UWSGI_SRCPLUGINS_ARCH_mongodb)
 UWSGI_SRCPLUGINS_CORE = $(filter-out \
 	$(UWSGI_SRCPLUGINS_ADDON_LANG) $(UWSGI_SRCPLUGINS_ADDON_MISC) \
 	$(UWSGI_SRCPLUGINS_SKIP),\
@@ -283,7 +286,7 @@ $(foreach pkg, $(UWSGI_PLUGIN_PACKAGES), $(eval \
 DEB_INSTALL_DOCS_ALL += $(DEB_SRCDIR)/CONTRIBUTORS
 
 DEB_DH_INSTALL_ARGS_uwsgi-mongodb-plugins = $(strip \
-	$(patsubst %,%_plugin.so,$(UWSGI_SRCPLUGINS_MONGODB)) \
+	$(patsubst %,%_plugin.so,$(UWSGI_SRCPLUGINS_ARCH_mongodb)) \
 	usr/lib/uwsgi/plugins)
 DEB_DH_INSTALL_ARGS_uwsgi-plugin-psgi = coroae_plugin.so usr/lib/uwsgi/plugins
 DEB_DH_INSTALL_ARGS_python-uwsgidecorators = uwsgidecorators.py $(python_installdir)
