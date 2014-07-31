@@ -17,24 +17,24 @@ include /usr/share/javahelper/java-vars.mk
 # resolve supported architectures for arch-varying build-dependencies
 # (in maintainer mode only: uses network and messes with control file)
 ifneq (,$(DEB_MAINTAINER_MODE))
-GLUSTERFS_ARCHS := $(shell sh debian/pkgarchs.sh glusterfs-common)
-GREENLET_ARCHS := $(shell sh debian/pkgarchs.sh python-greenlet-dev)
-OPENJDK7_ARCHS := $(shell sh debian/pkgarchs.sh openjdk-7-jdk)
-V8_ARCHS := $(shell sh debian/pkgarchs.sh libv8-dev)
-LUAJIT_ARCHS := $(shell sh debian/pkgarchs.sh luajit)
-MONGODB_ARCHS := $(shell sh debian/pkgarchs.sh mongodb-dev)
-MONO_ARCHS := $(shell sh debian/pkgarchs.sh libmono-2.0-dev)
-RADOS_ARCHS := $(shell sh debian/pkgarchs.sh librados-dev)
+$(shell sh debian/pkgarchs.sh glusterfs-common > debian/ARCHS_glusterfs)
+$(shell sh debian/pkgarchs.sh python-greenlet-dev > debian/ARCHS_greenlet)
+$(shell sh debian/pkgarchs.sh openjdk-7-jdk > debian/ARCHS_openjdk7)
+$(shell sh debian/pkgarchs.sh libv8-dev > debian/ARCHS_v8)
+$(shell sh debian/pkgarchs.sh luajit > debian/ARCHS_luajit)
+$(shell sh debian/pkgarchs.sh mongodb-dev > debian/ARCHS_mongodb)
+$(shell sh debian/pkgarchs.sh libmono-2.0-dev > debian/ARCHS_mono)
+$(shell sh debian/pkgarchs.sh librados-dev > debian/ARCHS_rados)
+endif
+UWSGI_ARCHLISTS = glusterfs greenlet openjdk7 v8 luajit mongodb \
+	mono rados
+$(foreach list,$(UWSGI_ARCHLISTS),\
+	$(eval UWSGI_ARCHS_$(list) := $(shell cat debian/ARCHS_$(list))))
+ifneq (,$(DEB_MAINTAINER_MODE))
 debian/control::
 	sed -i \
-		-e 's/@glusterfs_archs@/$(GLUSTERFS_ARCHS)/g' \
-		-e 's/@greenlet_archs@/$(GREENLET_ARCHS)/g' \
-		-e 's/@openjdk7_archs@/$(OPENJDK7_ARCHS)/g' \
-		-e 's/@v8_archs@/$(V8_ARCHS)/g' \
-		-e 's/@luajit_archs@/$(LUAJIT_ARCHS)/g' \
-		-e 's/@mongodb_archs@/$(MONGODB_ARCHS)/g' \
-		-e 's/@mono_archs@/$(MONO_ARCHS)/g' \
-		-e 's/@rados_archs@/$(RADOS_ARCHS)/g' \
+		$(foreach list,$(UWSGI_ARCHLISTS),\
+			-e 's/@$(list)_archs@/$(UWSGI_ARCHS_$(list))/g') \
 		-e 's/@ruby_kind@/$(UWSGI_KIND_ruby)/g' \
 		debian/control
 endif
