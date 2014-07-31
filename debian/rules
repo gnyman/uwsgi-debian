@@ -25,9 +25,10 @@ $(shell sh debian/pkgarchs.sh luajit > debian/ARCHS_luajit)
 $(shell sh debian/pkgarchs.sh mongodb-dev > debian/ARCHS_mongodb)
 $(shell sh debian/pkgarchs.sh libmono-2.0-dev > debian/ARCHS_mono)
 $(shell sh debian/pkgarchs.sh librados-dev > debian/ARCHS_rados)
+$(shell sh debian/pkgarchs.sh gccgo > debian/ARCHS_gccgo)
 endif
 UWSGI_ARCHLISTS = glusterfs greenlet openjdk7 v8 luajit mongodb \
-	mono rados
+	mono rados gccgo
 $(foreach list,$(UWSGI_ARCHLISTS),\
 	$(eval UWSGI_ARCHS_$(list) := $(shell cat debian/ARCHS_$(list))))
 ifneq (,$(DEB_MAINTAINER_MODE))
@@ -112,6 +113,7 @@ UWSGI_SRCPLUGINS_AVAILABLE := $(sort $(notdir $(wildcard plugins/*)))
 UWSGI_SRCPLUGINS_ZEROMQ = emperor_zeromq logzmq mongrel2
 UWSGI_SRCPLUGINS_ARCH_mongodb = emperor_mongodb gridfs mongodblog \
 	stats_pusher_mongodb
+UWSGI_SRCPLUGINS_ARCH_gccgo = gccgo
 # TODO: enable PyPy when supported by CDBS
 UWSGI_SRCPLUGINS_TODO = pypy
 # plugins not yet ready for production use
@@ -132,7 +134,7 @@ UWSGI_SRCPLUGINS_ADDON_MISC = alarm_curl alarm_xmpp curl_cron \
 	emperor_pg fiber gccgo geoip glusterfs graylog2 ldap mono psgi \
 	rados rbthreads router_access sqlite3 v8 php xslt
 # ZeroMQ is unavailable on the Hurd
-# GNU Go and systemd is available only on linux
+# systemd is available only on linux
 UWSGI_SRCPLUGINS_SKIP = \
 	$(foreach list,$(UWSGI_ARCHLISTS),\
 		$(if $(filter-out $(UWSGI_ARCHS_$(list)),$(DEB_HOST_ARCH)),\
@@ -140,7 +142,7 @@ UWSGI_SRCPLUGINS_SKIP = \
 	$(if $(filter hurd-%,$(DEB_HOST_ARCH)),\
 		$(UWSGI_SRCPLUGINS_ZEROMQ)) \
 	$(if $(filter hurd-% kfreebsd-%,$(DEB_HOST_ARCH)),\
-		gccgo systemd_logger)
+		systemd_logger)
 # coroae is installed with psgi package
 UWSGI_SRCPLUGINS_SKIPINSTALL = coroae $(UWSGI_SRCPLUGINS_ARCH_mongodb)
 UWSGI_SRCPLUGINS_CORE = $(filter-out \
