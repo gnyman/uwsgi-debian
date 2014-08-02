@@ -46,8 +46,8 @@ Build-Depends:
  python-greenlet-dev [@greenlet_archs@],
  python3-all-dev,
  openjdk-7-jdk [@openjdk7_archs@],
- ruby-all-dev | ruby1.9.1,
- ruby-all-dev | ruby1.9.1-dev,
+ ruby-all-dev | ruby-dev,
+ ruby-all-dev | ruby,
  uuid-dev
 Standards-Version: 3.9.5
 Homepage: http://projects.unbit.it/uwsgi/
