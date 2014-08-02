@@ -88,13 +88,18 @@ UWSGI_DEFAULTKIND_lua = lua5.1
 UWSGI_SRCPLUGINS_LANG_SELF += lua
 
 # Ruby kinds resolved as per packaging team policy (see bug#755779)
-UWSGI_KINDS_ruby := $(shell dh_ruby --print-supported)
+# TODO: maybe simplify to call "dh_ruby --print-supported" when stable
+UWSGI_DEFAULTKIND_ruby := $(shell readlink -f /usr/bin/ruby)
+UWSGI_KINDS_ruby := $(shell ruby -rruby_debian_dev \
+	-e 'include RubyDebianDev;' \
+	-e 'SUPPORTED_RUBY_VERSIONS.select! do |version, binary|;' \
+		-e 'puts version;' \
+	-e 'end' 2&>/dev/null || echo "$(UWSGI_DEFAULTKIND_ruby)")
 # TODO: support multiple Ruby kinds (requires dynamic control file sections)
 UWSGI_KIND_ruby := $(UWSGI_KINDS_ruby)$(strip $(if $(strip \
 	$(filter 1,$(words $(UWSGI_KINDS_ruby)))),\
 		,\
 		$(error ERROR: multiple Ruby kinds not supported)))
-UWSGI_DEFAULTKIND_ruby := $(shell readlink -f /usr/bin/ruby)
 UWSGI_SRCPLUGINS_ruby = rack
 
 UWSGI_PLUGIN_PACKAGES = $(filter uwsgi-plugin-%,$(DEB_PACKAGES))
