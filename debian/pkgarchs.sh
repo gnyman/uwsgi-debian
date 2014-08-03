@@ -42,6 +42,6 @@ echo >&2 "INFO: Resolving architectures for package \"$pkg\" through rmadison In
 rmadison -s "$suite" "$pkg" \
 	| awk -F'|' '{ print $4 }' \
 	| sed 's/source,//;s/ //g;s/,/\n/g' \
-	| LANG=C sort \
+	| LANG=C sort -u \
 	| tr '\n' ' ' \
 	| sed 's/ $/\n/'
