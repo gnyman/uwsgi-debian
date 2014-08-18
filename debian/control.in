@@ -47,7 +47,7 @@ Build-Depends:
  python3-all-dev,
  openjdk-7-jdk [@openjdk7_archs@],
  ruby-all-dev | ruby-dev,
- ruby-all-dev | ruby,
+ ruby,
  uuid-dev
 Standards-Version: 3.9.5
 Homepage: http://projects.unbit.it/uwsgi/
