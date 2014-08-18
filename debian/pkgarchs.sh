@@ -18,7 +18,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 # 02111-1307 USA.
 #
-# Depends: devscripts
+# Depends: devscripts liburi-perl curl ca-certificates
 
 set -e
 
