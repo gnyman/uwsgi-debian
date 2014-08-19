@@ -39,9 +39,11 @@ case "$suite" in
 esac
 
 echo >&2 "INFO: Resolving architectures for package \"$pkg\" through rmadison Internet request."
-rmadison -s "$suite" "$pkg" \
+dump="$(rmadison -s "$suite" "$pkg")"
+archs="$(echo "$dump" \
 	| awk -F'|' '{ print $4 }' \
 	| sed 's/source,//;s/ //g;s/,/\n/g' \
 	| LANG=C sort -u \
 	| tr '\n' ' ' \
-	| sed 's/^ //;s/ $/\n/'
+	| sed 's/^ //;s/ $/\n/')"
+echo "${archs:-none}"
