@@ -166,8 +166,8 @@ Description: fast, self-healing application container server (core)
  .
  ${uwsgi:corepluginlist}
  .
- ØMQ (ZeroMQ) and systemd plugins are provided only on supported
- architectures.
+ ØMQ (ZeroMQ) plugins, forkptyrouter, systemd and tuntap are provided
+ only on supported architectures.
 
 Package: uwsgi-emperor
 Architecture: any
