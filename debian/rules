@@ -90,7 +90,7 @@ UWSGI_SRCPLUGINS_LANG_SELF += lua
 # Ruby kinds resolved as per packaging team policy (see bug#755779)
 # TODO: simplify when ruby-all-dev is in stable
 # TODO: maybe simplify to call "dh_ruby --print-supported" when stable
-UWSGI_DEFAULTKIND_ruby := $(shell readlink -f /usr/bin/ruby)
+UWSGI_DEFAULTKIND_ruby := $(notdir $(shell readlink -f /usr/bin/ruby))
 UWSGI_KINDS_ruby := $(strip \
 	$(if $(wildcard /usr/lib/ruby/vendor_ruby/ruby_debian_dev.rb),\
 		$(shell ruby -rruby_debian_dev \
