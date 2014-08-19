@@ -51,8 +51,8 @@ Build-Depends:
  python-greenlet-dev [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
  python3-all-dev,
  openjdk-7-jdk [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
- ruby-all-dev | ruby1.9.1,
- ruby-all-dev | ruby1.9.1-dev,
+ ruby-all-dev | ruby-dev,
+ ruby,
  uuid-dev
 Standards-Version: 3.9.5
 Homepage: http://projects.unbit.it/uwsgi/
@@ -197,7 +197,6 @@ Depends: ${misc:Depends},
  uwsgi-plugin-rbthreads (= ${binary:Version}),
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-greenlet-python (= ${binary:Version}) [amd64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc s390x sparc],
- uwsgi-plugin-php (= ${binary:Version})
 Description: all available plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
@@ -214,6 +213,7 @@ Description: all available plugins for uWSGI
     - Coro::AnyEvent
     - Fiber (${uwsgi:RubyDefaultkind})
     - greenlet (Python 2)
+    - Ruby native threads (${uwsgi:RubyDefaultkind})
  .
  Greenlet plugin is provided only on supported architectures.
 

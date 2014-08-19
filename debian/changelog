@@ -1,3 +1,24 @@
+uwsgi (2.0.6~dfsg-8) unstable; urgency=medium
+
+  * Resolve Ruby kinds in backport-friendly manner (see bug#755779).
+  * Stop uwsgi-plugins-all needlessly depending directly on
+    uwsgi-plugin-php: Pulled in via uwsgi-app-integration-plugins.
+  * Fix enable plugin matheval (as intended since 1.9.15-1).
+  * Fix mention Ruby native threads in uwsgi-plugins-all long
+    description.
+  * Fix exclude coroae plugin from auto-resolved plugin list in
+    uwsgi-core long description.
+  * Improve pkgarchs.sh script to auto-resolve archs:
+    + Fix support experimental suite.
+    + Fix strip duplicates.
+    + Fix mention all its dependencies in header.
+    + Fix strip leading (not only trailing) space.
+  * Fix build-depend unconditionally on ruby: Needed to resolve default
+    ruby version (see bug#755779).
+    Closes: bug#758270.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 19 Aug 2014 11:52:19 +0200
+
 uwsgi (2.0.6~dfsg-7) unstable; urgency=medium
 
   * Re-enable Ceph/RADOS plugin as separate binary package (to also fix
