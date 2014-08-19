@@ -44,4 +44,4 @@ rmadison -s "$suite" "$pkg" \
 	| sed 's/source,//;s/ //g;s/,/\n/g' \
 	| LANG=C sort -u \
 	| tr '\n' ' ' \
-	| sed 's/ $/\n/'
+	| sed 's/^ //;s/ $/\n/'
