@@ -10,7 +10,6 @@ Build-Depends:
  javahelper,
  libapr1-dev,
  libaprutil1-dev,
- libattr1-dev,
  libjansson-dev,
  libldap2-dev,
  liblua5.1-0-dev,
