@@ -1,3 +1,9 @@
+uwsgi (2.0.6~dfsg-9) UNRELEASED; urgency=medium
+
+  * Fix auto-resolve as "none" (not empty string) when no archs found.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 20 Aug 2014 09:54:09 +0200
+
 uwsgi (2.0.6~dfsg-8) unstable; urgency=medium
 
   * Resolve Ruby kinds in backport-friendly manner (see bug#755779).
