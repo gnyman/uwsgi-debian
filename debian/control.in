@@ -49,7 +49,7 @@ Build-Depends:
  ruby-all-dev | ruby-dev,
  ruby,
  uuid-dev
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Homepage: http://projects.unbit.it/uwsgi/
 Vcs-Git: git://anonscm.debian.org/collab-maint/uwsgi.git
 Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/uwsgi.git
