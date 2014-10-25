@@ -1,6 +1,13 @@
 uwsgi (2.0.6~dfsg-9) UNRELEASED; urgency=medium
 
   * Fix auto-resolve as "none" (not empty string) when no archs found.
+  * Add patch 1007 to fix support pty on GNU/Hurd.
+  * Stop repackage source: Upstream no longer ship binary java class
+    file.
+  * Adjust architecture-dependent plugins:
+    + Enable Ceph/RADOS for s390x and sparc.
+    + Enable Greenlet for armel and ppc64el.
+    + Enable OpenJDK 7 for armhf and ppc64el.
 
  -- Jonas Smedegaard <dr@jones.dk>  Wed, 20 Aug 2014 09:54:09 +0200
 
