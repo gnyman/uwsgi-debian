@@ -1,5 +1,32 @@
-uwsgi (2.0.6~dfsg-9) UNRELEASED; urgency=medium
+uwsgi (2.0.7-1) unstable; urgency=medium
 
+  [ upstream ]
+  * New release 2.0.7.
+    Bugfixes:
+    + Fix counters in statsd plugin.
+    + Fix caching in php plugin.
+    + Fix management of system users starting with a number.
+    + Fix request body readline using memmove instead of memcpy.
+    + Ignore "user" namespace in setns (still a source of problems).
+    + Fix Python3 rpc bytes/string mess (result: we support both).
+    + Do not destroy the Emperor on failed mount hooks.
+    + Fix symbol lookup error in the Mono plugin on OS X.
+    + Fix fastcgi and scgi protocols error when out of buffer happens.
+    + Fix solaris/smartos I/O management.
+    + Fix 2 memory leaks in the rpc subsystem.
+    + Fix rados plugin PUT method.
+    + Fix multiple python mountpoints with multiple threads in cow mode.
+    + stats UNIX socket is now deleted by vacuum.
+    + Fix off-by-one corruption in cache LRU mode.
+    + Force single-cpu build in cygwin.
+    New Features and improvements:
+    + Allow calling the spooler from every cpython context.
+    + Add store_delete flag to cache2 option.
+    + Extend file logger to allow rotation.
+    + vassals plugin extended with hooks vassal and vassal_before_exec.
+    + broodlord subsystem improved with option –vassal-sos.
+
+  [ Jonas Smedegaard ]
   * Fix auto-resolve as "none" (not empty string) when no archs found.
   * Add patch 1007 to fix support pty on GNU/Hurd.
   * Stop repackage source: Upstream no longer ship binary java class
@@ -8,8 +35,11 @@ uwsgi (2.0.6~dfsg-9) UNRELEASED; urgency=medium
     + Enable Ceph/RADOS for s390x and sparc.
     + Enable Greenlet for armel and ppc64el.
     + Enable OpenJDK 7 for armhf and ppc64el.
+  * Drop patch 1006: Adopted upstream.
+  * Update Vcs-Browser URL to use cgit web frontend.
+  * Declare compliance with Debian Policy 3.9.6.
 
- -- Jonas Smedegaard <dr@jones.dk>  Wed, 20 Aug 2014 09:54:09 +0200
+ -- Jonas Smedegaard <dr@jones.dk>  Sat, 25 Oct 2014 20:50:17 +0200
 
 uwsgi (2.0.6~dfsg-8) unstable; urgency=medium
 
