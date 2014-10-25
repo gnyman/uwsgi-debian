@@ -382,6 +382,11 @@ PyObject *py_uwsgi_rpc(PyObject * self, PyObject * args) {
 	if (PyString_Check(py_node)) {
 		node = PyString_AsString(py_node);
 	}
+#ifdef PYTHREE
+        else if (PyUnicode_Check(py_node)) {
+                node = PyBytes_AsString(PyUnicode_AsLatin1String(py_node));
+	}
+#endif
 
 	py_func = PyTuple_GetItem(args, 1);
 
@@ -1855,7 +1860,6 @@ PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args, PyObject *kw) {
 	PyObject *spool_dict, *spool_vars;
 	PyObject *zero, *key, *val;
 	uint16_t keysize, valsize;
-	struct wsgi_request *wsgi_req = py_current_wsgi_req();
 	char *body = NULL;
 	size_t body_len= 0;
 
@@ -1956,7 +1960,8 @@ PyObject *py_uwsgi_send_spool(PyObject * self, PyObject * args, PyObject *kw) {
 
 	UWSGI_RELEASE_GIL
 
-	char *filename = uwsgi_spool_request(wsgi_req, ub->buf, ub->pos, body, body_len);
+	// current_wsgi_req can be NULL, in such a case a non-thread-safe counter will be used
+	char *filename = uwsgi_spool_request(NULL, ub->buf, ub->pos, body, body_len);
 	uwsgi_buffer_destroy(ub);
 
 	UWSGI_GET_GIL
@@ -2240,7 +2245,8 @@ PyObject *py_uwsgi_stop(PyObject * self, PyObject * args) {
 }
 
 PyObject *py_uwsgi_request_id(PyObject * self, PyObject * args) {
-	return PyLong_FromUnsignedLongLong(uwsgi.workers[uwsgi.mywid].requests);
+	struct wsgi_request *wsgi_req = py_current_wsgi_req();
+	return PyLong_FromUnsignedLongLong(uwsgi.workers[uwsgi.mywid].cores[wsgi_req->async_id].requests);
 }
 
 PyObject *py_uwsgi_worker_id(PyObject * self, PyObject * args) {

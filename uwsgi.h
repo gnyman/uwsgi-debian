@@ -6,6 +6,8 @@
 extern "C" {
 #endif
 
+#define UWSGI_PLUGIN_API	1
+
 #define UMAX16	65536
 #define UMAX8	256
 
@@ -832,6 +834,8 @@ struct uwsgi_cache {
 	int purge_lru;
 	uint64_t lru_head;
 	uint64_t lru_tail;
+
+	int store_delete;
 };
 
 struct uwsgi_option {
@@ -998,6 +1002,7 @@ struct uwsgi_protocol {
 };
 
 struct uwsgi_server;
+struct uwsgi_instance;
 
 struct uwsgi_plugin {
 
@@ -1056,6 +1061,9 @@ struct uwsgi_plugin {
         struct uwsgi_buffer* (*exception_msg)(struct wsgi_request *);
         struct uwsgi_buffer* (*exception_repr)(struct wsgi_request *);
         void (*exception_log)(struct wsgi_request *);
+
+	void (*vassal)(struct uwsgi_instance *);
+	void (*vassal_before_exec)(struct uwsgi_instance *);
 };
 
 #ifdef UWSGI_PCRE
@@ -2724,6 +2732,9 @@ struct uwsgi_server {
 	int metrics_no_cores;
 	int stats_no_cores;
 	int stats_no_metrics;
+
+	// uWSGI 2.0.7
+	int vassal_sos;
 
 };
 
@@ -4590,6 +4601,7 @@ void uwsgi_master_fifo_prepare();
 int uwsgi_master_fifo();
 int uwsgi_master_fifo_manage(int);
 
+void uwsgi_log_do_rotate(char *, char *, off_t, int);
 void uwsgi_log_rotate();
 void uwsgi_log_reopen();
 void uwsgi_reload_workers();
@@ -4788,6 +4800,7 @@ mode_t uwsgi_mode_t(char *, int *);
 
 int uwsgi_notify_socket_manage(int);
 int uwsgi_notify_msg(char *, char *, size_t);
+void vassal_sos();
 
 #ifdef __cplusplus
 }
