@@ -48,5 +48,5 @@ archs="$(echo "$dump" \
 	| sed 's/source,//;s/ //g;s/,/\n/g' \
 	| LANG=C sort -u \
 	| tr '\n' ' ' \
-	| sed 's/^ //;s/ $/\n/')"
+	| sed 's/^ //;s/ $/\n/;s/\ball\b/any/')"
 echo "${archs:-none}"
