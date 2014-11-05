@@ -55,6 +55,7 @@ Build-Depends:
  pkg-config,
  python-all-dev,
  python-greenlet-dev [amd64 arm64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc ppc64el s390x sparc],
+ python-trollius [any],
  python3-all-dev,
  openjdk-7-jdk [amd64 arm64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc ppc64el s390x sparc],
  mono-devel [amd64 armel armhf i386 kfreebsd-amd64 kfreebsd-i386 mipsel powerpc s390x],
@@ -207,6 +208,8 @@ Depends: ${misc:Depends},
  uwsgi-plugin-fiber (= ${binary:Version}),
  uwsgi-plugin-gevent-python (= ${binary:Version}) [amd64 arm64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc ppc64el s390x sparc],
  uwsgi-plugin-greenlet-python (= ${binary:Version}) [amd64 arm64 armel armhf hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386 mips mipsel powerpc ppc64el s390x sparc],
+ uwsgi-plugin-asyncio-python (= ${binary:Version}) [any],
+ uwsgi-plugin-asyncio-python3 (= ${binary:Version}),
  uwsgi-plugin-tornado-python (= ${binary:Version})
 Description: all available plugins for uWSGI
  uWSGI presents a complete stack for networked/clustered web applications,
@@ -225,6 +228,7 @@ Description: all available plugins for uWSGI
     - Fiber (${uwsgi:RubyDefaultkind})
     - gevent (Python 2)
     - greenlet (Python 2)
+    - asyncio (Python 3, and Python 2 when Trollius is available)
     - Ruby native threads (${uwsgi:RubyDefaultkind})
     - tornado (Python 2)
  .
@@ -484,6 +488,34 @@ Description: greenlet plugin for uWSGI (Python 2)
  .
  This package provides greenlet plugin for uWSGI
  with Python 2 WSGI interface.
+
+Package: uwsgi-plugin-asyncio-python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-trollius,
+ uwsgi-plugin-python (= ${binary:Version})
+Description: asyncio plugin for uWSGI (Python 2)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides asyncio plugin for uWSGI
+ with Python 2 WSGI interface.
+
+Package: uwsgi-plugin-asyncio-python3
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ uwsgi-plugin-python3 (= ${binary:Version})
+Description: asyncio plugin for uWSGI (Python 3)
+ uWSGI presents a complete stack for networked/clustered web applications,
+ implementing message/object passing, caching, RPC and process management.
+ It is designed to be fully modular. This means that different plugins can be
+ used in order to add compatibility with tons of different technology on top of
+ the same core.
+ .
+ This package provides asyncio plugin for uWSGI
+ with Python 3 WSGI interface.
 
 Package: uwsgi-plugin-tornado-python
 Architecture: any

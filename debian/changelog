@@ -1,5 +1,30 @@
-uwsgi (2.0.7-1+exp1) experimental; urgency=medium
+uwsgi (2.0.8-1~exp1) experimental; urgency=medium
 
+  [ upstream ]
+  * New release 2.0.7.
+    Bugfixes:
+    + Fix PHP SCRIPT_NAME usage when --php-app is in place.
+    + Allow "appendn" hook without second argument.
+    + Fix heap corruption in the Carbon plugin.
+    + Fix getifaddrs() memory management.
+    + Fix tcsetattr() usage.
+    + Fix kevent usage of return value.
+    + Ensure PSGI response headers are in the right format.
+    + Fix reloading of attached daemons.
+    + Fix SSL/TLS shutdown.
+    + Fix mountpoint logic for paths not ending with "/".
+    + Fix Python3 support in spooler decorators.
+    New Features and improvements:
+    + RTSP and chunked input (backported from 2.1) for the HTTP router.
+    + Custom hook --hook-post-fork to call actions after each fork().
+    + Support building asyncio plugin for Python 2, using trollius.
+    + Add sweep_on_full, clear_on_full and no_expire to --cache2.
+    + Susped options wait-for-fs/mountpoints (backported from 2.1).
+    + Improved offload API.
+    + Allows building plugins from remote sources as embedded.
+    + Automatically manage HTTP_X_FORWARDED_PROTO.
+
+  [ Jonas Smedegaard ]
   * Enable core plugins logcrypto logpipe msgpack pty router_expires
     router_hash router_metrics router_radius router_redis router_xmldir
     stats_pusher_file stats_pusher_socket transformation_chunked
@@ -10,6 +35,7 @@ uwsgi (2.0.7-1+exp1) experimental; urgency=medium
   * Enable core plugin systemd_logger (only on linux archs).
   * Enable plugins separately packaged:
     + gevent
+    + asyncio
     + tornado
     + Closure/ring
     + Servlet 2.5
@@ -24,9 +50,17 @@ uwsgi (2.0.7-1+exp1) experimental; urgency=medium
     + Build-depend on mono-devel and cli-common-dev: Needed for mono.
     + Build-depend on gccgo: Needed for GNU Go.
     + Build-depend on libsystemd-journal-dev: Needed for systemd_logger.
+    + Build-depend on python-trollius: Needed for asyncio on Python 2.
   * Adjust git-buildpackage config for experimental branch.
+  * Add patch 1008 to unconditionally use sys/xattr.h (not attr/xattr.h
+    on Linux), avoiding webdav plugin linkage against libattr and
+    hopefully fixing FTBFS for pty plugin on KFreeBSD.
+  * Fix typo in patch 1007: Caused FTBFS with pty plugin enabled.
+  * Improve package dependency auto-resolving:
+    + Normalize suite (i.e. suffix like -security).
+    + Swap "all" with "any", to fit use in control file.
 
- -- Jonas Smedegaard <dr@jones.dk>  Tue, 19 Aug 2014 14:03:58 +0200
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 05 Nov 2014 21:34:16 +0100
 
 uwsgi (2.0.7-1) unstable; urgency=medium
 

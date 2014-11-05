@@ -165,6 +165,7 @@ Files: CONTRIBUTORS
  debian/ARCHS_mono
  debian/ARCHS_openjdk7
  debian/ARCHS_rados
+ debian/ARCHS_trollius
  debian/ARCHS_v8
  debian/README.source
  debian/TODO
@@ -184,6 +185,7 @@ Files: CONTRIBUTORS
  debian/patches/1004_fix-php-ldflags.patch
  debian/patches/1005_emperor-pg-fix-cflags.patch
  debian/patches/1007_fix_pty_on_hurd.patch
+ debian/patches/1008_use_libc_sys-xattr.patch
  debian/patches/README
  debian/patches/series
  debian/rules
@@ -616,6 +618,9 @@ Files: CONTRIBUTORS
  t/perl/test_streaming.psgi
  t/pypy/t_continulet1.py
  t/pypy/t_continulet2.py
+ t/python/manage_script_name/manage_script_name_test.ini
+ t/python/manage_script_name/test_manage_script_name.py
+ t/python/manage_script_name/useless_app.py
  t/python/testba.py
  t/ring/README.md
  t/ring/config.ini
