@@ -1015,14 +1015,14 @@ int uwsgi_emperor_vassal_start(struct uwsgi_instance *n_ui) {
 		uwsgi_foreach(usl, uwsgi.mount_as_emperor) {
 			uwsgi_log("mounting \"%s\" (as-emperor for vassal \"%s\" pid: %d uid: %d gid: %d)...\n", usl->value, n_ui->name, n_ui->pid, n_ui->uid, n_ui->gid);
 			if (uwsgi_mount_hook(usl->value)) {
-				exit(1);
+				uwsgi_log("unable to mount %s\n", usl->value);
 			}
 		}
 
 		uwsgi_foreach(usl, uwsgi.umount_as_emperor) {
 			uwsgi_log("un-mounting \"%s\" (as-emperor for vassal \"%s\" pid: %d uid: %d gid: %d)...\n", usl->value, n_ui->name, n_ui->pid, n_ui->uid, n_ui->gid);
 			if (uwsgi_umount_hook(usl->value)) {
-				exit(1);
+				uwsgi_log("unable to umount %s\n", usl->value);
 			}
 		}
 		uwsgi_foreach(usl, uwsgi.exec_as_emperor) {
@@ -1093,7 +1093,20 @@ int uwsgi_emperor_vassal_start(struct uwsgi_instance *n_ui) {
 }
 
 static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
+	int i;
 
+	// run plugin hooks for the vassal
+	for (i = 0; i < 256; i++) {
+                if (uwsgi.p[i]->vassal) {
+                        uwsgi.p[i]->vassal(n_ui);
+                }
+        }
+
+        for (i = 0; i < uwsgi.gp_cnt; i++) {
+                if (uwsgi.gp[i]->vassal) {
+                        uwsgi.gp[i]->vassal(n_ui);
+                }
+        }
 
 #ifdef __linux__
 	if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0)) {
@@ -1350,7 +1363,6 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 	}
 
 	// close all of the unneded fd
-	int i;
 	for (i = 3; i < (int) uwsgi.max_fd; i++) {
 		if (uwsgi_fd_is_safe(i))
 			continue;
@@ -1429,10 +1441,24 @@ static void uwsgi_emperor_spawn_vassal(struct uwsgi_instance *n_ui) {
 		func(n_ui->name, n_ui->uid, n_ui->gid);
 	}
 
+	// ->vassal_before_exec
+	for (i = 0; i < 256; i++) {
+                if (uwsgi.p[i]->vassal_before_exec) {
+                        uwsgi.p[i]->vassal_before_exec(n_ui);
+                }
+        }
+
+        for (i = 0; i < uwsgi.gp_cnt; i++) {
+                if (uwsgi.gp[i]->vassal) {
+                        uwsgi.gp[i]->vassal_before_exec(n_ui);
+                }
+        }
+
 	// start !!!
 	if (execvp(vassal_argv[0], vassal_argv)) {
 		uwsgi_error("execvp()");
 	}
+	uwsgi_log("[emperor] binary path: %s\n", vassal_argv[0]);
 	uwsgi_log("[emperor] is the uwsgi binary in your system PATH ?\n");
 	// never here
 	exit(UWSGI_EXILE_CODE);
@@ -1738,6 +1764,8 @@ void emperor_loop() {
 			if (ui_current) {
 				char byte;
 				ssize_t rlen = read(interesting_fd, &byte, 1);
+				// retry if needed
+				if (rlen < 0 && uwsgi_is_again()) continue;
 				if (rlen <= 0) {
 					// SAFE
 					event_queue_del_fd(uwsgi.emperor_queue, interesting_fd, event_queue_read());
@@ -2322,7 +2350,17 @@ void uwsgi_emperor_simple_do(struct uwsgi_emperor_scanner *ues, char *name, char
 
 void uwsgi_master_manage_emperor() {
 	char byte;
+#ifdef UWSGI_EVENT_USE_PORT
+	// special cose for port event system
+	// place the socket in non-blocking mode
+        uwsgi_socket_nb(uwsgi.emperor_fd);
+#endif
 	ssize_t rlen = read(uwsgi.emperor_fd, &byte, 1);
+#ifdef UWSGI_EVENT_USE_PORT
+	// special cose for port event system
+	// and place back in blocking mode
+        uwsgi_socket_b(uwsgi.emperor_fd);
+#endif
 	if (rlen > 0) {
 		uwsgi_log_verbose("received message %d from emperor\n", byte);
 		// remove me
@@ -2342,6 +2380,12 @@ void uwsgi_master_manage_emperor() {
 			uwsgi_unblock_signal(SIGHUP);
 		}
 	}
+#ifdef UWSGI_EVENT_USE_PORT
+        // special cose for port event system
+	else if (rlen < 0 && uwsgi_is_again()) {
+		return;
+	}
+#endif
 	else {
 		uwsgi_error("uwsgi_master_manage_emperor()/read()");
 		uwsgi_log("lost connection with my emperor !!!\n");

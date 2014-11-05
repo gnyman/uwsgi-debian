@@ -1,6 +1,6 @@
 # uWSGI build system
 
-uwsgi_version = '2.0.6'
+uwsgi_version = '2.0.7'
 
 import os
 import re
@@ -52,6 +52,11 @@ if CPUCOUNT < 1:
             CPUCOUNT = int(os.sysconf('SC_NPROCESSORS_ONLN'))
         except:
             CPUCOUNT = 1
+
+
+# force single cpu in cygwin mode
+if uwsgi_os.startswith('CYGWIN'):
+    CPUCOUNT=1
 
 binary_list = []
 

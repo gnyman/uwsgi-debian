@@ -1019,8 +1019,14 @@ void uwsgi_destroy_request(struct wsgi_request *wsgi_req) {
                 pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &foo);
         }
 
-        memset(wsgi_req, 0, sizeof(struct wsgi_request));
+	// reset for avoiding following requests to fail on non-uwsgi protocols
+	// thanks Marko Tiikkaja for catching it
+	wsgi_req->uh->pktsize = 0;
 
+	// some plugins expected async_id to be defined before setup
+        int tmp_id = wsgi_req->async_id;
+        memset(wsgi_req, 0, sizeof(struct wsgi_request));
+        wsgi_req->async_id = tmp_id;
 }
 
 // finalize/close/free a request
@@ -1166,8 +1172,8 @@ void uwsgi_close_request(struct wsgi_request *wsgi_req) {
 	wsgi_req->uh->pktsize = 0;
 	tmp_id = wsgi_req->async_id;
 	memset(wsgi_req, 0, sizeof(struct wsgi_request));
+	// some plugins expected async_id to be defined before setup
 	wsgi_req->async_id = tmp_id;
-
 	// yes, this is pretty useless but we cannot ensure all of the plugin have the same behaviour
 	uwsgi.workers[uwsgi.mywid].cores[wsgi_req->async_id].in_request = 0;
 

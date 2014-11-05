@@ -331,6 +331,14 @@ void uwsgi_cache_init(struct uwsgi_cache *uc) {
 		int cache_fd;
 		struct stat cst;
 
+        if (uc->store_delete && !stat(uc->store, &cst) && ((size_t) cst.st_size != uc->filesize || !S_ISREG(cst.st_mode))) {
+            uwsgi_log("Removing invalid cache store file: %s\n", uc->store);
+            if (unlink(uc->store) != 0) {
+                uwsgi_log("Cannot remove invalid cache store file: %s\n", uc->store);
+                exit(1);
+            }
+        }
+
 		if (stat(uc->store, &cst)) {
 			uwsgi_log("creating a new cache store file: %s\n", uc->store);
 			cache_fd = open(uc->store, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
@@ -733,16 +741,22 @@ int uwsgi_cache_set2(struct uwsgi_cache *uc, char *key, uint16_t keylen, char *v
 		else {
 			uci->first_block = uwsgi_cache_find_free_blocks(uc, vallen);
 			if (uci->first_block == 0xffffffffffffffffLLU) {
-				if (!uc->ignore_full)
-					uwsgi_log("*** DANGER cache \"%s\" is FULL !!! ***\n", uc->name);
+				if (!uc->ignore_full) {
+					if (uc->purge_lru)
+                                        	uwsgi_log("LRU item will be purged from cache \"%s\"\n", uc->name);
+					else
+						uwsgi_log("*** DANGER cache \"%s\" is FULL !!! ***\n", uc->name);
+				}
                                 uc->full++;
 				uc->unused_blocks_stack_ptr++;
+				if (uc->purge_lru && uc->lru_head)
+                                	uwsgi_cache_del2(uc, NULL, 0, uc->lru_head, UWSGI_CACHE_FLAG_LOCAL);
                                 goto end;
 			}
 			// mark used blocks;
 			uint64_t needed_blocks = cache_mark_blocks(uc, uci->first_block, vallen);
 			// optimize the scan
-			if (uc->blocks_bitmap_pos + needed_blocks > uc->blocks) {
+			if (uci->first_block + needed_blocks >= uc->blocks) {
                         	uc->blocks_bitmap_pos = 0;
                         }
                         else {
@@ -837,16 +851,22 @@ int uwsgi_cache_set2(struct uwsgi_cache *uc, char *key, uint16_t keylen, char *v
 			uint64_t old_first_block = uci->first_block;
 			uci->first_block = uwsgi_cache_find_free_blocks(uc, vallen);
                         if (uci->first_block == 0xffffffffffffffffLLU) {
-				if (!uc->ignore_full)
-					uwsgi_log("*** DANGER cache \"%s\" is FULL !!! ***\n", uc->name);
+				if (!uc->ignore_full) {
+                                        if (uc->purge_lru)
+                                                uwsgi_log("LRU item will be purged from cache \"%s\"\n", uc->name);
+                                        else
+                                                uwsgi_log("*** DANGER cache \"%s\" is FULL !!! ***\n", uc->name);
+                                }
                                 uc->full++;
 				uci->first_block = old_first_block;
+				if (uc->purge_lru && uc->lru_head)
+                                        uwsgi_cache_del2(uc, NULL, 0, uc->lru_head, UWSGI_CACHE_FLAG_LOCAL);
                                 goto end;
                         }
                         // mark used blocks;
                         uint64_t needed_blocks = cache_mark_blocks(uc, uci->first_block, vallen);
                         // optimize the scan
-                        if (uc->blocks_bitmap_pos + needed_blocks > uc->blocks) {
+                        if (uci->first_block + needed_blocks >= uc->blocks) {
                                 uc->blocks_bitmap_pos = 0;
                         }
                         else {
@@ -1212,6 +1232,7 @@ struct uwsgi_cache *uwsgi_cache_create(char *arg) {
 		char *c_keysize = NULL;
 		char *c_store = NULL;
 		char *c_store_sync = NULL;
+		char *c_store_delete = NULL;
 		char *c_nodes = NULL;
 		char *c_sync = NULL;
 		char *c_udp_servers = NULL;
@@ -1236,6 +1257,8 @@ struct uwsgi_cache *uwsgi_cache_create(char *arg) {
                         "store", &c_store,
                         "store_sync", &c_store_sync,
                         "storesync", &c_store_sync,
+                        "store_delete", &c_store_delete,
+                        "storedelete", &c_store_delete,
                         "node", &c_nodes,
                         "nodes", &c_nodes,
                         "sync", &c_sync,
@@ -1298,6 +1321,8 @@ struct uwsgi_cache *uwsgi_cache_create(char *arg) {
 		}
 		if (c_use_last_modified) uc->use_last_modified = 1;
 		if (c_ignore_full) uc->ignore_full = 1;
+
+		if (c_store_delete) uc->store_delete = 1;
 
 		if (c_math_initial) uc->math_initial = strtol(c_math_initial, NULL, 10);
 

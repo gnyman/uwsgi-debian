@@ -71,8 +71,8 @@ static struct uwsgi_option uwsgi_base_options[] = {
 
 	{"protocol", required_argument, 0, "force the specified protocol for default sockets", uwsgi_opt_set_str, &uwsgi.protocol, 0},
 	{"socket-protocol", required_argument, 0, "force the specified protocol for default sockets", uwsgi_opt_set_str, &uwsgi.protocol, 0},
-	{"shared-socket", required_argument, 0, "create a shared sacket for advanced jailing or ipc", uwsgi_opt_add_shared_socket, NULL, 0},
-	{"undeferred-shared-socket", required_argument, 0, "create a shared sacket for advanced jailing or ipc (undeferred mode)", uwsgi_opt_add_shared_socket, NULL, 0},
+	{"shared-socket", required_argument, 0, "create a shared socket for advanced jailing or ipc", uwsgi_opt_add_shared_socket, NULL, 0},
+	{"undeferred-shared-socket", required_argument, 0, "create a shared socket for advanced jailing or ipc (undeferred mode)", uwsgi_opt_add_shared_socket, NULL, 0},
 	{"processes", required_argument, 'p', "spawn the specified number of workers/processes", uwsgi_opt_set_int, &uwsgi.numproc, 0},
 	{"workers", required_argument, 'p', "spawn the specified number of workers/processes", uwsgi_opt_set_int, &uwsgi.numproc, 0},
 	{"thunder-lock", no_argument, 0, "serialize accept() usage (if possible)", uwsgi_opt_true, &uwsgi.use_thunder_lock, 0},
@@ -241,6 +241,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"vassals-include-before", required_argument, 0, "include config templates to vassals config (uses --include instead of --inherit, parses before the vassal file)", uwsgi_opt_add_string_list, &uwsgi.vassals_includes_before, 0},
 	{"vassals-start-hook", required_argument, 0, "run the specified command before each vassal starts", uwsgi_opt_set_str, &uwsgi.vassals_start_hook, 0},
 	{"vassals-stop-hook", required_argument, 0, "run the specified command after vassal's death", uwsgi_opt_set_str, &uwsgi.vassals_stop_hook, 0},
+	{"vassal-sos", required_argument, 0, "ask emperor for reinforcement when overloaded", uwsgi_opt_set_int, &uwsgi.vassal_sos, 0},
 	{"vassal-sos-backlog", required_argument, 0, "ask emperor for sos if backlog queue has more items than the value specified", uwsgi_opt_set_int, &uwsgi.vassal_sos_backlog, 0},
 	{"vassals-set", required_argument, 0, "automatically set the specified option (via --set) for every vassal", uwsgi_opt_add_string_list, &uwsgi.vassals_set, 0},
 	{"vassal-set", required_argument, 0, "automatically set the specified option (via --set) for every vassal", uwsgi_opt_add_string_list, &uwsgi.vassals_set, 0},
@@ -1582,6 +1583,17 @@ static void vacuum(void) {
 				}
 next:
 				uwsgi_sock = uwsgi_sock->next;
+			}
+			if (uwsgi.stats) {
+				// is a unix socket ?
+				if (!strchr(uwsgi.stats, ':') && uwsgi.stats[0] != '@') {
+					if (unlink(uwsgi.stats)) {
+                                                uwsgi_error("unlink()");
+                                        }
+                                        else {
+                                                uwsgi_log("VACUUM: unix socket %s (stats) removed.\n", uwsgi.stats);
+                                        }
+				}
 			}
 		}
 	}
@@ -3786,7 +3798,8 @@ void uwsgi_opt_false(char *opt, char *value, void *key) {
 }
 
 void uwsgi_opt_set_immediate_gid(char *opt, char *value, void *none) {
-        gid_t gid = atoi(value);
+        gid_t gid = 0;
+	if (is_a_number(value)) gid = atoi(value);
 	if (gid == 0) {
 		struct group *ugroup = getgrnam(value);
                 if (ugroup)
@@ -3815,7 +3828,8 @@ void uwsgi_opt_set_immediate_gid(char *opt, char *value, void *none) {
 
 
 void uwsgi_opt_set_immediate_uid(char *opt, char *value, void *none) {
-	uid_t uid = atoi(value);
+	uid_t uid = 0;
+	if (is_a_number(value)) uid = atoi(value);
 	if (uid == 0) {
 		struct passwd *upasswd = getpwnam(value);
                 if (upasswd)
@@ -3862,7 +3876,8 @@ void uwsgi_opt_set_int(char *opt, char *value, void *key) {
 }
 
 void uwsgi_opt_uid(char *opt, char *value, void *key) {
-	uid_t uid = atoi(value);
+	uid_t uid = 0;
+	if (is_a_number(value)) uid = atoi(value);
 	if (!uid) {
 		struct passwd *p = getpwnam(value);
 		if (p) {
@@ -3880,7 +3895,8 @@ void uwsgi_opt_uid(char *opt, char *value, void *key) {
 }
 
 void uwsgi_opt_gid(char *opt, char *value, void *key) {
-        gid_t gid = atoi(value);
+        gid_t gid = 0;
+	if (is_a_number(value)) gid = atoi(value);
         if (!gid) {
                 struct group *g = getgrnam(value);
                 if (g) {
@@ -4181,15 +4197,13 @@ void uwsgi_opt_print(char *opt, char *value, void *str) {
 }
 
 void uwsgi_opt_set_uid(char *opt, char *value, void *none) {
-
-	uwsgi.uid = atoi(value);
+	if (is_a_number(value)) uwsgi.uid = atoi(value);
 	if (!uwsgi.uid)
 		uwsgi.uidname = value;
 }
 
 void uwsgi_opt_set_gid(char *opt, char *value, void *none) {
-
-	uwsgi.gid = atoi(value);
+	if (is_a_number(value)) uwsgi.gid = atoi(value);
 	if (!uwsgi.gid)
 		uwsgi.gidname = value;
 }
