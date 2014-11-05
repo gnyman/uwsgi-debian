@@ -19,6 +19,7 @@ include /usr/share/javahelper/java-vars.mk
 ifneq (,$(DEB_MAINTAINER_MODE))
 $(shell sh debian/pkgarchs.sh glusterfs-common > debian/ARCHS_glusterfs)
 $(shell sh debian/pkgarchs.sh python-greenlet-dev > debian/ARCHS_greenlet)
+$(shell sh debian/pkgarchs.sh python-trollius > debian/ARCHS_trollius)
 $(shell sh debian/pkgarchs.sh openjdk-7-jdk > debian/ARCHS_openjdk7)
 $(shell sh debian/pkgarchs.sh libv8-dev > debian/ARCHS_v8)
 $(shell sh debian/pkgarchs.sh luajit > debian/ARCHS_luajit)
@@ -27,7 +28,7 @@ $(shell sh debian/pkgarchs.sh libmono-2.0-dev > debian/ARCHS_mono)
 $(shell sh debian/pkgarchs.sh librados-dev > debian/ARCHS_rados)
 $(shell sh debian/pkgarchs.sh gccgo > debian/ARCHS_gccgo)
 endif
-UWSGI_ARCHLISTS = glusterfs greenlet openjdk7 v8 luajit mongodb \
+UWSGI_ARCHLISTS = glusterfs greenlet trollius openjdk7 v8 luajit mongodb \
 	mono rados gccgo
 $(foreach list,$(UWSGI_ARCHLISTS),\
 	$(eval UWSGI_ARCHS_$(list) := $(shell cat debian/ARCHS_$(list))))
@@ -81,6 +82,7 @@ UWSGI_PLUGINLANGS = python java lua ruby
 UWSGI_KINDS_python = python python3
 UWSGI_SRCPLUGINS_LANG_SELF += python
 UWSGI_SRCPLUGINS_python = gevent greenlet tornado
+UWSGI_SRCPLUGINS_python += $(if $(UWSGI_ARCHS_trollius),asyncio)
 UWSGI_SRCPLUGINS_python3 = asyncio
 
 UWSGI_KINDS_java = openjdk-7
