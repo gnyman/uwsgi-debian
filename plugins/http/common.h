@@ -46,6 +46,8 @@ struct uwsgi_http {
 	int connect_timeout;
 	int manage_source;
 	int enable_proxy_protocol;
+	int chunked_input;
+	int manage_rtsp;
 }; 
 
 struct http_session {
@@ -133,6 +135,8 @@ struct http_session {
 	struct uwsgi_buffer *last_chunked;
 
 	ssize_t (*func_write)(struct corerouter_peer *);
+
+	int is_rtsp;
 
 };
 

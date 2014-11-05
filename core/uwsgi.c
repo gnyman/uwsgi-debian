@@ -393,6 +393,7 @@ static struct uwsgi_option uwsgi_base_options[] = {
         {"hook-as-user-atexit", required_argument, 0, "run the specified hook before app exit and reload", uwsgi_opt_add_string_list, &uwsgi.hook_as_user_atexit, 0},
         {"hook-pre-app", required_argument, 0, "run the specified hook before app loading", uwsgi_opt_add_string_list, &uwsgi.hook_pre_app, 0},
         {"hook-post-app", required_argument, 0, "run the specified hook after app loading", uwsgi_opt_add_string_list, &uwsgi.hook_post_app, 0},
+	{"hook-post-fork", required_argument, 0, "run the specified hook after each fork", uwsgi_opt_add_string_list, &uwsgi.hook_post_fork, 0},
         {"hook-accepting", required_argument, 0, "run the specified hook after each worker enter the accepting phase", uwsgi_opt_add_string_list, &uwsgi.hook_accepting, 0},
         {"hook-accepting1", required_argument, 0, "run the specified hook after the first worker enters the accepting phase", uwsgi_opt_add_string_list, &uwsgi.hook_accepting1, 0},
         {"hook-accepting-once", required_argument, 0, "run the specified hook after each worker enter the accepting phase (once per-instance)", uwsgi_opt_add_string_list, &uwsgi.hook_accepting_once, 0},
@@ -459,6 +460,12 @@ static struct uwsgi_option uwsgi_base_options[] = {
 
 	{"wait-iface", required_argument, 0, "wait for the specified network interface to come up before running root hooks", uwsgi_opt_add_string_list, &uwsgi.wait_for_interface, 0},
 	{"wait-iface-timeout", required_argument, 0, "set the timeout for wait-for-interface", uwsgi_opt_set_int, &uwsgi.wait_for_interface_timeout, 0},
+
+	{"wait-for-fs", required_argument, 0, "wait for the specified filesystem item to appear before running root hooks", uwsgi_opt_add_string_list, &uwsgi.wait_for_fs, 0},
+	{"wait-for-file", required_argument, 0, "wait for the specified file to appear before running root hooks", uwsgi_opt_add_string_list, &uwsgi.wait_for_fs, 0},
+	{"wait-for-dir", required_argument, 0, "wait for the specified directory to appear before running root hooks", uwsgi_opt_add_string_list, &uwsgi.wait_for_fs, 0},
+	{"wait-for-mountpoint", required_argument, 0, "wait for the specified mountpoint to appear before running root hooks", uwsgi_opt_add_string_list, &uwsgi.wait_for_mountpoint, 0},
+	{"wait-for-fs-timeout", required_argument, 0, "set the timeout for wait-for-fs/file/dir", uwsgi_opt_set_int, &uwsgi.wait_for_fs_timeout, 0},
 
 	{"call-asap", required_argument, 0, "call the specified function as soon as possible", uwsgi_opt_add_string_list, &uwsgi.call_asap, 0},
 	{"call-pre-jail", required_argument, 0, "call the specified function before jailing", uwsgi_opt_add_string_list, &uwsgi.call_pre_jail, 0},
@@ -637,6 +644,8 @@ static struct uwsgi_option uwsgi_base_options[] = {
 	{"sni", required_argument, 0, "add an SNI-governed SSL context", uwsgi_opt_sni, NULL, 0},
 	{"sni-dir", required_argument, 0, "check for cert/key/client_ca file in the specified directory and create a sni/ssl context on demand", uwsgi_opt_set_str, &uwsgi.sni_dir, 0},
 	{"sni-dir-ciphers", required_argument, 0, "set ssl ciphers for sni-dir option", uwsgi_opt_set_str, &uwsgi.sni_dir_ciphers, 0},
+	{"ssl-enable3", no_argument, 0, "enable SSLv3 (insecure)", uwsgi_opt_true, &uwsgi.sslv3, 0},
+	{"ssl-option", no_argument, 0, "set a raw ssl option (numeric value)", uwsgi_opt_add_string_list, &uwsgi.ssl_options, 0},
 #ifdef UWSGI_PCRE
 	{"sni-regexp", required_argument, 0, "add an SNI-governed SSL context (the key is a regexp)", uwsgi_opt_sni, NULL, 0},
 #endif
@@ -1534,8 +1543,10 @@ static void vacuum(void) {
 	struct uwsgi_socket *uwsgi_sock = uwsgi.sockets;
 
 	if (uwsgi.restore_tc) {
-		if (tcsetattr(0, TCSANOW, &uwsgi.termios)) {
-			uwsgi_error("tcsetattr()");
+		if (getpid() == masterpid) {
+			if (tcsetattr(0, TCSANOW, &uwsgi.termios)) {
+				uwsgi_error("vacuum()/tcsetattr()");
+			}
 		}
 	}
 
@@ -2533,6 +2544,7 @@ int uwsgi_start(void *v_argv) {
 	}
 
 	if (uwsgi.chdir) {
+		uwsgi_log("chdir() to %s\n", uwsgi.chdir);
 		if (chdir(uwsgi.chdir)) {
 			uwsgi_error("chdir()");
 			exit(1);
@@ -3281,6 +3293,8 @@ int uwsgi_run() {
                 }
         }
 
+	uwsgi_hooks_run(uwsgi.hook_post_fork, "post-fork", 1);
+
 	if (uwsgi.worker_exec2) {
                 char *w_argv[2];
                 w_argv[0] = uwsgi.worker_exec2;
@@ -3357,6 +3371,7 @@ void uwsgi_worker_run() {
 	}
 
 	if (uwsgi.chdir2) {
+		uwsgi_log("chdir() to %s\n", uwsgi.chdir2);
 		if (chdir(uwsgi.chdir2)) {
 			uwsgi_error("chdir()");
 			exit(1);
@@ -3430,7 +3445,10 @@ void uwsgi_ignition() {
         if (uwsgi.has_emperor && uwsgi.mywid == 1) {
                 char byte = 5;
                 if (write(uwsgi.emperor_fd, &byte, 1) != 1) {
-                        uwsgi_error("write()");
+                        uwsgi_error("emperor-i-am-ready-to-accept/write()");
+			uwsgi_log_verbose("lost communication with the Emperor, goodbye...\n");
+			gracefully_kill_them_all(0);
+			exit(1);
                 }
         }
 

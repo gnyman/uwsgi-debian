@@ -1212,6 +1212,9 @@ next:
 		legion = legion->next;
 	}
 
+	// this must be called only by the master !!!
+	if (!uwsgi.workers) return;
+	if (uwsgi.workers[0].pid != getpid()) return;
 	uwsgi_legion_announce_death();
 }
 
