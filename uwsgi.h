@@ -8,6 +8,8 @@ extern "C" {
 
 #define UWSGI_PLUGIN_API	1
 
+#define UWSGI_HAS_OFFLOAD_UBUFS	1
+
 #define UMAX16	65536
 #define UMAX8	256
 
@@ -836,6 +838,9 @@ struct uwsgi_cache {
 	uint64_t lru_tail;
 
 	int store_delete;
+	int lazy_expire;
+	uint64_t sweep_on_full;
+	int clear_on_full;
 };
 
 struct uwsgi_option {
@@ -2736,6 +2741,18 @@ struct uwsgi_server {
 	// uWSGI 2.0.7
 	int vassal_sos;
 
+	// uWSGI 2.0.8
+	struct uwsgi_string_list *wait_for_fs;
+	struct uwsgi_string_list *wait_for_dir;
+	struct uwsgi_string_list *wait_for_file;
+	int wait_for_fs_timeout;
+	struct uwsgi_string_list *wait_for_mountpoint;
+#ifdef UWSGI_SSL
+	int sslv3;
+	struct uwsgi_string_list *ssl_options;
+#endif
+	struct uwsgi_string_list *hook_post_fork;
+
 };
 
 struct uwsgi_rpc {
@@ -3071,6 +3088,7 @@ struct wsgi_request *find_first_accepting_wsgi_req(void);
 struct wsgi_request *find_wsgi_req_by_fd(int);
 struct wsgi_request *find_wsgi_req_by_id(int);
 void async_schedule_to_req_green(void);
+void async_schedule_to_req(void);
 
 int async_add_fd_write(struct wsgi_request *, int, int);
 int async_add_fd_read(struct wsgi_request *, int, int);
@@ -4244,6 +4262,28 @@ struct uwsgi_offload_request {
 
 	struct uwsgi_offload_request *prev;
 	struct uwsgi_offload_request *next;
+
+	// added in 2.1
+	struct uwsgi_buffer *ubuf1;
+	struct uwsgi_buffer *ubuf2;
+	struct uwsgi_buffer *ubuf3;
+	struct uwsgi_buffer *ubuf4;
+	struct uwsgi_buffer *ubuf5;
+	struct uwsgi_buffer *ubuf6;
+	struct uwsgi_buffer *ubuf7;
+	struct uwsgi_buffer *ubuf8;
+
+	int64_t custom1;
+	int64_t custom2;
+	int64_t custom3;
+	int64_t custom4;
+	int64_t custom5;
+	int64_t custom6;
+	int64_t custom7;
+	int64_t custom8;
+
+	void *data;
+	void (*free)(struct uwsgi_offload_request *);
 };
 
 struct uwsgi_offload_engine {
@@ -4801,6 +4841,9 @@ mode_t uwsgi_mode_t(char *, int *);
 int uwsgi_notify_socket_manage(int);
 int uwsgi_notify_msg(char *, char *, size_t);
 void vassal_sos();
+
+int uwsgi_wait_for_fs(char *, int);
+int uwsgi_wait_for_mountpoint(char *);
 
 #ifdef __cplusplus
 }
