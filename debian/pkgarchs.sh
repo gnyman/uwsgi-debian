@@ -36,6 +36,9 @@ case "$suite" in
 	echo >&2 "WARNING: bad suite \"$suite\", using \"$defaultsuite\" instead."
 	suite="$defaultsuite"
 	;;
+    *-*)
+	suite="$(echo "$suite" | sed -e 's/-.*//')"
+	;;
 esac
 
 echo >&2 "INFO: Resolving architectures for package \"$pkg\" through rmadison Internet request."
