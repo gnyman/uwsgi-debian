@@ -4,3 +4,4 @@
 1004_fix-php-ldflags.patch
 1005_emperor-pg-fix-cflags.patch
 1007_fix_pty_on_hurd.patch
+1008_use_libc_sys-xattr.patch

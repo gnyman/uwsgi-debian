@@ -1,0 +1,35 @@
+Description: Unconditionally use sys/xattr.h (not attr/xattr.h on Linux)
+ Glibc have included sys/xattr.h since at least 2004, according to
+ <https://lists.nongnu.org/archive/html/acl-devel/2014-05/msg00002.html>
+ .
+ Hopefully fixes failure to build pty on KFreeBSD.
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2014-11-05
+
+--- a/plugins/xattr/xattr.c
++++ b/plugins/xattr/xattr.c
+@@ -14,9 +14,7 @@
+ 
+ */
+ 
+-#ifdef __linux__
+-#include <attr/xattr.h>
+-#endif
++#include <sys/xattr.h>
+ 
+ static char *uwsgi_route_var_xattr(struct wsgi_request *wsgi_req, char *key, uint16_t keylen, uint16_t *vallen) {
+ 	char *colon = memchr(key, ':', keylen);
+--- a/plugins/webdav/webdav.c
++++ b/plugins/webdav/webdav.c
+@@ -2,11 +2,7 @@
+ #include <libxml/parser.h>
+ #include <libxml/tree.h>
+ 
+-#if defined(__linux__)
+-#include <attr/xattr.h>
+-#elif defined(__APPLE__)
+ #include <sys/xattr.h>
+-#endif
+ 
+ /*
+ 
