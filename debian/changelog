@@ -1,3 +1,15 @@
+uwsgi (2.0.8-1~exp2) experimental; urgency=medium
+
+  * Replace patch 1005 with improved upstream fixes. Closes: bug#754854.
+  * Modernize uWSGI Emperor sysV init script:
+    + Rewrite to use init-d-script.
+    + Replace ENABLED variable in default file with comment instructing
+      to use update-rc.d.
+    + Have uwsgi-emperor depend on recent sysvinit-utils (not lsb-base
+      or recent initscripts).
+
+ -- Jonas Smedegaard <dr@jones.dk>  Thu, 06 Nov 2014 23:33:42 +0100
+
 uwsgi (2.0.8-1~exp1) experimental; urgency=medium
 
   [ upstream ]
