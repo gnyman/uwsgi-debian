@@ -311,6 +311,8 @@ $(foreach module, $(UWSGI_MODULES_apache),\
 	$(eval CDBS_SUGGESTS_libapache2-mod-$(module) = uwsgi)\
 )
 
+CDBS_DEPENDS_uwsgi-emperor = sysvinit-utils (>= 2.88dsf-52~)
+
 # Rules
 # =====
 

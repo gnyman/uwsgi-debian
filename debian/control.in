@@ -173,7 +173,7 @@ Package: uwsgi-emperor
 Architecture: any
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, uwsgi-core (= ${binary:Version}),
- lsb-base, initscripts (>= 2.88dsf-13.3)
+ ${cdbs:Depends}
 Description: fast, self-healing application container server (emperor scripts)
  uWSGI presents a complete stack for networked/clustered web applications,
  implementing message/object passing, caching, RPC and process management.
