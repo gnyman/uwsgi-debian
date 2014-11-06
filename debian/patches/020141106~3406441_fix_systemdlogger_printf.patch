@@ -1,0 +1,17 @@
+Description: fix compilation with -Werror=format-security
+Origin: upstream, https://github.com/unbit/uwsgi/commit/3406441
+Author: Riccardo Magliocchetti <riccardo.magliocchetti@gmail.com>
+Forwarded: yes
+Last-Update: 2014-11-06
+
+--- a/plugins/systemd_logger/systemd_logger.c
++++ b/plugins/systemd_logger/systemd_logger.c
+@@ -10,7 +10,7 @@
+ 	for(i=0;i<len;i++) {
+ 		if (message[i] == '\n') {
+ 			message[i] = 0;
+-			sd_journal_print(LOG_INFO, base);
++			sd_journal_print(LOG_INFO, "%s", base);
+ 			base = message+i+1;
+ 		}
+ 	}

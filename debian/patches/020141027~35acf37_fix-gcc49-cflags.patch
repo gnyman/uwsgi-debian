@@ -1,0 +1,25 @@
+Description: Don't lower security standards with gcc 4.9
+ For some reason since e4d65c07cee90461caad8b24f069fc93a82c3877
+ we started compiling -Wno-format, possibly because of plugins
+ dependencies not compiling.
+ Fedora (and Debian to some degrees) are starting to default to
+ -Wformat -Werror=format-security which is something sensible for
+ uwsgi. So let the distro handle the situation when a very recent
+ gcc version is encountered since they probably know better.
+Origin: upstream, https://github.com/unbit/uwsgi/commit/35acf37
+Author: Riccardo Magliocchetti <riccardo.magliocchetti@gmail.com>
+Forwarded: yes
+Bug-Debian: http://bugs.debian.org/754854
+Last-Update: 2014-10-27
+
+--- a/uwsgiconfig.py
++++ b/uwsgiconfig.py
+@@ -698,7 +698,7 @@
+         # add -fno-strict-aliasing only on python2 and gcc < 4.3
+         if gcc_major >= 4:
+             self.cflags = self.cflags + [ '-Wextra', '-Wno-unused-parameter', '-Wno-missing-field-initializers' ]
+-        if (gcc_major == 4 and gcc_minor >= 8) or gcc_major > 4:
++        if gcc_major == 4 and gcc_minor < 9:
+             self.cflags.append('-Wno-format -Wno-format-security')
+ 
+         self.ldflags = os.environ.get("LDFLAGS", "").split()
