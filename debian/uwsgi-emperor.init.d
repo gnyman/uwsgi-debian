@@ -43,10 +43,6 @@ do_start()
   #   0 if daemon has been started
   #   1 if daemon was already running
   #   2 if daemon could not be started
-  if [ "$ENABLED" != yes ]; then
-    [ "$VERBOSE" != no ] && log_progress_msg "(disabled; see /etc/default/uwsgi-emperor)"
-    return 2
-  fi
   start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --test > /dev/null \
     || return 1
   start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON -- \

@@ -1,8 +1,8 @@
 # Defaults for uWSGI Emperor initscript
 # sourced by /etc/init.d/uwsgi-emperor
 
-# Run automatically at system startup?
-ENABLED=yes
+# If you don't want uWSGI Emperor to be started as a system service,
+# disable it using the command 'update-rc.d uwsgi-emperor disable'
 
 # At startup VERBOSE value is setted in 'no'. So when user invokes
 # uWSGI init.d script, no output is showed.
