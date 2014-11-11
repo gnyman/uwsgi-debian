@@ -1,3 +1,10 @@
+uwsgi (2.0.8-1~exp3) UNRELEASED; urgency=medium
+
+  * Fix have uwsgi-plugin-python3 provide httpd-wsgi3 (not httpd-wsgi).
+    Closes: bug#769053. Thanks to Brian May.
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 11 Nov 2014 02:10:08 +0100
+
 uwsgi (2.0.8-1~exp2) experimental; urgency=medium
 
   * Replace patch 1005 with improved upstream fixes. Closes: bug#754854.
