@@ -20,6 +20,7 @@ Build-Depends:
  liblua5.1-0-dev,
  liblua5.2-dev,
  libluajit-5.1-dev [amd64 armel armhf i386 kfreebsd-i386 mips mipsel powerpc],
+ libpcre3-dev,
  libperl-dev,
  libpq-dev,
  libcurl4-openssl-dev,
