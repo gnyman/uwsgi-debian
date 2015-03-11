@@ -5,3 +5,4 @@
 1004_fix-php-ldflags.patch
 1007_fix_pty_on_hurd.patch
 1008_use_libc_sys-xattr.patch
+1009_fix_java_paths.patch
