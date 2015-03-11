@@ -365,12 +365,13 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec *backend, proxy_server_
                 ap_set_content_type(r, apr_pstrdup(r->pool, buf));
             }
 	
-	for(;;) {
+	int finish = 0;
+	while(!finish) {
 		rv = ap_get_brigade(rp->input_filters, bb,
                                         AP_MODE_READBYTES, mode,
                                         conf->io_buffer_size);
-		if (mode == APR_NONBLOCK_READ && (APR_STATUS_IS_EAGAIN(rv)
-                        || (rv == APR_SUCCESS && APR_BRIGADE_EMPTY(bb)))) {
+		if (APR_STATUS_IS_EAGAIN(rv)
+                        || (rv == APR_SUCCESS && APR_BRIGADE_EMPTY(bb)) ) {
 			e = apr_bucket_flush_create(c->bucket_alloc);
 			APR_BRIGADE_INSERT_TAIL(bb, e);
 			if (ap_pass_brigade(r->output_filters, bb) || c->aborted) {
@@ -401,7 +402,16 @@ static int uwsgi_response(request_rec *r, proxy_conn_rec *backend, proxy_server_
 
 		ap_proxy_buckets_lifetime_transform(r, bb, pass_bb);
 
-		ap_pass_brigade(r->output_filters, pass_bb);
+		// found the last brigade?
+		if (APR_BUCKET_IS_EOS(APR_BRIGADE_LAST(bb))) finish = 1;
+
+		// do not pass chunk if it is zero_sized
+		apr_brigade_length(pass_bb, 0, &readbytes);
+
+		if ((readbytes > 0 && ap_pass_brigade(r->output_filters, pass_bb) != APR_SUCCESS) || c->aborted) {
+			finish = 1;
+		}
+
 		apr_brigade_cleanup(bb);
 		apr_brigade_cleanup(pass_bb);
 	}

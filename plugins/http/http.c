@@ -141,9 +141,14 @@ static int http_add_uwsgi_header(struct corerouter_peer *peer, char *hh, size_t 
 	}	
 
 	if (!uwsgi_strncmp("HOST", 4, hh, keylen)) {
-		peer->key = val;
-		peer->key_len = vallen;
-		if (uhttp.server_name_as_http_host && uwsgi_buffer_append_keyval(out, "SERVER_NAME", 11, peer->key, peer->key_len)) return -1;
+		if (vallen <= 0xff) {
+			memcpy(peer->key, val, vallen);
+			peer->key_len = vallen;
+			if (uhttp.server_name_as_http_host && uwsgi_buffer_append_keyval(out, "SERVER_NAME", 11, peer->key, peer->key_len)) return -1;
+		}
+		else {
+			return -1;
+		}
 	}
 
 	else if (!uwsgi_strncmp("CONTENT_LENGTH", 14, hh, keylen)) {
@@ -166,8 +171,10 @@ static int http_add_uwsgi_header(struct corerouter_peer *peer, char *hh, size_t 
 		}
 	}
 	else if (peer->key == uwsgi.hostname && hr->raw_body && !uwsgi_strncmp("ICE_URL", 7, hh, keylen)) {
-		peer->key = val;
-		peer->key_len = vallen;
+		if (vallen <= 0xff) {
+                        memcpy(peer->key, val, vallen);
+                        peer->key_len = vallen;
+		}
 	}
 
 #ifdef UWSGI_ZLIB
@@ -345,7 +352,7 @@ int http_headers_parse(struct corerouter_peer *peer) {
 
 	// SERVER_NAME
 	if (!uhttp.server_name_as_http_host && uwsgi_buffer_append_keyval(out, "SERVER_NAME", 11, uwsgi.hostname, uwsgi.hostname_len)) return -1;
-	peer->key = uwsgi.hostname;
+	memcpy(peer->key, uwsgi.hostname, uwsgi.hostname_len);
 	peer->key_len = uwsgi.hostname_len;
 
 	// SERVER_PORT
@@ -461,10 +468,12 @@ int http_headers_parse(struct corerouter_peer *peer) {
 		if (uwsgi_starts_with("rtsp://", 7, hr->path_info, hr->path_info_len)) {
 			char *slash = memchr(hr->path_info + 7, '/', hr->path_info_len - 7);
 			if (!slash) return -1;
-			peer->key = hr->path_info + 7;
-			peer->key_len = slash - (hr->path_info + 7);
-			// override PATH_INFO
-			if (uwsgi_buffer_append_keyval(out, "PATH_INFO", 9, slash, hr->path_info_len - (7 + peer->key_len))) return -1;
+			if (slash - (hr->path_info + 7) <= 0xff) {
+				peer->key_len = slash - (hr->path_info + 7);
+				memcpy(peer->key, hr->path_info + 7, peer->key_len);
+				// override PATH_INFO
+				if (uwsgi_buffer_append_keyval(out, "PATH_INFO", 9, slash, hr->path_info_len - (7 + peer->key_len))) return -1;
+			}
 		}
 	}
 
@@ -831,10 +840,16 @@ ssize_t http_parse(struct corerouter_peer *main_peer) {
                 	if (new_peer->instance_address_len == 0)
                         	return -1;
 
+			// fix modifiers
+			if (uhttp.modifier1)
+				new_peer->modifier1 = uhttp.modifier1;
+			if (uhttp.modifier2)
+				new_peer->modifier2 = uhttp.modifier2;
+
 			uint16_t pktsize = new_peer->out->pos-4;
         		// fix modifiers
-        		new_peer->out->buf[0] = new_peer->session->main_peer->modifier1;
-        		new_peer->out->buf[3] = new_peer->session->main_peer->modifier2;
+        		new_peer->out->buf[0] = new_peer->modifier1;
+        		new_peer->out->buf[3] = new_peer->modifier2;
         		// fix pktsize
         		new_peer->out->buf[1] = (uint8_t) (pktsize & 0xff);
         		new_peer->out->buf[2] = (uint8_t) ((pktsize >> 8) & 0xff);
@@ -850,6 +865,12 @@ ssize_t http_parse(struct corerouter_peer *main_peer) {
 					hr->content_length -= hr->remains;
 				}
 				if (uwsgi_buffer_append(new_peer->out, main_peer->in->buf + hr->headers_size + 1, hr->remains)) return -1;
+			}
+
+			if (new_peer->modifier1 == 123) {
+				// reset modifier1 to 0
+				new_peer->out->buf[0] = 0;
+				hr->raw_body = 1;
 			}
 
 			if (hr->websockets > 2 && hr->websocket_key_len > 0) {
@@ -976,9 +997,6 @@ int http_alloc_session(struct uwsgi_corerouter *ucr, struct uwsgi_gateway_socket
 	// set the retry hook
         cs->retry = hr_retry;
 	struct http_session *hr = (struct http_session *) cs;
-	// set the modifier1
-	cs->main_peer->modifier1 = uhttp.modifier1;
-	cs->main_peer->modifier2 = uhttp.modifier2;
 	// default hook
 	cs->main_peer->last_hook_read = hr_read;
 

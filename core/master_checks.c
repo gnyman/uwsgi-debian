@@ -138,12 +138,25 @@ void uwsgi_master_check_idle() {
 			uwsgi.workers[i].cheaped = 1;
 			if (uwsgi.workers[i].pid == 0)
 				continue;
+			// first send SIGINT
+			kill(uwsgi.workers[i].pid, SIGINT);
+			// and start waiting upto 3 seconds
+			int j;
+			for(j=0;j<3;j++) {
+				sleep(1);
+				int ret = waitpid(uwsgi.workers[i].pid, &waitpid_status, WNOHANG);
+				if (ret == 0) continue;
+				if (ret == (int) uwsgi.workers[i].pid) goto done;
+				// on error, directly send SIGKILL
+				break;
+			}
 			kill(uwsgi.workers[i].pid, SIGKILL);
 			if (waitpid(uwsgi.workers[i].pid, &waitpid_status, 0) < 0) {
 				if (errno != ECHILD)
 					uwsgi_error("uwsgi_master_check_idle()/waitpid()");
 			}
 			else {
+done:
 				uwsgi.workers[i].pid = 0;
 				uwsgi.workers[i].rss_size = 0;
 				uwsgi.workers[i].vsz_size = 0;
@@ -335,6 +348,7 @@ int uwsgi_master_check_daemons_death(int diedpid) {
 
 int uwsgi_worker_is_busy(int wid) {
 	int i;
+	if (uwsgi.workers[uwsgi.mywid].sig) return 1;
 	for(i=0;i<uwsgi.cores;i++) {
 		if (uwsgi.workers[wid].cores[i].in_request) {
 			return 1;

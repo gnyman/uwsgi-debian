@@ -1,6 +1,6 @@
 # uWSGI build system
 
-uwsgi_version = '2.0.8'
+uwsgi_version = '2.0.9'
 
 import os
 import re
@@ -1171,6 +1171,8 @@ class uConf(object):
                 else:
                     jsonconf = spcall("pkg-config --cflags yajl")
                     if jsonconf:
+                        if jsonconf.endswith('include/yajl'):
+                            jsonconf = jsonconf.rstrip('yajl')
                         self.cflags.append(jsonconf)
                         self.cflags.append("-DUWSGI_JSON")
                         self.gcc_list.append('core/json')

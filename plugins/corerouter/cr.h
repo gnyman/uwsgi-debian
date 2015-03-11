@@ -180,8 +180,8 @@ struct corerouter_peer {
 	uint16_t retries;
 
 	// parsed key
-        char *key;
-        uint16_t key_len;
+        char key[0xff];
+        uint8_t key_len;
 
 	uint8_t modifier1;
 	uint8_t modifier2;
@@ -192,7 +192,10 @@ struct corerouter_peer {
 	int current_timeout;
 
 	ssize_t (*flush)(struct corerouter_peer *);
+
 	int is_flushing;
+	int is_buffering;
+        int buffering_fd;
 };
 
 struct uwsgi_corerouter {

@@ -2,13 +2,6 @@
 
 #define AMQP_CONNECTION_HEADER "AMQP\0\0\x09\x01"
 
-#ifdef __BIG_ENDIAN__
-#define ntohll(x) x
-#else
-#define ntohll(x) ( ( (uint64_t)(ntohl( (uint32_t)((x << 32) >> 32) )) << 32) | ntohl( ((uint32_t)(x >> 32)) ) )     
-#endif
-#define htonll(x) ntohll(x)
-
 #define amqp_send(a, b, c) if (send(a, b, c, 0) < 0) { uwsgi_error("send()"); return -1; }
 
 struct amqp_frame_header {
@@ -69,13 +62,8 @@ static char *amqp_get_long(char *ptr, char *watermark, uint32_t *lv) {
 
 static char *amqp_get_longlong(char *ptr, char *watermark, uint64_t *llv) {
 
-        uint64_t tmp_longlong;
-
 	if (ptr+8 > watermark) return NULL;
-
-        memcpy(&tmp_longlong, ptr, 8);
-
-        *llv = ntohll(tmp_longlong);
+        *llv = uwsgi_be64(ptr);
         return ptr+8;
 }
 
@@ -85,26 +73,29 @@ static int amqp_send_ack(int fd, uint64_t delivery_tag) {
 
 	uint32_t size = 4 + 8 + 1;
 
-        size = htonl(size);
+	struct uwsgi_buffer *ub = uwsgi_buffer_new(64);
         // send type and channel
-        amqp_send(fd, "\1\0\1", 3);
+	if (uwsgi_buffer_append(ub, "\1\0\1", 3)) goto end;
         // send size
-        amqp_send(fd, &size, 4);
-
-        // send class 60 method 80
-        amqp_send(fd, "\x00\x3C\x00\x50", 4);
-
+	if (uwsgi_buffer_u32be(ub, size)) goto end;
+	// send class 60 method 80
+	if (uwsgi_buffer_append(ub, "\x00\x3C\x00\x50", 4)) goto end;
 	// set delivery_tag
-	delivery_tag = htonll(delivery_tag);
-	amqp_send(fd, &delivery_tag, 8);
+	if (uwsgi_buffer_u64be(ub, delivery_tag)) goto end;
+	if (uwsgi_buffer_append(ub, "\0\xCE", 2)) goto end;
 
-        // empty bits
-        amqp_send(fd, "\0", 1);
+        // send buffer to socket
+        if (write(fd, ub->buf, ub->pos) < 0) {
+		uwsgi_error("amqp_send_ack()/write()");
+		goto end;
+	}
 
-        // send frame-end
-        amqp_send(fd, "\xCE", 1);
 
+	uwsgi_buffer_destroy(ub);	
 	return 0;
+end:
+	uwsgi_buffer_destroy(ub);
+	return -1;
 }
 
 char *uwsgi_amqp_consume(int fd, uint64_t *msgsize, char **routing_key) {
