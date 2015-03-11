@@ -180,13 +180,13 @@ Files: CONTRIBUTORS
  debian/libapache2-mod-__MODULE__.postinst.in
  debian/libapache2-mod-__MODULE__.prerm.in
  debian/patches/020141027~35acf37_fix-gcc49-cflags.patch
- debian/patches/020141106~3406441_fix_systemdlogger_printf.patch
  debian/patches/1001_avoid_setting_RPATH.patch
  debian/patches/1002_fix-reload-process-name.patch
  debian/patches/1003_remove-php-libs.patch
  debian/patches/1004_fix-php-ldflags.patch
  debian/patches/1007_fix_pty_on_hurd.patch
  debian/patches/1008_use_libc_sys-xattr.patch
+ debian/patches/1009_fix_java_paths.patch
  debian/patches/README
  debian/patches/series
  debian/rules
@@ -609,9 +609,11 @@ Files: CONTRIBUTORS
  t/java/rpc.java
  t/lua/basic.lua
  t/mono/cache.aspx
+ t/perl/active_workers_signal.pl
  t/perl/apps/input_with_offset.pl
  t/perl/test.psgi
  t/perl/test_benchmark.pl
+ t/perl/test_harakiri.psgi
  t/perl/test_hello.psgi
  t/perl/test_input_with_offset.pl
  t/perl/test_post.psgi

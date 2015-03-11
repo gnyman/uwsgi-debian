@@ -1,11 +1,46 @@
-uwsgi (2.0.8-1~exp3) UNRELEASED; urgency=medium
+uwsgi (2.0.9-1) experimental; urgency=medium
 
+  [ upstream ]
+  * New release 2.0.7.
+    Bugfixes:
+    + Fix mod_proxy_uwsgi for non-blocking mode.
+    + Fix master-fifo + cheaper.
+    + Fix leak on error in bind_to_unix.
+    + atexit hooks works in cheaped workers too.
+    + atexit hooks works in gevent mode too during shutdown.
+    + Fix carbon command line option value after reload.
+    + Do not honour Emperor throttling on the first run.
+    + Fix Mono plugin.
+    + Fix peer name in corerouters.
+    + Fix stop signal for daemons.
+    + Varios ssl/tls fixes in https/spdy router.
+    + Fix python3 –py-auto-reload-ignore.
+    + Fix modifiers in corerouters.
+    + Support for yajl from homebrew.
+    + Ensure that we call any DESTROY hooks on psgix.harakiri.commit.
+    + Fix systemdlogger compilation with -Werror=format-security.
+    + Fix unmasked websockets.
+    + Fix perl latent refcounting bug.
+    New Features and improvements:
+    + Improved PyPy support for Linux.
+    + Fastrouter now supports post-buffering.
+    + Have psgi/perl plugin expose the uwsgi::opt hash.
+    + New pull-header option.
+    + New active-workers signal target.
+    + New httpdumb routing action.
+
+  [ Jonas Smedegaard ]
   * Fix have uwsgi-plugin-python3 provide httpd-wsgi3 (not httpd-wsgi).
     Closes: bug#769053. Thanks to Brian May.
   * Fix build-depend explicitly on libpcre3-dev.
     Closes: bug#771840. Thanks to Logan Rosen.
+  * Update patches:
+    + Drop patch cherry-picked upstream now merged.
+    + Unfuzz patch 1002.
+    + Add patch 1009 to fix java paths.
+      Closes: bug#774026, #774027. Thanks to Jakub Wilk.
 
- -- Jonas Smedegaard <dr@jones.dk>  Tue, 11 Nov 2014 02:10:08 +0100
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 11 Mar 2015 14:59:39 +0100
 
 uwsgi (2.0.8-1~exp2) experimental; urgency=medium
 
