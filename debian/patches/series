@@ -1,5 +1,4 @@
 020141027~35acf37_fix-gcc49-cflags.patch
-020141106~3406441_fix_systemdlogger_printf.patch
 1001_avoid_setting_RPATH.patch
 1002_fix-reload-process-name.patch
 1003_remove-php-libs.patch
